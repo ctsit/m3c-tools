@@ -1,6 +1,3 @@
-#!/usr/bin/python
-
-
 class Project(object):
     def __init__(self):
         self.uri = None

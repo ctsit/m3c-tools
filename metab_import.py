@@ -1,5 +1,3 @@
-#!/usr/bin/python
-
 """
 Metab Importer
 Usage:
@@ -16,7 +14,6 @@ Instructions:
 
 from datetime import datetime
 import os
-import sys
 import yaml
 
 import psycopg2

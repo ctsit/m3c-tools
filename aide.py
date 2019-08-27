@@ -1,6 +1,3 @@
-#!/usr/bin/python
-
-import random  # maybe don't need-- increment number + related id?
 import requests
 
 
