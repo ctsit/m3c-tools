@@ -14,6 +14,7 @@ Instructions:
 
 from datetime import datetime
 import os
+import sys
 import yaml
 
 import psycopg2
@@ -32,7 +33,7 @@ def get_config(config_path):
             config = yaml.load(config_file.read(), Loader=yaml.FullLoader)
     except Exception as e:
         print("Error: Check config file")
-        exit(e)
+        sys.exit(e)
     return config
 
 
@@ -140,7 +141,7 @@ def get_projects(mwb_cur, sup_cur, people, org_names):
         if missing_orgs:
             print("Error: The following organizations are missing")
             print(missing_orgs)
-            exit()
+            sys.exit()
         try:
             project.pi_uri = people[person_id].uri
         except KeyError:
@@ -148,7 +149,7 @@ def get_projects(mwb_cur, sup_cur, people, org_names):
             print("PI for project " + project.project_id)
             print("Last name: " + project.last_name)
             print("First name: " + project.first_name)
-            exit()
+            sys.exit()
         projects[project.project_id] = project
     return projects
 
@@ -190,7 +191,7 @@ def get_studies(mwb_cur, sup_cur, people, org_names):
         if missing_orgs:
             print("Error: The following organizations are missing")
             print(missing_orgs)
-            exit()
+            sys.exit()
         sup_cur.execute("""SELECT person_id
                         FROM people
                         WHERE last_name=%s AND first_name=%s""",
@@ -203,7 +204,7 @@ def get_studies(mwb_cur, sup_cur, people, org_names):
             print("Runner for study " + study.study_id)
             print("Last name: " + study.last_name)
             print("First name: " + study.first_name)
-            exit()
+            sys.exit()
         studies[study.study_id] = study
     return studies
 
@@ -286,6 +287,16 @@ def do_upload(aide, triples):
 
 
 def main():
+    if len(sys.argv) < 2:
+        print(__doc__)
+        sys.exit(2)
+
+    if sys.argv[1] in ["-h", "--help"]:
+        print(__doc__)
+        sys.exit()
+
+    config_path = sys.argv[1]
+
     timestamp = datetime.now()
     path = 'data_out/' + timestamp.strftime("%Y") + '/' + \
         timestamp.strftime("%m") + '/' + timestamp.strftime("%Y_%m_%d")
@@ -344,3 +355,7 @@ def main():
     do_upload(aide, project_triples)
     do_upload(aide, study_triples)
     do_upload(aide, dataset_triples)
+
+
+if __name__ == "__main__":
+    main()
