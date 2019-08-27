@@ -124,11 +124,11 @@ class Organization(object):
 
     def get_triples(self):
         rdf = []
-        if self.type = "institute":
+        if self.type == "institute":
             rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://vivoweb.org/ontology/core#Institute>".format(self.uri))
-        if self.type = "department":
+        if self.type == "department":
             rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://vivoweb.org/ontology/core#Department>".format(self.uri))
-        if self.type = "laboratory":
+        if self.type == "laboratory":
             rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://vivoweb.org/ontology/core#Laboratory>".format(self.uri))
         rdf.append("<{}> <http://www.w3.org/2000/01/rdf-schema#label> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(self.uri, self.name))
 
