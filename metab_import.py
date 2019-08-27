@@ -10,7 +10,8 @@ Options:
     -h --help       Show this message and exit
 
 Instructions:
-    Run the importer where you have access to the postgres metabolomics database.
+    Run the importer where you have access to the postgres metabolomics
+    database.
 """
 
 from datetime import datetime
@@ -39,10 +40,11 @@ def get_config(config_path):
 
 
 def connect(host, db, user, pg_password, port):
-    conn = psycopg2.connect(host=host,dbname=db,user=user,
-                            password=pg_password,port=port)
+    conn = psycopg2.connect(host=host, dbname=db, user=user,
+                            password=pg_password, port=port)
     cur = conn.cursor()
     return cur
+
 
 def get_organizations(sup_cur):
     print("Gathering Organizations")
@@ -60,6 +62,7 @@ def get_organizations(sup_cur):
         org_names.append(org.name)
     return orgs, org_names
 
+
 def make_organizations(namespace, orgs):
     print("Making Organizations")
     triples = []
@@ -70,6 +73,7 @@ def make_organizations(namespace, orgs):
         org_count += 1
     print("There are " + str(org_count) + " organizations.")
     return triples
+
 
 def get_people(sup_cur):
     print("Gathering People")
@@ -87,6 +91,7 @@ def get_people(sup_cur):
         people[person.person_id] = person
     return people
 
+
 def make_people(namespace, people):
     print("Making People Profiles")
     triples = []
@@ -99,6 +104,7 @@ def make_people(namespace, people):
     print("There are " + str(people_count) + " people.")
     return triples
 
+
 def link_people_to_org(sup_cur, people, orgs):
     triples = []
     for person in people.values():
@@ -110,14 +116,16 @@ def link_people_to_org(sup_cur, people, orgs):
             triples.extend(orgs[row[1]].add_person(person.uri))
     return triples
 
+
 def get_projects(mwb_cur, sup_cur, people, org_names):
     print("Gathering Workbench Projects")
     projects = {}
-    mwb_cur.execute("""\
-                SELECT project_id, project_title, project_type, project_summary,
-                  doi, funding_source, last_name, first_name, institute, department,
-                  laboratory
-                FROM project""")
+    mwb_cur.execute("""
+        SELECT project_id, project_title, project_type, project_summary,
+               doi, funding_source, last_name, first_name, institute,
+               department, laboratory
+          FROM project
+    """)
     for row in mwb_cur:
         project = Project()
         project.project_id = row[0].replace('\n', '')
@@ -139,12 +147,14 @@ def get_projects(mwb_cur, sup_cur, people, org_names):
         try:
             project.pi_uri = people[person_id].uri
         except KeyError:
-            print("Error: Person does not exist.\nPI for project " + project.project_id)
+            print("Error: Person does not exist.")
+            print("PI for project " + project.project_id)
             print("Last name: " + project.last_name)
             print("First name: " + project.first_name)
             exit()
         projects[project.project_id] = project
     return projects
+
 
 def make_projects(namespace, projects):
     print("Making Workbench Projects")
@@ -157,6 +167,7 @@ def make_projects(namespace, projects):
         project_count += 1
     print("There are " + str(project_count) + " projects.")
     return triples
+
 
 def get_studies(mwb_cur, sup_cur, people, org_names):
     print("Gathering Workbench Studies")
@@ -185,17 +196,20 @@ def get_studies(mwb_cur, sup_cur, people, org_names):
             exit()
         sup_cur.execute("""SELECT person_id
                         FROM people
-                        WHERE last_name=%s AND first_name=%s""", (last_name, first_name))
+                        WHERE last_name=%s AND first_name=%s""",
+                        (last_name, first_name))
         try:
             person_id = sup_cur[0][0]
             study.pi_uri = people[person_id].uri
         except IndexError:
-            print("Error: Person does not exist.\nRunner for study " + study.study_id)
+            print("Error: Person does not exist.")
+            print("Runner for study " + study.study_id)
             print("Last name: " + study.last_name)
             print("First name: " + study.first_name)
             exit()
         studies[study.study_id] = study
     return studies
+
 
 def make_studies(namespace, studies, projects):
     print("Making Workbench Studies")
@@ -216,6 +230,7 @@ def make_studies(namespace, studies, projects):
         print("There are " + str(no_proj_study) + " studies without projects")
     return triples
 
+
 def get_datasets(mwb_cur):
     print("Gathering Workbench Datasets")
     datasets = {}
@@ -231,6 +246,7 @@ def get_datasets(mwb_cur):
         dataset.subject_species = row[2].replace('\n', '')
         datasets[dataset.mb_sample_id] = dataset
     return datasets
+
 
 def make_datasets(namespace, datasets, studies):
     print("Making Workbench Datasets")
@@ -248,13 +264,16 @@ def make_datasets(namespace, datasets, studies):
         dataset_count += 1
     print("There will be " + str(dataset_count) + " new datasets.")
     if no_study_datasets > 0:
-        print("There are " + str(no_study_datasets) + " datasets without studies")
+        print("There are {} datasets without studies"
+              .format(no_study_datasets))
     return triples
+
 
 def print_to_file(triples, file):
     with open(file, 'a+') as rdf:
         rdf.write(" . \n".join(triples))
         rdf.write(" . \n")
+
 
 def do_upload(aide, triples):
     chunks = [triples[x:x+15] for x in range(0, len(triples), 15)]
@@ -268,10 +287,11 @@ def do_upload(aide, triples):
         """.format(" . \n".join(chunk))
         aide.do_update(query)
 
+
 def main():
     timestamp = datetime.now()
-    path = 'data_out/' + timestamp.strftime("%Y") + '/' +\
-            timestamp.strftime("%m") + '/' + timestamp.strftime("%Y_%m_%d")
+    path = 'data_out/' + timestamp.strftime("%Y") + '/' + \
+        timestamp.strftime("%m") + '/' + timestamp.strftime("%Y_%m_%d")
     try:
         os.makedirs(path)
     except FileExistsError:
@@ -288,11 +308,11 @@ def main():
                 config.get('vivo_password'),
                 config.get('namespace'))
     mwb_cur = connect(config.get('mwb_host'), config.get('mwb_database'),
-                  config.get('mwb_username'), config.get('mwb_password'),
-                  config.get('mwb_port'))
+                      config.get('mwb_username'), config.get('mwb_password'),
+                      config.get('mwb_port'))
     sup_cur = connect(config.get('sup_host'), config.get('sup_database'),
-                  config.get('sup_username'), config.get('sup_password'),
-                  config.get('sup_port'))
+                      config.get('sup_username'), config.get('sup_password'),
+                      config.get('sup_port'))
 
     # Organizations
     orgs, org_names = get_organizations(sup_cur)

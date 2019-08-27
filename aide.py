@@ -3,6 +3,7 @@
 import random  # maybe don't need-- increment number + related id?
 import requests
 
+
 class Aide(object):
     def __init__(self, endpoint, email, password, namespace):
         # Endpoint must be update endpoint, not query
@@ -28,7 +29,7 @@ class Aide(object):
             return True
 
     def do_delete(self):
-        query='''\
+        query = '''\
             DELETE {?s ?p ?o}
             WHERE {
                 ?s ?p ?o

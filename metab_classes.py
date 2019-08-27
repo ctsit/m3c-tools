@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+
 class Project(object):
     def __init__(self):
         self.uri = None
@@ -19,7 +20,7 @@ class Project(object):
         rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#projectId> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(self.uri, self.project_id))
         rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#workbenchLink> \"https://www.metabolomicsworkbench.org/data/DRCCMetadata.php?Mode=Project&ProjectID={}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(self.uri, self.project_id))
         if self.project_type:
-            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#projectType> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(self.uri, self. project_type))
+            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#projectType> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(self.uri, self.project_type))
         if self.summary:
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#summary> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(self.uri, self.summary))
         if self.doi:
@@ -28,7 +29,8 @@ class Project(object):
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#hasPI> <{}>".format(self.uri, self.pi_uri))
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#isPIFor> <{}>".format(self.pi_uri, self.uri))
         return rdf
-        
+
+
 class Study(object):
     def __init__(self):
         self.uri = None
@@ -59,6 +61,7 @@ class Study(object):
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#runnerOf> <{}>".format(self.runner_uri, self.uri))
         return rdf
 
+
 class Dataset(object):
     def __init__(self):
         self.uri = None
@@ -77,6 +80,7 @@ class Dataset(object):
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#dataFor> <{}>".format(self.uri, study_uri))
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#developedFrom> <{}>".format(study_uri, self.uri))
         return rdf
+
 
 class Person(object):
     def __init__(self):
@@ -114,7 +118,8 @@ class Person(object):
             rdf.append("<{}> <http://www.w3.org/2006/vcard/ns#hasTelephone>  <{}>".format(vcard_uri, phone_uri))
             rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2006/vcard/ns#Telephone>".format(phone_uri))
             rdf.append("<{}> <http://www.w3.org/2006/vcard/ns#telephone> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(phone_uri, self.phone))
-        return rdf 
+        return rdf
+
 
 class Organization(object):
     def __init__(self):
