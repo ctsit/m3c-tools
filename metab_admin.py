@@ -346,7 +346,7 @@ def associate_person():
 
             if institute is not '':
                 if institute in institutes:
-                    cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s)', (institutes[institute], id))
+                    cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s) ON CONFLICT DO NOTHING', (institutes[institute], id))
                 else:
                     cur.execute('INSERT INTO organizations (name, type) VALUES (%s, %s) RETURNING id', (institute, 'institute'))
                     org_id = cur.fetchone()[0]
@@ -354,7 +354,7 @@ def associate_person():
 
             if department is not '':
                 if department in departments:
-                    cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s)', (departments[department], id))
+                    cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s) ON CONFLICT DO NOTHING', (departments[department], id))
                 else:
                     cur.execute('INSERT INTO organizations (name, type) VALUES (%s, %s) RETURNING id', (department, 'department'))
                     org_id = cur.fetchone()[0]
@@ -362,7 +362,7 @@ def associate_person():
             
             if lab is not '':
                 if lab in labs:
-                    cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s)', (labs[lab], id))
+                    cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s) ON CONFLICT DO NOTHING', (labs[lab], id))
                 else:
                     cur.execute('INSERT INTO organizations (name, type) VALUES (%s, %s) RETURNING id', (lab, 'lab'))
                     org_id = cur.fetchone()[0]
