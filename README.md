@@ -40,3 +40,8 @@ Next, run:
 
 This will produce up to four files: projects.rdf, studies.rdf, datasets.rdf, and people.rdf. These files contain the triples for each respective class. They can be uploaded to VIVO via the Add/Remove RDF data option under the Site Admin menu.
 
+## Running the Admin Page
+
+To start the admin page run:
+
+    $ FLASK_APP=metab_admin flask run
