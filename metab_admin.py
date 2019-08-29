@@ -97,7 +97,6 @@ def upload_image():
             {% endwith %}
 
             <form method=post enctype=multipart/form-data>
-                <div class="form-group">
                     <!-- <label>Display Name (for search)</label>
                     <input list=displaynames name=displayname>
                     <datalist id=displaynames>
