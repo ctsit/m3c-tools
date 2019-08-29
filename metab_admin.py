@@ -33,11 +33,20 @@ def main_menu():
     <html>
         <head>
             <title>M3C Admin Form</title>
+            <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
         </head>
         <body>
-            <h1>M3C Admin Form</h1>
-            <button onclick="window.location.href = '/uploadimage'">Upload Profile Picture</button>
-            <button onclick="window.location.href = '/createperson'">Create New Person</button>
+            <div class="container mx-auto" style="width: 50%;">
+                <div class="row">
+                    <h1 class="mx-auto">M3C Admin Form</h1>
+                </div>
+                <div class="row my-3">
+                    <button class="btn btn-info w-100" onclick="window.location.href = '/uploadimage'">Upload Profile Picture</button>
+                </div>
+                <div class="row my-3">
+                    <button class="btn btn-info w-100" onclick="window.location.href = '/createperson'">Create New Person</button>
+                </div>
+            </div>
         </body>
     </html>
     '''
@@ -56,7 +65,7 @@ def upload_image():
         except Exception:
             flash('Error uploading file')
             return redirect(request.url)
-    
+
     display_names = []
     cur = conn.cursor()
 
@@ -69,44 +78,51 @@ def upload_image():
     <!doctype html>
     <head>
         <title>Upload a new picture</title>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
     </head>
     <body>
-        <h1>Upload new profile picture</h1>
-        <a href="/">Back to Home</a>
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                {% for message in messages %}
-                    {{ message }}
-                    <br/>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-        <form method=post enctype=multipart/form-data>
-            <label>Display Name (for search)</label>
-            <input list=displaynames name=displayname>
-            <datalist id=displaynames>
-                {% for name in dispNameList %}
-                    <option value="{{name}}">
-                {% endfor %}
-            </datalist>
+        <div class="container mx-auto" style="width: 50%;">
+            <div class="row">
+                <h1 class="mx-auto">Upload new profile picture</h1>
+            </div>
+            <a href="/">Back to Home</a>
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-warning" role="alert">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
 
-            <label>First Name</label>
-            <input type=text name=first_name>
+            <form method=post enctype=multipart/form-data>
+                <div class="form-group">
+                    <!-- <label>Display Name (for search)</label>
+                    <input list=displaynames name=displayname>
+                    <datalist id=displaynames>
+                        {% for name in dispNameList %}
+                            <option value="{{name}}">
+                        {% endfor %}
+                    </datalist> --!>
 
-            <label>Last Name</label>
-            <input type=text name=last_name>
+                    <div class="form-group">
+                        <label>First Name</label>
+                        <input class="form-control" type=text name=first_name>
+                    </div>
 
-            <input type=file name=picture>
+                    <div class="form-group">
+                        <label>Last Name</label>
+                        <input class="form-control" type=text name=last_name>
+                    </div>
 
-            <input type=submit value=Upload>
-        </form>
+                    <div class="form-group">
+                        <input type="file" class="form-control-file" id="inputGroupFile01" name=picture>
+                    </div>
 
-        <script>
-            const dListOptions = document.getElementById('displaynames').childNodes;
-            for (let i = 0; i < dListOptions.length; i++) {
-                
-            }
-        </script>
+                    <button class="btn btn-primary" type=submit>Upload</button>
+            </form>
+        </div>
     </body>
     ''', dispNameList=display_names)
 
@@ -194,57 +210,77 @@ def create_person():
     <!doctype html>
     <head>
         <title>Create a new Person</title>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
     </head>
     <body>
-        <h1>Create a new Person</h1>
-        <a href="/">Back to Home</a>
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                {% for message in messages %}
-                    {{ message }}
-                    <br/>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-        <form method=post enctype=multipart/form-data>
-            <label>First Name</label>
-            <input type=text name=first_name required>
-            
-            <label>Last Name</label>
-            <input type=text name=last_name required>
-            
-            <label>Email</label>
-            <input type=email name=email>
+        <div class="container mx-auto" style="width: 50%;">
+            <div class="row">
+                <h1 class="mx-auto">Create a new Person</h1>
+            </div>
+            <a href="/">Back to Home</a>
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-warning" role="alert">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            <form method=post enctype=multipart/form-data>
+                <div class="form-group">
+                    <label>First Name</label>
+                    <input class="form-control" type=text name=first_name required>
+                </div>
 
-            <label>Phone Number</label>
-            <input type=tel name=phone>
+                <div class="form-group">
+                    <label>Last Name</label>
+                    <input class="form-control" type=text name=last_name required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Email</label>
+                    <input class="form-control" type=email name=email>
+                </div>
 
-            <label>Institute</label>
-            <input list=institutes name=institute>
-            <datalist id=institutes>
-                {% for inst in instituteList %}
-                    <option value="{{inst}}">
-                {% endfor %}
-            </datalist>
+                <div class="form-group">
+                    <label>Phone Number</label>
+                    <input class="form-control" type=tel name=phone>
+                </div>
 
-            <label>Department</label>
-            <input list=departments name=department>
-            <datalist id=departments>
-                {% for dept in departmentList %}
-                    <option value="{{dept}}">
-                {% endfor %}
-            </datalist>
+                <div class="form-group">
+                    <label>Institute</label>
+                    <input class="form-control" list=institutes name=institute>
+                    <datalist id=institutes>
+                        {% for inst in instituteList %}
+                            <option value="{{inst}}">
+                        {% endfor %}
+                    </datalist>
+                </div>
 
-            <label>Labs</label>
-            <input list=labs name=lab>
-            <datalist id=labs>
-                {% for labItem in labList %}
-                    <option value="{{labItem}}">
-                {% endfor %}
-            </datalist>
-            
-            <input type=submit value=Create>
-        </form>
+                <div class="form-group">
+                    <label>Department</label>
+                    <input class="form-control" list=departments name=department>
+                    <datalist id=departments>
+                        {% for dept in departmentList %}
+                            <option value="{{dept}}">
+                        {% endfor %}
+                    </datalist>
+                </div>
+
+                <div class="form-group">
+                    <label>Labs</label>
+                    <input class="form-control" list=labs name=lab>
+                    <datalist id=labs>
+                        {% for labItem in labList %}
+                            <option value="{{labItem}}">
+                        {% endfor %}
+                    </datalist>
+                </div>
+
+                <button class="btn btn-primary" type=submit>Create Person</button>
+            </form>
+        </div>
     </body>
     ''', instituteList=institutes.keys(), departmentList=departments.keys(), labList=labs.keys())
 
