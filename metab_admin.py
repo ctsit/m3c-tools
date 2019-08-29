@@ -96,23 +96,25 @@ def upload_image():
                 {% endif %}
             {% endwith %}
 
-            <form method=post enctype=multipart/form-data>
-                    <!-- <label>Display Name (for search)</label>
-                    <input list=displaynames name=displayname>
+                <div class="form-group">
+                    <label>Search Display Name</label>
+                    <input id=searchInput class="form-control" list=displaynames name=displayname>
                     <datalist id=displaynames>
                         {% for name in dispNameList %}
                             <option value="{{name}}">
                         {% endfor %}
-                    </datalist> --!>
+                    </datalist>
+                </div>
 
+            <form method=post enctype=multipart/form-data>
                     <div class="form-group">
                         <label>First Name</label>
-                        <input class="form-control" type=text name=first_name>
+                        <input id=firstName class="form-control" type=text name=first_name>
                     </div>
 
                     <div class="form-group">
                         <label>Last Name</label>
-                        <input class="form-control" type=text name=last_name>
+                        <input id=lastName class="form-control" type=text name=last_name>
                     </div>
 
                     <div class="form-group">
@@ -122,6 +124,19 @@ def upload_image():
                     <button class="btn btn-primary" type=submit>Upload</button>
             </form>
         </div>
+        <script>
+            const displayNameInput = document.getElementById('searchInput');
+            const displayNames = [...document.getElementById('displaynames').childNodes].filter(name => name.value).map(name => name.value);
+            const firstName = document.getElementById('firstName');
+            const lastName = document.getElementById('lastName');
+            displayNameInput.addEventListener('change', (e) => {
+                if (displayNames.includes(e.srcElement.value)) {
+                    const splitName = e.srcElement.value.split(' ');
+                    firstName.value = splitName[0];
+                    lastName.value = splitName[1];
+                }
+            });
+        </script>
     </body>
     ''', dispNameList=display_names)
 
