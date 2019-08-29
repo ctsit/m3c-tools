@@ -1,3 +1,18 @@
+"""
+Metab Admin
+Usage:
+    python metab_admin.py (-h | --help)
+    python metab_admin.py <path_to_config>
+
+Options:
+    -h --help   Show this message and exit
+
+Instructions:
+    See README
+
+Example:
+    $ python metab_admin.py config.yaml
+"""
 import sys
 
 from flask import Flask, request, flash, redirect, render_template_string
@@ -6,35 +21,10 @@ from yaml import safe_load
 import psycopg2
 import psycopg2.errorcodes
 
-CONFIG_FILE = 'config.yaml'
-
-config_map = None
-picture_path = ''
-secret_key = ''
-db_host = ''
-db_database = ''
-db_user = ''
-db_password = ''
-db_port = ''
-
-with open(CONFIG_FILE, 'r') as f:
-    config_map = safe_load(f)
-    picture_path = config_map['picturepath']
-    secret_key = config_map['secret']
-    db_host = config_map['sup_host']
-    db_database = config_map['sup_database']
-    db_user = config_map['sup_username']
-    db_password = config_map['sup_password']
-    db_port = config_map['sup_port']
-
-try:
-    conn = psycopg2.connect(database=db_database, user=db_user, password=db_password, host=db_host, port=db_port)
-except:
-    print('Cannot connect to the database')
-    sys.exit(-1)
-
+# Globals
 app = Flask(__name__)
-app.secret_key = secret_key
+conn = None
+picture_path = ''
 
 @app.route('/')
 def main_menu():
@@ -257,3 +247,41 @@ def create_person():
         </form>
     </body>
     ''', instituteList=institutes.keys(), departmentList=departments.keys(), labList=labs.keys())
+
+def main():
+    '''Sets up a simple website for admin tasks'''
+    global conn
+    global picture_path
+
+    if len(sys.argv) < 2:
+        print(__doc__)
+        sys.exit(2)
+
+    if sys.argv[1] in ['-h', '--help']:
+        print(__doc__)
+        sys.exit()
+
+    config_path = sys.argv[1]
+
+    with open(config_path, 'r') as f:
+        config_map = safe_load(f)
+        picture_path = config_map['picturepath']
+        secret_key = config_map['secret']
+        db_host = config_map['sup_host']
+        db_database = config_map['sup_database']
+        db_user = config_map['sup_username']
+        db_password = config_map['sup_password']
+        db_port = config_map['sup_port']
+
+    try:
+        conn = psycopg2.connect(database=db_database, user=db_user, password=db_password, host=db_host, port=db_port)
+    except:
+        print('Cannot connect to the database')
+        sys.exit(-1)
+
+    app.secret_key = secret_key
+    app.run()
+
+
+if __name__ == "__main__":
+    main()

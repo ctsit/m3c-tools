@@ -44,4 +44,4 @@ This will produce up to four files: projects.rdf, studies.rdf, datasets.rdf, and
 
 To start the admin page run:
 
-    $ FLASK_APP=metab_admin flask run
+    $ python metab_admin.py $CONFIG_PATH
