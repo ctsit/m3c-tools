@@ -49,6 +49,9 @@ def main_menu():
                 <div class="row my-3">
                     <button class="btn btn-info w-100" onclick="window.location.href = '/associateperson'">Associate a Person with Inst/Dept/Lab</button>
                 </div>
+                <div class="row my-3">
+                    <button class="btn btn-info w-100" onclick="window.location.href = '/parentorganization'">Modify an Organization's Parent</button>
+                </div>
             </div>
         </body>
     </html>
@@ -156,7 +159,7 @@ def create_person():
             institutes[row[1]] = row[0]
         elif row[2] == 'department':
             departments[row[1]] = row[0]
-        elif row[2] == 'lab':
+        elif row[2] == 'laboratory':
             labs[row[1]] = row[0]
         else:
             pass
@@ -309,7 +312,7 @@ def associate_person():
     cur.execute('SELECT display_name, email, id from people;')
     rows = cur.fetchall()
     for row in rows:
-        display_names.append(row[0] + ' | ' + row[1] + ' | ' + str(row[2]))
+        display_names.append(str(row[0]) + ' | ' + str(row[1]) + ' | ' + str(row[2]))
 
     institutes = {}
     departments = {}
@@ -471,6 +474,164 @@ def associate_person():
         </script>
     </body>
     ''', dispNameList=display_names, instituteList=institutes.keys(), departmentList=departments.keys(), labList=labs.keys())
+
+@app.route('/parentorganization', methods=['GET', 'POST'])
+def parent_organization():
+    cur = conn.cursor()
+
+    organizations = []
+
+    cur.execute('SELECT id, name, type, parent_id from organizations')
+    for row in cur.fetchall():
+        organizations.append('{} | {} | {} | {}'.format(row[1], row[2], row[0], row[3]))
+    
+    if request.method == 'POST':
+        cur = conn.cursor()
+        try:
+            org_id = request.form['orgId'].strip()
+            parent_id = request.form['parentId'].strip()
+
+            if org_id is '' or parent_id is '':
+                flash('Please select an orgaization')
+                return redirect(request.url)
+
+            if parent_id == 'None':
+                cur.execute('UPDATE organizations SET parent_id = NULL WHERE id = %s', (org_id))
+            else:
+                cur.execute('UPDATE organizations SET parent_id = %s WHERE id = %s', (parent_id, org_id))
+
+            conn.commit()
+            cur.close()
+            flash('Success! Changed Parent ID.')
+            return redirect(request.url)
+        except Exception as e:
+            print(e)
+            conn.rollback()
+            cur.close()
+            flash('Error setting parent')
+            return redirect(request.url)
+
+    return render_template_string('''
+    <!doctype html>
+    <head>
+        <title>Modify Organization Parent</title>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    </head>
+    <body>
+        <div class="container mx-auto" style="width: 50%;">
+            <h1 class="mx-auto">Modify an Orgaization's Parent</h1>
+            <a href="/">Back to Home</a>
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-warning" role="alert">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="form-group">
+                <label>Search Organization to Change</label>
+                <input id=searchInput class="form-control" list=orgs name=org>
+                <datalist id=orgs>
+                    {% for org in orgList %}
+                        <option value="{{org}}">
+                    {% endfor %}
+                </datalist>
+            </div>
+
+            <form method=post enctype=multipart/form-data>
+                <div class="form-group">
+                    <label>Name</label>
+                    <input readonly id=orgName class="form-control" type=text name=orgName>
+                </div>
+
+                <div class="form-group">
+                    <label>Type</label>
+                    <input readonly id=orgType class="form-control" type=text name=orgType>
+                </div>
+
+                <div class="form-group">
+                    <label>Current Parent</label>
+                    <input readonly id=currentParent class="form-control" type=text name=currentParent>
+                </div>
+
+                <input hidden readonly id=orgId type=text name=orgId>
+                <input hidden readonly id=parentId type=text name=parentId>
+
+                <div class="form-group">
+                    <label>Search for new Parent</label>
+                    <input id=searchInputParent class="form-control" list=parentOrgs name=parentOrg>
+                    <datalist id=parentOrgs>
+                        {% for org in orgList %}
+                            <option value="{{org}}">
+                        {% endfor %}
+                    </datalist>
+                </div>
+
+                <div class="form-group">
+                    <label>Parent Name</label>
+                    <input readonly id=parentName class="form-control" type=text name=parentName>
+                </div>
+
+                <div class="form-group">
+                    <label>Parent Type</label>
+                    <input readonly id=parentType class="form-control" type=text name=parentType>
+                </div>
+
+                <button class="btn btn-primary" type="submit">Make Parent</button>
+            </form>
+        </div>
+        <script>
+            const orgSearchInput = document.getElementById('searchInput');
+            const organizations = [...document.getElementById('orgs').childNodes].filter(name => name.value).map(name => name.value);
+            const orgName = document.getElementById('orgName');
+            const orgType = document.getElementById('orgType');
+            const orgId = document.getElementById('orgId');
+            const currentParent = document.getElementById('currentParent');
+            const parentName = document.getElementById('parentName');
+            const parentType = document.getElementById('parentType');
+            const parentId = document.getElementById('parentId');
+            const searchParent = document.getElementById('searchInputParent');
+            orgSearchInput.addEventListener('change', (e) => {
+                if (organizations.includes(e.srcElement.value)) {
+                    const splitName = e.srcElement.value.split('|');
+                    orgName.value = splitName[0];
+                    orgType.value = splitName[1];
+                    orgId.value = splitName[2].trim();
+                    parentId.value = splitName[3].trim();
+                    if (splitName[3].trim() === 'None') {
+                        currentParent.value = 'None';
+                    } else {
+                        const parent = organizations.find(n => n.split('|')[2].trim() === splitName[3].trim());
+                        console.log(parentName);
+                        if (parentName) {
+                            const splitParentName = parent.split('|');
+                            console.log(splitParentName);
+                            currentParent.value = parent;
+                            parentName.value = splitParentName[0];
+                            parentType.value = splitParentName[1].trim();
+                            parentId.value = splitParentName[2].trim();
+                        } else {
+
+                        }
+                    }
+                } else {
+                    orgName.value = orgType.value = orgId.value = parentName.value = parentType.value = parentId.value = currentParent.value = '';
+                }
+            });
+            searchParent.addEventListener('change', (e) => {
+                if (organizations.includes(e.srcElement.value)) {
+                    const splitName = e.srcElement.value.split('|');
+                    parentName.value = splitName[0].trim();
+                    parentType.value = splitName[1].trim();
+                    parentId.value = splitName[2].trim();
+                }
+            });
+        </script>
+    </body>
+    ''', orgList=organizations)
 
 def main():
     '''Sets up a simple website for admin tasks'''
