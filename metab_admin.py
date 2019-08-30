@@ -26,6 +26,10 @@ app = Flask(__name__)
 conn = None
 picture_path = ''
 
+INST_TYPE = 'institute'
+DEPT_TYPE = 'department'
+LAB_TYPE = 'laboratory'
+
 @app.route('/')
 def main_menu():
     return '''
@@ -155,11 +159,11 @@ def create_person():
 
     cur.execute('SELECT id, name, type from organizations')
     for row in cur.fetchall():
-        if row[2] == 'institute':
+        if row[2] == INST_TYPE:
             institutes[row[1]] = row[0]
-        elif row[2] == 'department':
+        elif row[2] == DEPT_TYPE:
             departments[row[1]] = row[0]
-        elif row[2] == 'laboratory':
+        elif row[2] == LAB_TYPE:
             labs[row[1]] = row[0]
         else:
             pass
@@ -189,7 +193,7 @@ def create_person():
                 if institute in institutes:
                     cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s)', (institutes[institute], id))
                 else:
-                    cur.execute('INSERT INTO organizations (name, type) VALUES (%s, %s) RETURNING id', (institute, 'institute'))
+                    cur.execute('INSERT INTO organizations (name, type) VALUES (%s, %s) RETURNING id', (institute, INST_TYPE))
                     org_id = cur.fetchone()[0]
                     cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s)', (org_id, id))
 
@@ -197,7 +201,7 @@ def create_person():
                 if department in departments:
                     cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s)', (departments[department], id))
                 else:
-                    cur.execute('INSERT INTO organizations (name, type) VALUES (%s, %s) RETURNING id', (department, 'department'))
+                    cur.execute('INSERT INTO organizations (name, type) VALUES (%s, %s) RETURNING id', (department, DEPT_TYPE))
                     org_id = cur.fetchone()[0]
                     cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s)', (org_id, id))
             
@@ -205,7 +209,7 @@ def create_person():
                 if lab in labs:
                     cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s)', (labs[lab], id))
                 else:
-                    cur.execute('INSERT INTO organizations (name, type) VALUES (%s, %s) RETURNING id', (lab, 'lab'))
+                    cur.execute('INSERT INTO organizations (name, type) VALUES (%s, %s) RETURNING id', (lab, LAB_TYPE))
                     org_id = cur.fetchone()[0]
                     cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s)', (org_id, id))
 
@@ -320,11 +324,11 @@ def associate_person():
 
     cur.execute('SELECT id, name, type from organizations')
     for row in cur.fetchall():
-        if row[2] == 'institute':
+        if row[2] == INST_TYPE:
             institutes[row[1]] = row[0]
-        elif row[2] == 'department':
+        elif row[2] == DEPT_TYPE:
             departments[row[1]] = row[0]
-        elif row[2] == 'lab':
+        elif row[2] == LAB_TYPE:
             labs[row[1]] = row[0]
         else:
             pass
@@ -351,7 +355,7 @@ def associate_person():
                 if institute in institutes:
                     cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s) ON CONFLICT DO NOTHING', (institutes[institute], id))
                 else:
-                    cur.execute('INSERT INTO organizations (name, type) VALUES (%s, %s) RETURNING id', (institute, 'institute'))
+                    cur.execute('INSERT INTO organizations (name, type) VALUES (%s, %s) RETURNING id', (institute, INST_TYPE))
                     org_id = cur.fetchone()[0]
                     cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s)', (org_id, id))
 
@@ -359,7 +363,7 @@ def associate_person():
                 if department in departments:
                     cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s) ON CONFLICT DO NOTHING', (departments[department], id))
                 else:
-                    cur.execute('INSERT INTO organizations (name, type) VALUES (%s, %s) RETURNING id', (department, 'department'))
+                    cur.execute('INSERT INTO organizations (name, type) VALUES (%s, %s) RETURNING id', (department, DEPT_TYPE))
                     org_id = cur.fetchone()[0]
                     cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s)', (org_id, id))
             
@@ -367,7 +371,7 @@ def associate_person():
                 if lab in labs:
                     cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s) ON CONFLICT DO NOTHING', (labs[lab], id))
                 else:
-                    cur.execute('INSERT INTO organizations (name, type) VALUES (%s, %s) RETURNING id', (lab, 'lab'))
+                    cur.execute('INSERT INTO organizations (name, type) VALUES (%s, %s) RETURNING id', (lab, LAB_TYPE))
                     org_id = cur.fetchone()[0]
                     cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s)', (org_id, id))
 
