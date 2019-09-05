@@ -198,7 +198,6 @@ def make_projects(namespace, projects):
     for project in projects.values():
         project.uri = namespace + project.project_id
         triples.extend(project.get_triples())
-        triples.extend(project.add_person())
         project_count += 1
     print("There are " + str(project_count) + " projects.")
     return triples
@@ -221,25 +220,25 @@ def get_studies(mwb_cur, sup_cur, people, org_names):
         if row[3]:
             study.summary = row[3].replace('\n', '').replace('"', '\\"')
         study.project_id = row[4].replace('\n', '')
-        last_name = row[6]
-        first_name = row[7]
-        if row[8]:
-            if row[8].lower() != 'none':
-                institute = row[8]
+        last_name = row[5]
+        first_name = row[6]
+        if row[7]:
+            if row[7].lower() != 'none':
+                institute = row[7]
             else:
                 institute = None
         else:
             institute = None
-        if row[9]:
-            if row[9].lower() != 'none':
-                department = row[9]
+        if row[8]:
+            if row[8].lower() != 'none':
+                department = row[8]
             else:
                 department = None
         else:
             department = None
-        if row[10]:
-            if row[10].lower() != 'none':
-                lab = row[10]
+        if row[9]:
+            if row[9].lower() != 'none':
+                lab = row[9]
             else:
                 institute = None
         else:
@@ -296,7 +295,7 @@ def get_datasets(mwb_cur):
         FROM metadata
         INNER JOIN subject
         ON metadata.subject_id = subject.subject_id""")
-    for row in cur:
+    for row in mwb_cur:
         dataset = Dataset()
         dataset.mb_sample_id = row[0]
         dataset.study_id = row[1]
