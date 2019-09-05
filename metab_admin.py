@@ -64,12 +64,15 @@ def main_menu():
 @app.route('/uploadimage', methods=['GET', 'POST'])
 def upload_image():
     if request.method == 'POST':
+        cur = conn.cursor()
         try:
             first_name = request.form['first_name']
             last_name = request.form['last_name']
+            person_id = request.form['person_id']
             picture_file = request.files['picture']
             extension = picture_file.filename.split('.')[-1]
-            picture_file.save('{}/'.format(picture_path) + secure_filename('{}_{}.{}'.format(last_name, first_name, extension)))
+
+            picture_file.save('{}/'.format(picture_path) + secure_filename('{}.{}'.format(person_id, extension)))
             flash('Completed save sucessfully')
             return redirect(request.url)
         except Exception:
@@ -79,10 +82,10 @@ def upload_image():
     display_names = []
     cur = conn.cursor()
 
-    cur.execute('SELECT (display_name) from people;')
+    cur.execute('SELECT display_name, id from people;')
     rows = cur.fetchall()
     for row in rows:
-        display_names.append(row[0])
+        display_names.append(row[0] + ' | ' + str(row[1]))
 
     return render_template_string('''
     <!doctype html>
@@ -122,6 +125,8 @@ def upload_image():
                     <input id=firstName readonly class="form-control" type=text name=first_name>
                 </div>
 
+                <input hidden id=personId readonly type=text name=person_id>
+
                 <div class="form-group">
                     <label>Last Name</label>
                     <input id=lastName readonly class="form-control" type=text name=last_name>
@@ -139,11 +144,16 @@ def upload_image():
             const displayNames = [...document.getElementById('displaynames').childNodes].filter(name => name.value).map(name => name.value);
             const firstName = document.getElementById('firstName');
             const lastName = document.getElementById('lastName');
+            const personId = document.getElementById('personId');
             displayNameInput.addEventListener('change', (e) => {
                 if (displayNames.includes(e.srcElement.value)) {
                     const splitName = e.srcElement.value.split(' ');
+                    const splitId = e.srcElement.value.split(' | ');
                     firstName.value = splitName[0];
                     lastName.value = splitName[1];
+                    if (splitId.length > 0) {
+                        personId.value = splitId[1];
+                    }
                 }
             });
         </script>
