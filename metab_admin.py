@@ -150,7 +150,7 @@ def upload_image():
     </body>
     ''', dispNameList=display_names)
 
-def associate_and_insert_orgs(cur, institute, department, lab, id):
+def associate_and_insert_orgs(cur, institute, department, lab, person_id):
     '''
         Takes in a cursor and creates the association between the id and the different organization types. Creates
         the organization with the right parents if they don't already exist. 
@@ -167,7 +167,7 @@ def associate_and_insert_orgs(cur, institute, department, lab, id):
         else:
             flash('There are more than one Institutions with that name.')
             raise Exception('More that one Institution')
-        cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s)', (inst_id, id))
+        cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s)', (inst_id, person_id))
 
     if department is not '':
         if inst_id is None:
@@ -183,7 +183,7 @@ def associate_and_insert_orgs(cur, institute, department, lab, id):
         else:
             pass
             # TODO How do we handle duplicate departments
-        cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s)', (dept_id, id))
+        cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s)', (dept_id, person_id))
 
     if lab is not '':
         if dept_id is None:
@@ -199,7 +199,7 @@ def associate_and_insert_orgs(cur, institute, department, lab, id):
         else:
             pass
             # TODO How do we handle duplicate labs
-        cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s)', (lab_id, id))
+        cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s)', (lab_id, person_id))
 
 @app.route('/createperson', methods=['GET', 'POST'])
 def create_person():
@@ -237,10 +237,10 @@ def create_person():
                 return redirect(request.url)
 
             cur.execute('INSERT INTO people (display_name, email, phone) VALUES (%s, %s, %s) RETURNING id', (first_name + ' ' + last_name, email, phone))
-            id = cur.fetchone()[0]
-            cur.execute('INSERT INTO names (person_id, first_name, last_name) VALUES (%s, %s, %s)', (id, first_name, last_name))
+            person_id = cur.fetchone()[0]
+            cur.execute('INSERT INTO names (person_id, first_name, last_name) VALUES (%s, %s, %s)', (person_id, first_name, last_name))
 
-            associate_and_insert_orgs(cur, institute, department, lab, id)
+            associate_and_insert_orgs(cur, institute, department, lab, person_id)
 
             conn.commit()
             flash('Person created successfully')
@@ -367,12 +367,12 @@ def associate_person():
     if request.method == 'POST':
         cur = conn.cursor()
         try:
-            id = request.form['id'].strip()
+            person_id = request.form['id'].strip()
             institute = request.form['institute'].strip()
             department = request.form['department'].strip()
             lab = request.form['lab'].strip()
 
-            if id is '':
+            if person_id is '':
                 flash('Please search and select someone')
                 return redirect(request.url)
             
@@ -380,7 +380,7 @@ def associate_person():
                 flash('Please select or enter at least one institute, department, OR lab.')
                 return redirect(request.url)
 
-            associate_and_insert_orgs(cur, institute, department, lab, id)
+            associate_and_insert_orgs(cur, institute, department, lab, person_id)
 
             conn.commit()
             flash('Association created successfully')
