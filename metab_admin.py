@@ -119,12 +119,12 @@ def upload_image():
             <form method=post enctype=multipart/form-data>
                 <div class="form-group">
                     <label>First Name</label>
-                    <input id=firstName class="form-control" type=text name=first_name>
+                    <input id=firstName readonly class="form-control" type=text name=first_name>
                 </div>
 
                 <div class="form-group">
                     <label>Last Name</label>
-                    <input id=lastName class="form-control" type=text name=last_name>
+                    <input id=lastName readonly class="form-control" type=text name=last_name>
                 </div>
 
                 <div class="form-group">
