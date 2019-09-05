@@ -167,49 +167,40 @@ def associate_and_insert_orgs(cur, institute, department, lab, person_id):
     '''
     inst_id = None
     if institute is not '':
-        cur.execute('SELECT id from organizations WHERE name = %s and type = %s', (institute, INST_TYPE))
+        cur.execute('SELECT id from organizations WHERE name = %s and type = %s LIMIT 1', (institute, INST_TYPE))
         rows = cur.fetchall()
         if len(rows) == 0:
             cur.execute('INSERT INTO organizations (name, type) VALUES (%s, %s) RETURNING id', (institute, INST_TYPE))
             inst_id = cur.fetchone()[0]
-        elif len(rows) == 1:
-            inst_id = rows[0][0]
         else:
-            flash('There are more than one Institutions with that name.')
-            raise Exception('More that one Institution')
-        cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s)', (inst_id, person_id))
+            inst_id = rows[0][0]
+        cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s) ON CONFLICT DO NOTHING', (inst_id, person_id))
 
     if department is not '':
         if inst_id is None:
             flash('Please specify an existing or new Institution for this department')
             raise Exception('Department missing Institution')
-        cur.execute('SELECT id FROM organizations WHERE name = %s and type = %s and parent_id = %s', (department, DEPT_TYPE, inst_id))
+        cur.execute('SELECT id FROM organizations WHERE name = %s and type = %s and parent_id = %s LIMIT 1', (department, DEPT_TYPE, inst_id))
         rows = cur.fetchall()
         if len(rows) == 0:
             cur.execute('INSERT INTO organizations (name, type, parent_id) VALUES (%s, %s, %s) RETURNING id', (department, DEPT_TYPE, inst_id))
             dept_id = cur.fetchone()[0]
-        elif len(rows) == 1:
-            dept_id = rows[0][0]
         else:
-            pass
-            # TODO How do we handle duplicate departments
-        cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s)', (dept_id, person_id))
+            dept_id = rows[0][0]
+        cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s) ON CONFLICT DO NOTHING', (dept_id, person_id))
 
     if lab is not '':
         if dept_id is None:
             flash('Please specify an existing or new Department for this lab')
             raise Exception('Lab missing Department')
-        cur.execute('SELECT id FROM organizations WHERE name = %s and type = %s and parent_id = %s', (lab, LAB_TYPE, dept_id))
+        cur.execute('SELECT id FROM organizations WHERE name = %s and type = %s and parent_id = %s LIMIT 1', (lab, LAB_TYPE, dept_id))
         rows = cur.fetchall()
         if len(rows) == 0:
             cur.execute('INSERT INTO organizations (name, type, parent_id) VALUES (%s, %s, %s) RETURNING id', (lab, LAB_TYPE, dept_id))
             lab_id = cur.fetchone()[0]
-        elif len(rows) == 1:
-            lab_id = rows[0][0]
         else:
-            pass
-            # TODO How do we handle duplicate labs
-        cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s)', (lab_id, person_id))
+            lab_id = rows[0][0]
+        cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s) ON CONFLICT DO NOTHING', (lab_id, person_id))
 
 @app.route('/createperson', methods=['GET', 'POST'])
 def create_person():
