@@ -6,6 +6,9 @@ class Project(object):
         self.summary = None
         self.doi = None
         self.funding_source = None
+        self.institute_uri = None
+        self.department_uri = None
+        self.lab_uri = None
         self.last_name = None
         self.first_name = None
         self.pi_uri = None
@@ -20,6 +23,15 @@ class Project(object):
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#projectType> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(self.uri, self.project_type))
         if self.doi:
             rdf.append("<{}> <http://purl.org/ontology/bibo/doi> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(self.uri, self.doi))
+        if self.institute_uri:
+            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#managedBy> <{}>".format(self.uri, self.institute_uri))
+            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#manages> <{}>".format(self.institute_uri, self.uri))
+        if self.department_uri:
+            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#managedBy> <{}>".format(self.uri, self.department_uri))
+            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#manages> <{}>".format(self.department_uri, self.uri))
+        if self.lab_uri:
+            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#managedBy> <{}>".format(self.uri, self.lab_uri))
+            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#manages> <{}>".format(self.lab_uri, self.uri))
         if self.pi_uri:
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#hasPI> <{}>".format(self.uri, self.pi_uri))
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#isPIFor> <{}>".format(self.pi_uri, self.uri))
@@ -38,6 +50,9 @@ class Study(object):
         self.study_type = None
         self.summary = None
         self.submit_date = None
+        self.institute_uri = None
+        self.department_uri = None
+        self.lab_uri = None
         self.last_name = None
         self.first_name = None
         self.runner_uri = None
@@ -56,6 +71,15 @@ class Study(object):
         if project_uri:
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#inCollection> <{}>".format(self.uri, project_uri))
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#collectionFor> <{}>".format(project_uri, self.uri))
+        if self.institute_uri:
+            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#managedBy> <{}>".format(self.uri, self.institute_uri))
+            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#manages> <{}>".format(self.institute_uri, self.uri))
+        if self.department_uri:
+            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#managedBy> <{}>".format(self.uri, self.department_uri))
+            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#manages> <{}>".format(self.department_uri, self.uri))
+        if self.lab_uri:
+            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#managedBy> <{}>".format(self.uri, self.lab_uri))
+            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#manages> <{}>".format(self.lab_uri, self.uri))
         if self.runner_uri:
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#runBy> <{}>".format(self.uri, self.runner_uri))
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#runnerOf> <{}>".format(self.runner_uri, self.uri))
