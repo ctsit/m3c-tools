@@ -47,7 +47,6 @@ def connect(host, db, user, pg_password, port):
 def get_organizations(sup_cur):
     print("Gathering Organizations")
     orgs = {}
-    org_names = []
     sup_cur.execute("""\
                     SELECT id, name, type
                     FROM organizations""")
@@ -57,8 +56,7 @@ def get_organizations(sup_cur):
         org.name = row[1]
         org.type = row[2]
         orgs[org.org_id] = org
-        org_names.append(org.name)
-    return orgs, org_names
+    return orgs
 
 
 def make_organizations(namespace, orgs):
@@ -121,7 +119,7 @@ def link_people_to_org(sup_cur, people, orgs):
     return triples
 
 
-def get_projects(mwb_cur, sup_cur, people, org_names):
+def get_projects(mwb_cur, sup_cur, people, orgs):
     print("Gathering Workbench Projects")
     projects = {}
     mwb_cur.execute("""\
@@ -154,6 +152,7 @@ def get_projects(mwb_cur, sup_cur, people, org_names):
         if row[9]:
             if row[9].lower() != 'none':
                 department = row[9].replace('\n', '')
+                department = department
             else:
                 department = None
         else:
@@ -165,13 +164,25 @@ def get_projects(mwb_cur, sup_cur, people, org_names):
                 institute = None
         else:
             lab = None
-        missing_orgs = list({institute, department, lab} - set(org_names) -
-                        {None,})
-        if missing_orgs:
-            print("Error: While processing project " + project.project_id +
-                 ", the following missing organizations were found")
-            print(missing_orgs)
-            sys.exit()
+
+        for org_name, uri_attr in [(institute, 'institute_uri'), 
+                    (department, 'department_uri'),
+                    (lab, 'lab_uri')]:
+            if org_name:
+                sup_cur.execute("""\
+                            SELECT id
+                            FROM organizations
+                            WHERE name=%s""",
+                            (org_name,))
+                try:
+                    org_id = sup_cur.fetchone()[0]
+                    setattr(project, uri_attr, orgs[org_id].uri)
+                except TypeError:
+                    print("Error: Organization does not exist.")
+                    print("Organization for project " + project.project_id)
+                    print("Organization name: " + org_name)
+                    sys.exit()
+
         sup_cur.execute("""\
                     SELECT person_id
                     FROM names
@@ -206,7 +217,7 @@ def make_projects(namespace, projects):
     return triples, summaries
 
 
-def get_studies(mwb_cur, sup_cur, people, org_names):
+def get_studies(mwb_cur, sup_cur, people, orgs):
     print("Gathering Workbench Studies")
     studies = {}
     mwb_cur.execute("""\
@@ -248,12 +259,25 @@ def get_studies(mwb_cur, sup_cur, people, org_names):
                 institute = None
         else:
             lab = None
-        missing_orgs = list({institute, department, lab} - set(org_names) - 
-                        {None,})
-        if missing_orgs:
-            print("Error: The following organizations are missing")
-            print(missing_orgs)
-            sys.exit()
+
+        for org_name, uri_attr in [(institute, 'institute_uri'), 
+                    (department, 'department_uri'),
+                    (lab, 'lab_uri')]:
+            if org_name:
+                sup_cur.execute("""\
+                            SELECT id
+                            FROM organizations
+                            WHERE name=%s""",
+                            (org_name,))
+                try:
+                    org_id = sup_cur.fetchone()[0]
+                    setattr(study, uri_attr, orgs[org_id].uri)
+                except TypeError:
+                    print("Error: Organization does not exist.")
+                    print("Organization for study " + study.study_id)
+                    print("Organization name: " + org_name)
+                    sys.exit()
+
         sup_cur.execute("""\
                     SELECT person_id
                     FROM names
@@ -391,7 +415,7 @@ def main():
                       config.get('sup_port'))
 
     # Organizations
-    orgs, org_names = get_organizations(sup_cur)
+    orgs = get_organizations(sup_cur)
     org_triples = make_organizations(aide.namespace, orgs)
     print_to_file(org_triples, org_file)
 
@@ -402,13 +426,13 @@ def main():
     print_to_file(people_triples, people_file)
 
     # Projects
-    projects = get_projects(mwb_cur, sup_cur, people, org_names)
+    projects = get_projects(mwb_cur, sup_cur, people, orgs)
     project_triples, project_summaries = make_projects(aide.namespace, projects)
     all_proj_triples = project_triples + project_summaries
     print_to_file(all_proj_triples, project_file)
 
     # Studies
-    studies = get_studies(mwb_cur, sup_cur, people, org_names)
+    studies = get_studies(mwb_cur, sup_cur, people, orgs)
     study_triples, study_summaries = make_studies(aide.namespace, studies, projects)
     all_study_triples = study_triples + study_summaries
     print_to_file(all_study_triples, study_file)
