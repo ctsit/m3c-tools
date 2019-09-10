@@ -67,6 +67,8 @@ def make_organizations(namespace, orgs):
     org_count = 0
     for org in orgs.values():
         org.uri = namespace + str(org.org_id)
+        if org.parent_id:
+            org.parent_uri = namespace + str(org.parent_id)
         triples.extend(org.get_triples())
         org_count += 1
     print("There are " + str(org_count) + " organizations.")
@@ -131,7 +133,7 @@ def get_projects(mwb_cur, sup_cur, people, org_names):
     for row in mwb_cur:
         project = Project()
         project.project_id = row[0].replace('\n', '')
-        project.project_title = row[1].replace('\n', '')
+        project.project_title = row[1].replace('\n', '').replace('"', '\\"')
         if row[2]:
             project.project_type = row[2].replace('\n', '')
         if row[3]:
@@ -142,26 +144,23 @@ def get_projects(mwb_cur, sup_cur, people, org_names):
             project.funding_source = row[5].replace('\n', '')
         last_name = row[6]
         first_name = row[7]
-        # if project.project_id == "PR000048":
-        #     import pdb
-        #     pdb.set_trace()
         if row[8]:
             if row[8].lower() != 'none':
-                institute = row[8]
+                institute = row[8].replace('\n', '')
             else:
                 institute = None
         else:
             institute = None
         if row[9]:
             if row[9].lower() != 'none':
-                department = row[9]
+                department = row[9].replace('\n', '')
             else:
                 department = None
         else:
             department = None
         if row[10]:
             if row[10].lower() != 'none':
-                lab = row[10]
+                lab = row[10].replace('\n', '')
             else:
                 institute = None
         else:
@@ -194,51 +193,57 @@ def get_projects(mwb_cur, sup_cur, people, org_names):
 def make_projects(namespace, projects):
     print("Making Workbench Projects")
     triples = []
+    summaries = []
     project_count = 0
     for project in projects.values():
         project.uri = namespace + project.project_id
-        triples.extend(project.get_triples())
+        project_triples, summary_line = project.get_triples()
+        triples.extend(project_triples)
+        if summary_line:
+            summaries.append(summary_line)
         project_count += 1
     print("There are " + str(project_count) + " projects.")
-    return triples
+    return triples, summaries
 
 
 def get_studies(mwb_cur, sup_cur, people, org_names):
     print("Gathering Workbench Studies")
     studies = {}
     mwb_cur.execute("""\
-        SELECT study_id, study_title, study_type, study_summary,
+        SELECT study_id, study_title, study_type, study_summary, submit_date,
             project_id, last_name, first_name, institute, department,
             laboratory
         FROM study""")
     for row in mwb_cur:
         study = Study()
         study.study_id = row[0].replace('\n', '')
-        study.study_title = row[1].replace('\n', '')
+        study.study_title = row[1].replace('\n', '').replace('"', '\\"')
         if row[2]:
             study.study_type = row[2].replace('\n', '')
         if row[3]:
             study.summary = row[3].replace('\n', '').replace('"', '\\"')
-        study.project_id = row[4].replace('\n', '')
-        last_name = row[5]
-        first_name = row[6]
-        if row[7]:
-            if row[7].lower() != 'none':
-                institute = row[7]
+        if row[4]:
+            study.submit_date = str(row[4]) + "T00:00:00"
+        study.project_id = row[5].replace('\n', '')
+        last_name = row[6]
+        first_name = row[7]
+        if row[8]:
+            if row[8].lower() != 'none':
+                institute = row[8].replace('\n', '')
             else:
                 institute = None
         else:
             institute = None
-        if row[8]:
-            if row[8].lower() != 'none':
-                department = row[8]
+        if row[9]:
+            if row[9].lower() != 'none':
+                department = row[9].replace('\n', '')
             else:
                 department = None
         else:
             department = None
-        if row[9]:
-            if row[9].lower() != 'none':
-                lab = row[9]
+        if row[10]:
+            if row[10].lower() != 'none':
+                lab = row[10].replace('\n', '')
             else:
                 institute = None
         else:
@@ -256,7 +261,7 @@ def get_studies(mwb_cur, sup_cur, people, org_names):
                     (last_name, first_name))
         try:
             person_id = sup_cur.fetchone()[0]
-            study.pi_uri = people[person_id].uri
+            study.runner_uri = people[person_id].uri
         except IndexError:
             print("Error: Person does not exist.")
             print("Runner for study " + study.study_id)
@@ -270,6 +275,7 @@ def get_studies(mwb_cur, sup_cur, people, org_names):
 def make_studies(namespace, studies, projects):
     print("Making Workbench Studies")
     triples = []
+    summaries = []
     study_count = 0
     no_proj_study = 0
     for study in studies.values():
@@ -279,12 +285,15 @@ def make_studies(namespace, studies, projects):
         else:
             project_uri = None
             no_proj_study += 1
-        triples.extend(study.get_triples(project_uri))
+        study_triples, summary_line = study.get_triples(project_uri)
+        triples.extend(study_triples)
+        if summary_line:
+            summaries.append(summary_line)
         study_count += 1
     print("There are " + str(study_count) + " studies.")
     if no_proj_study > 0:
         print("There are " + str(no_proj_study) + " studies without projects")
-    return triples
+    return triples, summaries
 
 
 def get_datasets(mwb_cur):
@@ -332,8 +341,8 @@ def print_to_file(triples, file):
         rdf.write(" . \n")
 
 
-def do_upload(aide, triples):
-    chunks = [triples[x:x+15] for x in range(0, len(triples), 15)]
+def do_upload(aide, triples, chunk_size=20):
+    chunks = [triples[x:x+chunk_size] for x in range(0, len(triples), chunk_size)]
     for chunk in chunks:
         query = """
             INSERT DATA {{
@@ -370,7 +379,7 @@ def main():
     dataset_file = os.path.join(path, 'datasets.rdf')
 
     config = get_config(config_path)
-    aide = Aide(config.get('update'),
+    aide = Aide(config.get('update_endpoint'),
                 config.get('vivo_email'),
                 config.get('vivo_password'),
                 config.get('namespace'))
@@ -394,26 +403,30 @@ def main():
 
     # Projects
     projects = get_projects(mwb_cur, sup_cur, people, org_names)
-    project_triples = make_projects(aide.namespace, projects)
-    print_to_file(project_triples, project_file)
+    project_triples, project_summaries = make_projects(aide.namespace, projects)
+    all_proj_triples = project_triples + project_summaries
+    print_to_file(all_proj_triples, project_file)
 
     # Studies
     studies = get_studies(mwb_cur, sup_cur, people, org_names)
-    study_triples = make_studies(aide.namespace, studies, projects)
-    print_to_file(study_triples, study_file)
+    study_triples, study_summaries = make_studies(aide.namespace, studies, projects)
+    all_study_triples = study_triples + study_summaries
+    print_to_file(all_study_triples, study_file)
 
     # Datasets
     datasets = get_datasets(mwb_cur)
     dataset_triples = make_datasets(aide.namespace, datasets, studies)
     print_to_file(dataset_triples, dataset_file)
 
+    summary_triples = project_summaries.extend(study_summaries)
     # If you've made it this far, it's time to delete
-    # aide.do_delete()
-    # do_upload(aide, org_triples)
-    # do_upload(aide, people_triples)
-    # do_upload(aide, project_triples)
-    # do_upload(aide, study_triples)
-    # do_upload(aide, dataset_triples)
+    aide.do_delete()
+    do_upload(aide, org_triples)
+    do_upload(aide, people_triples)
+    do_upload(aide, project_triples)
+    do_upload(aide, study_triples)
+    do_upload(aide, dataset_triples)
+    do_upload(aide, summary_triples, 1)
 
 
 if __name__ == "__main__":
