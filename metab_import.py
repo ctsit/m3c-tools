@@ -48,8 +48,8 @@ def get_organizations(sup_cur):
     print("Gathering Organizations")
     orgs = {}
     org_names = []
-    sup_cur.execute("""/
-                    SELECT org_id, name, type
+    sup_cur.execute("""\
+                    SELECT id, name, type
                     FROM organizations""")
     for row in sup_cur:
         org = Organization()
@@ -66,7 +66,9 @@ def make_organizations(namespace, orgs):
     triples = []
     org_count = 0
     for org in orgs.values():
-        org.uri = namespace + org.org_id
+        org.uri = namespace + str(org.org_id)
+        if org.parent_id:
+            org.parent_uri = namespace + str(org.parent_id)
         triples.extend(org.get_triples())
         org_count += 1
     print("There are " + str(org_count) + " organizations.")
@@ -77,15 +79,18 @@ def get_people(sup_cur):
     print("Gathering People")
     people = {}
     sup_cur.execute("""\
-            SELECT person_id, first_name, last_name, email, phone
-            FROM people""")
+            SELECT id, first_name, last_name, display_name, email, phone
+            FROM people
+            JOIN names
+            ON id=person_id""")
     for row in sup_cur:
         person = Person()
         person.person_id = row[0]
         person.first_name = row[1]
         person.last_name = row[2]
-        person.email = row[3]
-        person.phone = row[4]
+        person.display_name = row[3]
+        person.email = row[4]
+        person.phone = row[5]
         people[person.person_id] = person
     return people
 
@@ -95,8 +100,9 @@ def make_people(namespace, people):
     triples = []
     people_count = 0
     for person in people.values():
-        person.uri = namespace + person.person_id
-        person.make_display_name()
+        person.uri = namespace + str(person.person_id)
+        if not person.display_name:
+            person.make_display_name()
         triples.extend(person.get_triples())
         people_count += 1
     print("There are " + str(people_count) + " people.")
@@ -107,9 +113,9 @@ def link_people_to_org(sup_cur, people, orgs):
     triples = []
     for person in people.values():
         sup_cur.execute("""\
-                    SELECT person_id, org_id
+                    SELECT person_id, organization_id
                     FROM associations
-                    WHERE person_id=%s""", (person.id,))
+                    WHERE person_id=%s""", (person.person_id,))
         for row in sup_cur:
             triples.extend(orgs[row[1]].add_person(person.uri))
     return triples
@@ -118,7 +124,7 @@ def link_people_to_org(sup_cur, people, orgs):
 def get_projects(mwb_cur, sup_cur, people, org_names):
     print("Gathering Workbench Projects")
     projects = {}
-    mwb_cur.execute("""
+    mwb_cur.execute("""\
         SELECT project_id, project_title, project_type, project_summary,
                doi, funding_source, last_name, first_name, institute,
                department, laboratory
@@ -127,22 +133,52 @@ def get_projects(mwb_cur, sup_cur, people, org_names):
     for row in mwb_cur:
         project = Project()
         project.project_id = row[0].replace('\n', '')
-        project.project_title = row[1].replace('\n', '')
-        project.project_type = row[2].replace('\n', '')
-        project.summary = row[3].replace('\n', '').replace('"', '\\"')
-        project.doi = row[4].replace('\n', '')
-        project.funding_source = row[5].replace('\n', '')
+        project.project_title = row[1].replace('\n', '').replace('"', '\\"')
+        if row[2]:
+            project.project_type = row[2].replace('\n', '')
+        if row[3]:
+            project.summary = row[3].replace('\n', '').replace('"', '\\"')
+        if row[4]:
+            project.doi = row[4].replace('\n', '')
+        if row[5]:
+            project.funding_source = row[5].replace('\n', '')
         last_name = row[6]
         first_name = row[7]
-        institute = row[8]
-        department = row[9]
-        lab = row[10]
-        missing_orgs = list({institute, department, lab} - set(org_names))
+        if row[8]:
+            if row[8].lower() != 'none':
+                institute = row[8].replace('\n', '')
+            else:
+                institute = None
+        else:
+            institute = None
+        if row[9]:
+            if row[9].lower() != 'none':
+                department = row[9].replace('\n', '')
+            else:
+                department = None
+        else:
+            department = None
+        if row[10]:
+            if row[10].lower() != 'none':
+                lab = row[10].replace('\n', '')
+            else:
+                institute = None
+        else:
+            lab = None
+        missing_orgs = list({institute, department, lab} - set(org_names) -
+                        {None,})
         if missing_orgs:
-            print("Error: The following organizations are missing")
+            print("Error: While processing project " + project.project_id +
+                 ", the following missing organizations were found")
             print(missing_orgs)
             sys.exit()
+        sup_cur.execute("""\
+                    SELECT person_id
+                    FROM names
+                    WHERE last_name=%s AND first_name=%s""",
+                    (last_name, first_name))
         try:
+            person_id = sup_cur.fetchone()[0]
             project.pi_uri = people[person_id].uri
         except KeyError:
             print("Error: Person does not exist.")
@@ -157,48 +193,75 @@ def get_projects(mwb_cur, sup_cur, people, org_names):
 def make_projects(namespace, projects):
     print("Making Workbench Projects")
     triples = []
+    summaries = []
     project_count = 0
     for project in projects.values():
         project.uri = namespace + project.project_id
-        triples.extend(project.get_triples())
-        triples.extend(project.add_person())
+        project_triples, summary_line = project.get_triples()
+        triples.extend(project_triples)
+        if summary_line:
+            summaries.append(summary_line)
         project_count += 1
     print("There are " + str(project_count) + " projects.")
-    return triples
+    return triples, summaries
 
 
 def get_studies(mwb_cur, sup_cur, people, org_names):
     print("Gathering Workbench Studies")
     studies = {}
     mwb_cur.execute("""\
-        SELECT study_id, study_title, study_type, study_summary,
+        SELECT study_id, study_title, study_type, study_summary, submit_date,
             project_id, last_name, first_name, institute, department,
             laboratory
         FROM study""")
     for row in mwb_cur:
         study = Study()
         study.study_id = row[0].replace('\n', '')
-        study.study_title = row[1].replace('\n', '')
-        study.study_type = row[2].replace('\n', '')
-        study.summary = row[3].replace('\n', '').replace('"', '\\"')
-        study.project_id = row[4].replace('\n', '')
+        study.study_title = row[1].replace('\n', '').replace('"', '\\"')
+        if row[2]:
+            study.study_type = row[2].replace('\n', '')
+        if row[3]:
+            study.summary = row[3].replace('\n', '').replace('"', '\\"')
+        if row[4]:
+            study.submit_date = str(row[4]) + "T00:00:00"
+        study.project_id = row[5].replace('\n', '')
         last_name = row[6]
         first_name = row[7]
-        institute = row[8]
-        department = row[9]
-        lab = row[10]
-        missing_orgs = list({institute, department, lab} - set(org_names))
+        if row[8]:
+            if row[8].lower() != 'none':
+                institute = row[8].replace('\n', '')
+            else:
+                institute = None
+        else:
+            institute = None
+        if row[9]:
+            if row[9].lower() != 'none':
+                department = row[9].replace('\n', '')
+            else:
+                department = None
+        else:
+            department = None
+        if row[10]:
+            if row[10].lower() != 'none':
+                lab = row[10].replace('\n', '')
+            else:
+                institute = None
+        else:
+            lab = None
+        missing_orgs = list({institute, department, lab} - set(org_names) - 
+                        {None,})
         if missing_orgs:
             print("Error: The following organizations are missing")
             print(missing_orgs)
             sys.exit()
-        sup_cur.execute("""SELECT person_id
-                        FROM people
-                        WHERE last_name=%s AND first_name=%s""",
-                        (last_name, first_name))
+        sup_cur.execute("""\
+                    SELECT person_id
+                    FROM names
+                    WHERE last_name=%s AND first_name=%s""",
+                    (last_name, first_name))
         try:
-            person_id = sup_cur[0][0]
-            study.pi_uri = people[person_id].uri
+            person_id = sup_cur.fetchone()[0]
+            study.runner_uri = people[person_id].uri
         except IndexError:
             print("Error: Person does not exist.")
             print("Runner for study " + study.study_id)
@@ -212,6 +275,7 @@ def get_studies(mwb_cur, sup_cur, people, org_names):
 def make_studies(namespace, studies, projects):
     print("Making Workbench Studies")
     triples = []
+    summaries = []
     study_count = 0
     no_proj_study = 0
     for study in studies.values():
@@ -221,12 +285,15 @@ def make_studies(namespace, studies, projects):
         else:
             project_uri = None
             no_proj_study += 1
-        triples.extend(study.get_triples(project_uri))
+        study_triples, summary_line = study.get_triples(project_uri)
+        triples.extend(study_triples)
+        if summary_line:
+            summaries.append(summary_line)
         study_count += 1
     print("There are " + str(study_count) + " studies.")
     if no_proj_study > 0:
         print("There are " + str(no_proj_study) + " studies without projects")
-    return triples
+    return triples, summaries
 
 
 def get_datasets(mwb_cur):
@@ -237,11 +304,12 @@ def get_datasets(mwb_cur):
         FROM metadata
         INNER JOIN subject
         ON metadata.subject_id = subject.subject_id""")
-    for row in cur:
+    for row in mwb_cur:
         dataset = Dataset()
         dataset.mb_sample_id = row[0]
         dataset.study_id = row[1]
-        dataset.subject_species = row[2].replace('\n', '')
+        if row[2]:
+            dataset.subject_species = row[2].replace('\n', '')
         datasets[dataset.mb_sample_id] = dataset
     return datasets
 
@@ -273,8 +341,8 @@ def print_to_file(triples, file):
         rdf.write(" . \n")
 
 
-def do_upload(aide, triples):
-    chunks = [triples[x:x+15] for x in range(0, len(triples), 15)]
+def do_upload(aide, triples, chunk_size=20):
+    chunks = [triples[x:x+chunk_size] for x in range(0, len(triples), chunk_size)]
     for chunk in chunks:
         query = """
             INSERT DATA {{
@@ -311,7 +379,7 @@ def main():
     dataset_file = os.path.join(path, 'datasets.rdf')
 
     config = get_config(config_path)
-    aide = Aide(config.get('update'),
+    aide = Aide(config.get('update_endpoint'),
                 config.get('vivo_email'),
                 config.get('vivo_password'),
                 config.get('namespace'))
@@ -335,19 +403,22 @@ def main():
 
     # Projects
     projects = get_projects(mwb_cur, sup_cur, people, org_names)
-    project_triples = make_projects(aide.namespace, projects)
-    print_to_file(project_triples, project_file)
+    project_triples, project_summaries = make_projects(aide.namespace, projects)
+    all_proj_triples = project_triples + project_summaries
+    print_to_file(all_proj_triples, project_file)
 
     # Studies
     studies = get_studies(mwb_cur, sup_cur, people, org_names)
-    study_triples = make_studies(aide.namespace, studies, projects)
-    print_to_file(study_triples, study_file)
+    study_triples, study_summaries = make_studies(aide.namespace, studies, projects)
+    all_study_triples = study_triples + study_summaries
+    print_to_file(all_study_triples, study_file)
 
     # Datasets
     datasets = get_datasets(mwb_cur)
     dataset_triples = make_datasets(aide.namespace, datasets, studies)
     print_to_file(dataset_triples, dataset_file)
 
+    summary_triples = project_summaries.extend(study_summaries)
     # If you've made it this far, it's time to delete
     aide.do_delete()
     do_upload(aide, org_triples)
@@ -355,6 +426,7 @@ def main():
     do_upload(aide, project_triples)
     do_upload(aide, study_triples)
     do_upload(aide, dataset_triples)
+    do_upload(aide, summary_triples, 1)
 
 
 if __name__ == "__main__":

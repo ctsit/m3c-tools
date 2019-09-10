@@ -14,22 +14,18 @@ class Aide(object):
         payload = {
             'email': self.email,
             'password': self.password,
-            'query': query
+            'update': query
         }
-        response = requests.post(endpoint, params=payload, verify=False)
+        response = requests.post(self.endpoint, params=payload, verify=False)
         if response.status_code != 200:
             print('Error with following query:')
             print(query)
             print(response.status_code)
+            print(response.text)
             return False
         else:
             return True
 
     def do_delete(self):
-        query = '''\
-            DELETE {?s ?p ?o}
-            WHERE {
-                ?s ?p ?o
-            }
-            '''
+        query = "CLEAR GRAPH <http://vitro.mannlib.cornell.edu/default/vitro-kb-2>"
         self.do_update(query)
