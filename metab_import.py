@@ -442,7 +442,7 @@ def main():
     dataset_triples = make_datasets(aide.namespace, datasets, studies)
     print_to_file(dataset_triples, dataset_file)
 
-    summary_triples = project_summaries.extend(study_summaries)
+    summary_triples = project_summaries + study_summaries
     # If you've made it this far, it's time to delete
     aide.do_delete()
     do_upload(aide, org_triples)
