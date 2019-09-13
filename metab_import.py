@@ -394,9 +394,9 @@ def make_tools(namespace, tools, people):
 
 
 def print_to_file(triples, file):
+    triples = [t + " ." for t in triples]
     with open(file, 'a+') as rdf:
-        rdf.write(" . \n".join(triples))
-        rdf.write(" . \n")
+        rdf.write("\n".join(triples))
 
 
 def do_upload(aide, triples, chunk_size=20):
