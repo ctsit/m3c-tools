@@ -492,6 +492,7 @@ def main():
     do_upload(aide, project_triples)
     do_upload(aide, study_triples)
     do_upload(aide, dataset_triples)
+    do_upload(aide, tools_triples)
     do_upload(aide, summary_triples, 1)
 
 
