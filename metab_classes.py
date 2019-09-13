@@ -236,6 +236,9 @@ class Tool(object):
         rdf.append('<{uri}> <{m3c}summary> {desc}'
                    .format(uri=uri, m3c=m3c, desc=escape(self.description)))
 
+        rdf.append('<{uri}> <{m3c}toolLink> {desc}'
+                   .format(uri=uri, m3c=m3c, desc=escape(self.url)))
+
         if not self.license or not self.license.kind or not self.license.url:
             raise Exception('Bad license for tool: ' + self.tool_id)
 
@@ -252,6 +255,11 @@ class Tool(object):
                        .format(uri=uri, m3c=m3c, author=author))
             rdf.append("<{author.uri}> <{m3c}developerOf> <{uri}>"
                        .format(uri=uri, m3c=m3c, author=author))
+
+        for tag in self.tags:
+            tag = tag.strip().lower()
+            rdf.append("<{uri}> <{m3c}tag> {tag}"
+                       .format(uri=uri, m3c=m3c, tag=escape(tag)))
 
         return rdf
 
