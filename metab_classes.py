@@ -1,3 +1,8 @@
+import json
+import re
+import typing
+
+
 class Project(object):
     def __init__(self):
         self.uri = None
@@ -177,3 +182,89 @@ class Organization(object):
         rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#associatedWith> <{}>".format(person_uri, self.uri))
         rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#associationFor> <{}>".format(self.uri, person_uri))
         return rdf
+
+
+class Tool(object):
+    class License:
+        def __init__(self, kind: typing.Text,
+                     url: typing.Optional[typing.Text] = ''):
+            self.kind = kind.strip()
+            self.url = url.strip()
+
+    class Author:
+        def __init__(self, name: str, email: typing.Optional[str] = '',
+                     uri: typing.Optional[str] = ''):
+            self.name = name.strip()
+            self.email = email.strip()
+            self.uri = uri.strip()
+
+    def __init__(self, tool_id: typing.Text, data: dict):
+        self.tool_id: typing.Text = tool_id.strip()
+        self.name: typing.Text = data['name'].replace('\n', ' ').strip()
+        self.description: typing.Text = data['description'].strip()
+        self.url: typing.Text = data['url'].strip()
+        self.authors: typing.List[Tool.Author] = []
+        for author in data['authors']:
+            self.authors.append(Tool.Author(**author))
+        license = data['license']
+        self.license: Tool.License = Tool.License(**license)
+        self.tags: typing.List[typing.Text] = data.get('tags', [])
+
+    def uri(self, namespace: typing.Text) -> typing.Text:
+        encoded = self.tool_id
+        encoded = encoded.replace('_', '__')
+        encoded = encoded.replace('-', '_d')
+        encoded = encoded.replace('/', '_s')
+
+        contains_unhandled_char = re.search('[^A-Za-z0-9._/]', encoded)
+        if contains_unhandled_char:
+            raise Exception(
+                "Unhandled character in tool's ID: %s" % self.tool_id)
+
+        return namespace + 't' + encoded
+
+    def get_triples(self, namespace: typing.Text) -> typing.List[typing.Text]:
+        m3c = 'http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#'
+
+        rdf = []
+        uri = self.uri(namespace)
+
+        rdf.append('<{uri}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <{m3c}Tool>'
+                   .format(uri=uri, m3c=m3c))
+        rdf.append('<{uri}> <http://www.w3.org/2000/01/rdf-schema#label> {name}'
+                   .format(uri=uri, name=escape(self.name)))
+        rdf.append('<{uri}> <{m3c}summary> {desc}'
+                   .format(uri=uri, m3c=m3c, desc=escape(self.description)))
+
+        if not self.license or not self.license.kind or not self.license.url:
+            raise Exception('Bad license for tool: ' + self.tool_id)
+
+        rdf.append('<{uri}> <{m3c}licenseType> {kind}'
+                   .format(uri=uri, m3c=m3c, kind=escape(self.license.kind)))
+        rdf.append('<{uri}> <{m3c}licenseUrl> {link}'
+                   .format(uri=uri, m3c=m3c, link=escape(self.license.url)))
+
+        for author in self.authors:
+            if not author.uri:
+                raise Exception('Unknown author "%s" for tool: %s' %
+                                (author.name, self.tool_id))
+            rdf.append("<{uri}> <{m3c}developedBy> <{author.uri}>"
+                       .format(uri=uri, m3c=m3c, author=author))
+            rdf.append("<{author.uri}> <{m3c}developerOf> <{uri}>"
+                       .format(uri=uri, m3c=m3c, author=author))
+
+        return rdf
+
+    def match_authors(self, people: typing.Dict[int, Person]):
+        for author in self.authors:
+            for person in people.values():
+                if person.display_name == author.name:
+                    author.uri = person.uri
+                    break
+            if not author.uri:
+                raise Exception('Unknown author "%s" for tool: %s' %
+                                (author.name, self.tool_id))
+
+
+def escape(text):
+    return json.dumps(text)
