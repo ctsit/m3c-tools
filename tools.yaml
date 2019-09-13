@@ -1,0 +1,36 @@
+github.com/MoseleyBioinformaticsLab/mwtab:
+  name: mwtab
+  description: |
+    Parser for mwtab files from the Metabolomics Workbench.
+  url: https://github.com/MoseleyBioinformaticsLab/mwtab
+  authors:
+    - name: Andrey Smelter
+      email: andrey.smelter@gmail.com
+  license:
+    kind: BSD 3-Clause Clear License
+    url: https://raw.githubusercontent.com/MoseleyBioinformaticsLab/mwtab/master/LICENSE
+  tags:
+    - python
+    - mwtab
+
+batman.r-forge.r-project.org:
+  name: Bayesian AuTomated Metabolite Analyser for NMR spectra
+  description: >
+    BATMAN is an R package for estimating metabolite concentrations from
+    Nuclear Magnetic Resonance spectral data using a specialised MCMC
+    algorithm.
+
+    Descriptions can also span multiple lines!
+  url: http://batman.r-forge.r-project.org/
+  authors:
+    - name: Jie Hao
+      email: j.hao@ic.ac.uk
+    - name: William Astle
+      email: william.astle@mail.mcgill.ca
+    - name: Maria De Iorio
+      email: m.deiorio@ucl.ac.uk
+    - name: Timothy Ebbels
+      email: t.ebbels@ic.ac.uk
+  license:
+    kind: Boost Software License Version 1.0
+    url: "https://r-forge.r-project.org/scm/viewvc.php/*checkout*/pkg/batman/LICENSE_1_0.txt?root=batman"
