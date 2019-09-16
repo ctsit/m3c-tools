@@ -236,7 +236,7 @@ class Tool(object):
         rdf.append('<{uri}> <{m3c}summary> {desc}'
                    .format(uri=uri, m3c=m3c, desc=escape(self.description)))
 
-        rdf.append('<{uri}> <{m3c}toolLink> {desc}'
+        rdf.append('<{uri}> <{m3c}homepage> {desc}'
                    .format(uri=uri, m3c=m3c, desc=escape(self.url)))
 
         if not self.license or not self.license.kind or not self.license.url:
