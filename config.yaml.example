@@ -17,3 +17,7 @@ vivo_email: "update_api_authorized_account@email.com"
 vivo_password: "vivo_password"
 update_endpoint: "http://vivo.domain.info/api/sparqlUpdate"
 namespace: "https://vivo.domain.info/individual/"
+
+# Admin Page Requirements
+picturepath: 'pictures'
+secret: 'secret_hex_string'

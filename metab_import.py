@@ -25,6 +25,7 @@ from metab_classes import Organization
 from metab_classes import Person
 from metab_classes import Project
 from metab_classes import Study
+from metab_classes import Tool
 
 
 def get_config(config_path):
@@ -359,10 +360,43 @@ def make_datasets(namespace, datasets, studies):
     return triples
 
 
+def get_tools(config):
+    try:
+        tools_path = config.get('tools', 'tools.yaml')
+        with open(tools_path, 'r') as tools_file:
+            t = yaml.load(tools_file.read(), Loader=yaml.FullLoader)
+            tools = []
+            for tool_id, data in t.items():
+                try:
+                    tool = Tool(tool_id, data)
+                    tools.append(tool)
+                except Exception:
+                    print('Error: check configuration for tool "%s"' % tool_id)
+                    raise
+            return tools
+    except Exception:
+        print('Error parsing tools config file: %s' % tools_path)
+        return []
+
+
+def make_tools(namespace, tools, people):
+    print("Making Tools")
+    triples = []
+    tool_count = 0
+    for tool in tools:
+        # First, find all the authors' URIs
+        tool.match_authors(people)
+        # Now, generate the triples.
+        triples.extend(tool.get_triples(namespace))
+        tool_count += 1
+    print("There are " + str(tool_count) + " tools.")
+    return triples
+
+
 def print_to_file(triples, file):
+    triples = [t + " ." for t in triples]
     with open(file, 'a+') as rdf:
-        rdf.write(" . \n".join(triples))
-        rdf.write(" . \n")
+        rdf.write("\n".join(triples))
 
 
 def do_upload(aide, triples, chunk_size=20):
@@ -401,8 +435,10 @@ def main():
     project_file = os.path.join(path, 'projects.rdf')
     study_file = os.path.join(path, 'studies.rdf')
     dataset_file = os.path.join(path, 'datasets.rdf')
+    tools_file = os.path.join(path, 'tools.rdf')
 
     config = get_config(config_path)
+
     aide = Aide(config.get('update_endpoint'),
                 config.get('vivo_email'),
                 config.get('vivo_password'),
@@ -424,6 +460,11 @@ def main():
     people_triples = make_people(aide.namespace, people)
     people_triples.extend(link_people_to_org(sup_cur, people, orgs))
     print_to_file(people_triples, people_file)
+
+    # Tools
+    tools = get_tools(config)
+    tools_triples = make_tools(aide.namespace, tools, people)
+    print_to_file(tools_triples, tools_file)
 
     # Projects
     projects = get_projects(mwb_cur, sup_cur, people, orgs)
@@ -450,6 +491,7 @@ def main():
     do_upload(aide, project_triples)
     do_upload(aide, study_triples)
     do_upload(aide, dataset_triples)
+    do_upload(aide, tools_triples)
     do_upload(aide, summary_triples, 1)
 
 
