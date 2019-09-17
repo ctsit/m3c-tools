@@ -168,7 +168,7 @@ def get_projects(mwb_cur, sup_cur, people, orgs):
             lab = None
 
         if institute:
-           sup_cur.execute("""\
+            sup_cur.execute("""\
                         SELECT id, parent_id
                         FROM organizations
                         WHERE name=%s""",
@@ -182,7 +182,7 @@ def get_projects(mwb_cur, sup_cur, people, orgs):
                 print("Organization name: " + org_name)
                 sys.exit()
         if department:
-           sup_cur.execute("""\
+            sup_cur.execute("""\
                         SELECT id, parent_id
                         FROM organizations
                         WHERE name=%s""",
@@ -199,18 +199,18 @@ def get_projects(mwb_cur, sup_cur, people, orgs):
                 print("Organization for project " + project.project_id)
                 print("Organization name: " + org_name)
                 sys.exit()
-        if laboratory:
-           sup_cur.execute("""\
+        if lab:
+            sup_cur.execute("""\
                         SELECT id, parent_id
                         FROM organizations
                         WHERE name=%s""",
-                        (laboratory,)) 
+                        (lab,)) 
             try:
                 lab_options = {}
                 for row in sup_cur:
                     lab_options[row[0]] = row[1]
                 for lab_id, parent in lab_options.items():
-                    if inst_id == parent:
+                    if dept_id == parent:
                         project.lab_uri = orgs[lab_id].uri
             except TypeError:
                 print("Error: Organization does not exist.")
@@ -296,7 +296,7 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
             lab = None
 
         if institute:
-           sup_cur.execute("""\
+            sup_cur.execute("""\
                         SELECT id, parent_id
                         FROM organizations
                         WHERE name=%s""",
@@ -310,7 +310,7 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
                 print("Organization name: " + org_name)
                 sys.exit()
         if department:
-           sup_cur.execute("""\
+            sup_cur.execute("""\
                         SELECT id, parent_id
                         FROM organizations
                         WHERE name=%s""",
@@ -327,18 +327,18 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
                 print("Organization for study " + study.study_id)
                 print("Organization name: " + org_name)
                 sys.exit()
-        if laboratory:
-           sup_cur.execute("""\
+        if lab:
+            sup_cur.execute("""\
                         SELECT id, parent_id
                         FROM organizations
                         WHERE name=%s""",
-                        (laboratory,)) 
+                        (lab,)) 
             try:
                 lab_options = {}
                 for row in sup_cur:
                     lab_options[row[0]] = row[1]
                 for lab_id, parent in lab_options.items():
-                    if inst_id == parent:
+                    if dept_id == parent:
                         study.lab_uri = orgs[lab_id].uri
             except TypeError:
                 print("Error: Organization does not exist.")
@@ -535,9 +535,9 @@ def main():
     print_to_file(people_triples, people_file)
 
     # Tools
-    tools = get_tools(config)
-    tools_triples = make_tools(aide.namespace, tools, people)
-    print_to_file(tools_triples, tools_file)
+    # tools = get_tools(config)
+    # tools_triples = make_tools(aide.namespace, tools, people)
+    # print_to_file(tools_triples, tools_file)
 
     # Projects
     projects = get_projects(mwb_cur, sup_cur, people, orgs)
@@ -560,14 +560,14 @@ def main():
 
     summary_triples = project_summaries + study_summaries
     # If you've made it this far, it's time to delete
-    aide.do_delete()
-    do_upload(aide, org_triples)
-    do_upload(aide, people_triples)
-    do_upload(aide, project_triples)
-    do_upload(aide, study_triples)
-    do_upload(aide, dataset_triples)
-    do_upload(aide, tools_triples)
-    do_upload(aide, summary_triples, 1)
+    # aide.do_delete()
+    # do_upload(aide, org_triples)
+    # do_upload(aide, people_triples)
+    # do_upload(aide, project_triples)
+    # do_upload(aide, study_triples)
+    # do_upload(aide, dataset_triples)
+    # do_upload(aide, tools_triples)
+    # do_upload(aide, summary_triples, 1)
 
 
 if __name__ == "__main__":
