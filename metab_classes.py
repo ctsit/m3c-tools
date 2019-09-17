@@ -62,6 +62,7 @@ class Study(object):
         self.first_name = None
         self.runner_uri = None
         self.project_id = None
+        self.subject_species = []
 
     def get_triples(self, project_uri=None):
         rdf = []
@@ -93,6 +94,12 @@ class Study(object):
         else:
             summary_line = None
         return rdf, summary_line
+
+    def get_species_triples(self):
+        rdf = []
+        for species in self.subject_species:
+            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#subjectSpecies> \"{}\"".format(self.uri, species))
+        return rdf
 
 
 class Dataset(object):
