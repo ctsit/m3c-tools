@@ -49,13 +49,14 @@ def get_organizations(sup_cur):
     print("Gathering Organizations")
     orgs = {}
     sup_cur.execute("""\
-                    SELECT id, name, type
+                    SELECT id, name, type, parent_id
                     FROM organizations""")
     for row in sup_cur:
         org = Organization()
         org.org_id = row[0]
         org.name = row[1]
         org.type = row[2]
+        org.parent_id = row[3]
         orgs[org.org_id] = org
     return orgs
 
@@ -166,23 +167,56 @@ def get_projects(mwb_cur, sup_cur, people, orgs):
         else:
             lab = None
 
-        for org_name, uri_attr in [(institute, 'institute_uri'), 
-                    (department, 'department_uri'),
-                    (lab, 'lab_uri')]:
-            if org_name:
-                sup_cur.execute("""\
-                            SELECT id
-                            FROM organizations
-                            WHERE name=%s""",
-                            (org_name,))
-                try:
-                    org_id = sup_cur.fetchone()[0]
-                    setattr(project, uri_attr, orgs[org_id].uri)
-                except TypeError:
-                    print("Error: Organization does not exist.")
-                    print("Organization for project " + project.project_id)
-                    print("Organization name: " + org_name)
-                    sys.exit()
+        if institute:
+           sup_cur.execute("""\
+                        SELECT id, parent_id
+                        FROM organizations
+                        WHERE name=%s""",
+                        (institute,)) 
+            try:
+                inst_id = sup_cur.fetchone()[0]
+                project.institute_uri = orgs[inst_id].uri
+            except TypeError:
+                print("Error: Organization does not exist.")
+                print("Organization for project " + project.project_id)
+                print("Organization name: " + org_name)
+                sys.exit()
+        if department:
+           sup_cur.execute("""\
+                        SELECT id, parent_id
+                        FROM organizations
+                        WHERE name=%s""",
+                        (department,)) 
+            try:
+                dept_options = {}
+                for row in sup_cur:
+                    dept_options[row[0]] = row[1]
+                for dept_id, parent in dept_options.items():
+                    if inst_id == parent:
+                        project.department_uri = orgs[dept_id].uri
+            except TypeError:
+                print("Error: Organization does not exist.")
+                print("Organization for project " + project.project_id)
+                print("Organization name: " + org_name)
+                sys.exit()
+        if laboratory:
+           sup_cur.execute("""\
+                        SELECT id, parent_id
+                        FROM organizations
+                        WHERE name=%s""",
+                        (laboratory,)) 
+            try:
+                lab_options = {}
+                for row in sup_cur:
+                    lab_options[row[0]] = row[1]
+                for lab_id, parent in lab_options.items():
+                    if inst_id == parent:
+                        project.lab_uri = orgs[lab_id].uri
+            except TypeError:
+                print("Error: Organization does not exist.")
+                print("Organization for project " + project.project_id)
+                print("Organization name: " + org_name)
+                sys.exit()
 
         sup_cur.execute("""\
                     SELECT person_id
@@ -261,23 +295,56 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
         else:
             lab = None
 
-        for org_name, uri_attr in [(institute, 'institute_uri'), 
-                    (department, 'department_uri'),
-                    (lab, 'lab_uri')]:
-            if org_name:
-                sup_cur.execute("""\
-                            SELECT id
-                            FROM organizations
-                            WHERE name=%s""",
-                            (org_name,))
-                try:
-                    org_id = sup_cur.fetchone()[0]
-                    setattr(study, uri_attr, orgs[org_id].uri)
-                except TypeError:
-                    print("Error: Organization does not exist.")
-                    print("Organization for study " + study.study_id)
-                    print("Organization name: " + org_name)
-                    sys.exit()
+        if institute:
+           sup_cur.execute("""\
+                        SELECT id, parent_id
+                        FROM organizations
+                        WHERE name=%s""",
+                        (institute,)) 
+            try:
+                inst_id = sup_cur.fetchone()[0]
+                study.institute_uri = orgs[inst_id].uri
+            except TypeError:
+                print("Error: Organization does not exist.")
+                print("Organization for study " + study.study_id)
+                print("Organization name: " + org_name)
+                sys.exit()
+        if department:
+           sup_cur.execute("""\
+                        SELECT id, parent_id
+                        FROM organizations
+                        WHERE name=%s""",
+                        (department,)) 
+            try:
+                dept_options = {}
+                for row in sup_cur:
+                    dept_options[row[0]] = row[1]
+                for dept_id, parent in dept_options.items():
+                    if inst_id == parent:
+                        study.department_uri = orgs[dept_id].uri
+            except TypeError:
+                print("Error: Organization does not exist.")
+                print("Organization for study " + study.study_id)
+                print("Organization name: " + org_name)
+                sys.exit()
+        if laboratory:
+           sup_cur.execute("""\
+                        SELECT id, parent_id
+                        FROM organizations
+                        WHERE name=%s""",
+                        (laboratory,)) 
+            try:
+                lab_options = {}
+                for row in sup_cur:
+                    lab_options[row[0]] = row[1]
+                for lab_id, parent in lab_options.items():
+                    if inst_id == parent:
+                        study.lab_uri = orgs[lab_id].uri
+            except TypeError:
+                print("Error: Organization does not exist.")
+                print("Organization for study " + study.study_id)
+                print("Organization name: " + org_name)
+                sys.exit()
 
         sup_cur.execute("""\
                     SELECT person_id
@@ -341,23 +408,29 @@ def get_datasets(mwb_cur):
 
 def make_datasets(namespace, datasets, studies):
     print("Making Workbench Datasets")
-    triples = []
+    dataset_triples = []
+    study_triples = []
     dataset_count = 0
     no_study_datasets = 0
     for dataset in datasets.values():
         dataset.uri = namespace + dataset.mb_sample_id
         if dataset.study_id in studies.keys():
-            study_uri = studies[dataset.study_id].uri
+            parent_study = studies[dataset.study_id]
+            study_uri = parent_study.uri
+            if dataset.subject_species not in parent_study.subject_species:
+                parent_study.subject_species.append(dataset.subject_species)
         else:
             study_uri = None
             no_study_datasets += 1
-        triples.extend(dataset.get_triples(study_uri))
+        dataset_triples.extend(dataset.get_triples(study_uri))
         dataset_count += 1
     print("There will be " + str(dataset_count) + " new datasets.")
     if no_study_datasets > 0:
         print("There are {} datasets without studies"
               .format(no_study_datasets))
-    return triples
+    for study in studies.values():
+        study_triples.extend(study.get_species_triples())
+    return dataset_triples, study_triples
 
 
 def get_tools(config):
@@ -473,15 +546,17 @@ def main():
     print_to_file(all_proj_triples, project_file)
 
     # Studies
+    # Study file printed after datasets
     studies = get_studies(mwb_cur, sup_cur, people, orgs)
     study_triples, study_summaries = make_studies(aide.namespace, studies, projects)
-    all_study_triples = study_triples + study_summaries
-    print_to_file(all_study_triples, study_file)
 
     # Datasets
     datasets = get_datasets(mwb_cur)
-    dataset_triples = make_datasets(aide.namespace, datasets, studies)
+    dataset_triples, study_sup_triples = make_datasets(aide.namespace, datasets, studies)
     print_to_file(dataset_triples, dataset_file)
+
+    all_study_triples = study_triples + study_summaries + study_sup_triples
+    print_to_file(all_study_triples, study_file)
 
     summary_triples = project_summaries + study_summaries
     # If you've made it this far, it's time to delete
