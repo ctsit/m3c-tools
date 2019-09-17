@@ -535,9 +535,9 @@ def main():
     print_to_file(people_triples, people_file)
 
     # Tools
-    # tools = get_tools(config)
-    # tools_triples = make_tools(aide.namespace, tools, people)
-    # print_to_file(tools_triples, tools_file)
+    tools = get_tools(config)
+    tools_triples = make_tools(aide.namespace, tools, people)
+    print_to_file(tools_triples, tools_file)
 
     # Projects
     projects = get_projects(mwb_cur, sup_cur, people, orgs)
@@ -560,14 +560,14 @@ def main():
 
     summary_triples = project_summaries + study_summaries
     # If you've made it this far, it's time to delete
-    # aide.do_delete()
-    # do_upload(aide, org_triples)
-    # do_upload(aide, people_triples)
-    # do_upload(aide, project_triples)
-    # do_upload(aide, study_triples)
-    # do_upload(aide, dataset_triples)
-    # do_upload(aide, tools_triples)
-    # do_upload(aide, summary_triples, 1)
+    aide.do_delete()
+    do_upload(aide, org_triples)
+    do_upload(aide, people_triples)
+    do_upload(aide, project_triples)
+    do_upload(aide, study_triples)
+    do_upload(aide, dataset_triples)
+    do_upload(aide, tools_triples)
+    do_upload(aide, summary_triples, 1)
 
 
 if __name__ == "__main__":
