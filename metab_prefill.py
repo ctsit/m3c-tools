@@ -45,6 +45,8 @@ def add_organization(cursor: psycopg2.extensions.cursor, type: str, name: str,
     insert_org = '''
         INSERT INTO organizations (id     , name, type, parent_id)
              VALUES               (DEFAULT, %s  , %s  , %s       )
+        ON CONFLICT (name, type, parent_id)
+        DO UPDATE SET name=organizations.name
           RETURNING id
     '''
 
