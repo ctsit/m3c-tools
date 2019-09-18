@@ -50,7 +50,8 @@ def get_organizations(sup_cur):
     orgs = {}
     sup_cur.execute("""\
                     SELECT id, name, type, parent_id
-                    FROM organizations""")
+                    FROM organizations
+                    WHERE withheld = FALSE""")
     for row in sup_cur:
         org = Organization()
         org.org_id = row[0]
@@ -81,6 +82,7 @@ def get_people(sup_cur):
     sup_cur.execute("""\
             SELECT id, first_name, last_name, display_name, email, phone
             FROM people
+            WHERE withheld = FALSE
             JOIN names
             ON id=person_id""")
     for row in sup_cur:
@@ -161,8 +163,8 @@ def get_projects(mwb_cur, sup_cur, people, orgs):
             sup_cur.execute("""\
                         SELECT id, parent_id
                         FROM organizations
-                        WHERE name=%s""",
-                        (institute,)) 
+                        WHERE name=%s AND withheld = FALSE""",
+                        (institute,))
             try:
                 inst_id = sup_cur.fetchone()[0]
                 project.institute_uri = orgs[inst_id].uri
@@ -175,8 +177,8 @@ def get_projects(mwb_cur, sup_cur, people, orgs):
             sup_cur.execute("""\
                         SELECT id, parent_id
                         FROM organizations
-                        WHERE name=%s""",
-                        (department,)) 
+                        WHERE name=%s AND withheld = FALSE""",
+                        (department,))
             try:
                 dept_options = {}
                 for row in sup_cur:
@@ -193,8 +195,8 @@ def get_projects(mwb_cur, sup_cur, people, orgs):
             sup_cur.execute("""\
                         SELECT id, parent_id
                         FROM organizations
-                        WHERE name=%s""",
-                        (lab,)) 
+                        WHERE name=%s AND withheld = FALSE""",
+                        (lab,))
             try:
                 lab_options = {}
                 for row in sup_cur:
@@ -280,8 +282,8 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
             sup_cur.execute("""\
                         SELECT id, parent_id
                         FROM organizations
-                        WHERE name=%s""",
-                        (institute,)) 
+                        WHERE name=%s AND withheld = FALSE""",
+                        (institute,))
             try:
                 inst_id = sup_cur.fetchone()[0]
                 study.institute_uri = orgs[inst_id].uri
@@ -294,8 +296,8 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
             sup_cur.execute("""\
                         SELECT id, parent_id
                         FROM organizations
-                        WHERE name=%s""",
-                        (department,)) 
+                        WHERE name=%s AND withheld = FALSE""",
+                        (department,))
             try:
                 dept_options = {}
                 for row in sup_cur:
@@ -312,8 +314,8 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
             sup_cur.execute("""\
                         SELECT id, parent_id
                         FROM organizations
-                        WHERE name=%s""",
-                        (lab,)) 
+                        WHERE name=%s AND withheld = FALSE""",
+                        (lab,))
             try:
                 lab_options = {}
                 for row in sup_cur:
