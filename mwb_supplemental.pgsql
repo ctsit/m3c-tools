@@ -1,6 +1,6 @@
 -- mwb_supplemental
 
--- For tables have a "withheld" column, if set (to TRUE), then the importer
+-- For tables with a "withheld" column, if set (to TRUE), then the importer
 -- should not generate triples for the record.
 
 CREATE TABLE IF NOT EXISTS public.people
