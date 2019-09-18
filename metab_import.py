@@ -2,10 +2,11 @@
 Metab Importer
 Usage:
     import.py (-h | --help)
-    import.py <path_to_config>
+    import.py [-d | --dry-run] <path_to_config>
 
 Options:
     -h --help       Show this message and exit
+    -d --dry-run    Create rdf files but do not delete and reupload data to VIVO
 
 Instructions:
     Run the importer where you have access to the postgres metabolomics
@@ -475,7 +476,12 @@ def main():
         print(__doc__)
         sys.exit()
 
-    config_path = sys.argv[1]
+    if sys.argv[1] in ["-d", "--dry-run"]:
+        DRY_RUN = True
+        config_path = sys.argv[2]
+    else:
+        DRY_RUN = False
+        config_path = sys.argv[1]
 
     timestamp = datetime.now()
     path = 'data_out/' + timestamp.strftime("%Y") + '/' + \
@@ -540,15 +546,16 @@ def main():
     print_to_file(all_study_triples, study_file)
 
     summary_triples = project_summaries + study_summaries
-    # If you've made it this far, it's time to delete
-    aide.do_delete()
-    do_upload(aide, org_triples)
-    do_upload(aide, people_triples)
-    do_upload(aide, project_triples)
-    do_upload(aide, study_triples)
-    do_upload(aide, dataset_triples)
-    do_upload(aide, tools_triples)
-    do_upload(aide, summary_triples, 1)
+    if not DRY_RUN:
+        # If you've made it this far, it's time to delete
+        aide.do_delete()
+        do_upload(aide, org_triples)
+        do_upload(aide, people_triples)
+        do_upload(aide, project_triples)
+        do_upload(aide, study_triples)
+        do_upload(aide, dataset_triples)
+        do_upload(aide, tools_triples)
+        do_upload(aide, summary_triples, 1)
 
 
 if __name__ == "__main__":
