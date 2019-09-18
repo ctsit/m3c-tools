@@ -34,3 +34,321 @@ batman.r-forge.r-project.org:
   license:
     kind: Boost Software License Version 1.0
     url: "https://r-forge.r-project.org/scm/viewvc.php/*checkout*/pkg/batman/LICENSE_1_0.txt?root=batman"
+github.com/dgrapov/CTSgetR:
+  name: CTSgetR
+  description: |
+    "R interface to Chemical Translation Service (CTS)"
+  url: https://github.com/dgrapov/CTSgetR
+  authors: 
+    - name: Dmitry Grapov
+      email: dgrapov@gmail.com
+  license:
+    - kind: MIT
+    - url: https://opensource.org/licenses/MIT
+  tags:
+    - R
+
+stat.ethz.ch/R-manual/R-patched/library/stats/html/hclust.html:
+  name: Hierarchical Clustering
+  description: |
+    "Hierarchical cluster analysis on a set of dissimilarities and methods for analyzing it."
+  url: https://stat.ethz.ch/R-manual/R-patched/library/stats/html/hclust.html
+  author:
+    - name: Fionn Murtagh
+      email: fmurtagh@acm.org
+  license: 
+    kind: GNU GENERAL PUBLIC LICENSE
+    url: https://cran.r-project.org/web/licenses/GPL-3
+  
+stat.ethz.ch/R-manual/R-devel/library/MASS/html/lda.html:
+  name: Linear Discriminant Analysis
+  description: |
+    "Linear discriminant analysis."
+  url: https://stat.ethz.ch/R-manual/R-devel/library/MASS/html/lda.html
+  author:
+  license:
+    kind: GNU General Public License
+    url: https://www.r-project.org/Licenses/GPL-2
+
+cran.r-project.org/web/packages/muma/index.html:
+  name: Metabolomics Univariate and Multivariate Analysis
+  description: |
+    "Preprocessing of high-throughput data (normalization and scalings)"
+  url: https://cran.r-project.org/web/packages/muma/index.html
+  author: 
+    - name: Edoardo Gaude
+      email: egaude541@gmail.com
+    - name: Francesca Chignola
+    - name: Dimitrios Spiliotopoulos
+    - name: Silvia Mari
+    - name: Andrea Spitaleri
+    - name: Michela Ghitti
+  license:
+    kind: GNU GENERAL PUBLIC LICENSE
+    url: https://cran.r-project.org/web/licenses/GPL-3
+  
+stat.ethz.ch/R-manual/R-patched/library/stats/html/prcomp.html:
+  name: Principal Components Analysis
+  description: |
+    "Performs a principal components analysis on the given data matrix and returns the results as an object of class prcomp."
+  url: https://stat.ethz.ch/R-manual/R-patched/library/stats/html/prcomp.html
+  author: 
+  license:
+    kind: GNU General Public License
+    url: https://www.r-project.org/Licenses/GPL-2
+
+cran.cnr.berkeley.edu/:
+  name: The Comprehensive R Archive Network
+  description: >
+    "freely available language and environment for statistical computing and graphics which provides a
+    wide variety of statistical and graphical techniques."
+  url: http://cran.cnr.berkeley.edu/
+  author: 
+    - name:  The College of Natural Resources at University of California, Berkeley
+  license:
+    kind: GNU GENERAL PUBLIC LICENSE
+    url: https://www.r-project.org/Licenses/GPL-2
+
+# odd site 
+3omics.cmdm.tw:
+  name: 3omics
+  description: |
+    "Web tool for visualizing and rapidly integrating multiple inter- or intra-transcriptomic, proteomic, and metabolomic human data."
+  url: https://3omics.cmdm.tw
+  author:
+    - name: MDDLab
+  license: 
+    kind: 
+    url:
+
+# paid product
+acdlabs.com/products/adh/spectrusprocessor/index.php:
+  name: ACD/ NMR Processor Academic Edition
+  description: |
+    "Free NMR processing software for academic and non-commercial use only"
+  url: https://www.acdlabs.com/products/adh/spectrusprocessor/index.php
+  author:
+    - name: ACD/Labs
+  license: 
+    kind: 
+    url:
+
+CHEMDATA.NIST.GOV:
+  name: Mass Spectrometry Data Center
+  description: >
+    "Mass spectral libraries and data analysis tools include AMDIS 
+    (Automated Mass Spectral Deconvolution and Identification System for GC/MS) 
+    and MS Interpreter (for fragmentation analysis)."
+  url: https://chemdata.nist.gov
+  author:
+    - name: National Institute of Standards and Technology 
+      email: massspec@nist.gov
+  license: 
+    kind: open ? 
+    url:
+
+cts.fiehnlab.ucdavis.edu/:
+  name: Chemical Translation Service
+  description: >
+    Web-based service for metabolite identifier translation between > 200 common biological databases, including; 
+    Chemical Name, InChIKey, PubChem, ChemSpider, BioCyc, ChEBI, CAS, HMDB, KEGG and LIPID MAPS.
+  url: http://cts.fiehnlab.ucdavis.edu/
+  author: 
+    - name: Sajjan Mehta
+    - name: Diego Pedrosa
+  license: 
+    kind: GNU LESSER GENERAL PUBLIC LICENSE
+    url: http://www.gnu.org/licenses/lgpl-3.0.html
+
+# paid product
+chenomx.com:
+  name: Chenomx NMR Suite
+  description: |
+    "Chenomx specializes in mixture analysis for applications in life sciences such as 
+    metabolomics, food/nutrition, and cell culture research."
+  url: https://www.chenomx.com
+  author: 
+    - name: Chenomx
+  license:
+    kind:
+    url:
+
+cytoscape.org:
+  name: Cytoscape
+  description: |
+    "Cytoscape is an open source software platform for visualizing complex networks and 
+    integrating these with any type of attribute data"
+  url: https://cytoscape.org
+  author: 
+  license: 
+    kind: GNU LESSER GENERAL PUBLIC LICENSE
+    url: http://www.gnu.org/licenses/lgpl-3.0.html
+
+github.com/dgrapov/DeviumWeb:
+  name: DeviumWeb
+  description: |
+    "Interactive multivariate data analysis in R implemented in shiny."
+  url: https://github.com/dgrapov/DeviumWeb
+  author: 
+    - name: Dmitry Grapov
+      email: dgrapov@gmail.com
+  license:
+    kind: AGPLv3
+    url: http://www.tldrlegal.com/l/AGPL3
+
+genome.jp/kegg/:
+  name: Kyoto Encyclopedia of Genes and Genomes
+  description: >
+    "KEGG is a database resource for understanding high-level functions and 
+    utilities of the biological system, such as the cell, the organism 
+    and the ecosystem, from molecular-level information, especially large-scale molecular datasets generated by 
+    genome sequencing and other high-throughput experimental technologies"
+  url: https://www.genome.jp/kegg/
+  author:
+  license:
+    kind: "?"
+    url: https://www.kegg.jp/kegg/legal.html
+
+csbg.cnb.csic.es/mbrole2/:
+  name: MBrole 2.0
+  description: |
+    "Metabolite enrichment analysis"
+  url: http://csbg.cnb.csic.es/mbrole2/
+author:
+  - name: Javier Lopez-Lbanez
+    email: jlopezibanez@cnb.csic.es
+  license:
+    kind: Creative Commons Attribution-NonCommercial 4.0 International License.
+    url: https://creativecommons.org/licenses/by-nc/4.0/
+
+metaboanalyst.ca:
+  name: MetaboAnalyst
+  description: |
+    "Tool suite for metabolomics analysis"
+  url: https://www.metaboanalyst.ca
+  author: 
+    - name: Xia Lab
+      email: jeff.xia@mcgill.ca
+  license: 
+    kind: GNU General Public License
+    url: http://www.gnu.org/licenses/
+  
+github.com/dgrapov/MetaMapR:
+  name: MetaMapR
+  description: |
+    "Local or web-based tool for generating biochemical interaction (KEGG), structural similarity 
+    (PubChem Substructure Fingerprints), mass spectral similarity and correlation based networks."
+  url: http://dgrapov.github.io/MetaMapR/
+  author: 
+    - name: Dmitry Grapov
+      email: dgrapov@gmail.com
+  license: 
+    kind: GNU General Public License
+    url: https://github.com/dgrapov/MetaMapR/blob/master/LICENSE
+
+metap.helmholtz-muenchen.de/metap2:
+  name: metaP-server
+  description: |
+    "automates data analysis for the processing of metabolomics experiments."
+  url: http://metap.helmholtz-muenchen.de/metap2/
+  author: 
+    - name: Gabi Kastenmüller
+      email: presse@helmholtz-muenchen.de
+    - name: Werner Römisch-Margl
+  license:
+    kind: 
+    url:  https://www.pathway.jp/licensing/commercial.html
+
+metexplore.fr:
+  name: MetaExplore
+  description: |
+    "MetExplore is a free academic service allowing; Importing/storing/sharing genome scale meta­bolic networks; Map­ping poly­omics data; 
+    Path­way enrichment; Visu­al­iz­ing networks; Min­ing net­works based on data and net­work structure; and Com­put­ing fluxes"
+  url: http://www.metexplore.fr
+  author: 
+    - name: Institut national de la recherche agronomique
+      email: "?"
+  license:
+    kind: Creative Commons Attribution-NonCommercial 4.0 International License.
+    url: https://creativecommons.org/licenses/by-nc/4.0/
+
+metscape.ncibi.org/: 
+  name: MetScape 3 for Cytoscape
+  description: |
+    "The MetScape Plugin for Cytoscape provides a bioinformatics framework for the visualization and interpretation of metabolomic 
+    and expression profiling data in the context of human metabolism."
+  url: http://metscape.ncibi.org/
+  author:
+    - name: Bill Duren
+      email: metscape-help@umich.edu
+    - name: Terry E. Weymouth
+    - name: Tim Hull
+    - name: Alla Karnovsky
+  license:
+    kind: "?"
+    url: "?"
+
+# Paid service 
+umetrics.com/products/simca: 
+  name: SIMCA
+  description: |
+    "Multivariate statistical analysis (PCA, PLSDA etc.)"
+  url: https://umetrics.com/products/simca
+  author: 
+    - name: Sartorius Stedim Biotech
+      email: umetrics@sartorius-stedim.com
+  license: 
+    kind:
+    url:
+
+# paid service
+statsoft.com/Products/STATISTICA-Features:
+  name: Statistica product features
+  description: |
+    "tools for statistical analysis of data"
+  url: http://www.statsoft.com/Products/STATISTICA-Features
+  author:
+    - name: 
+      email:
+  license: 
+    kind:
+    url:
+
+imdevsoftware.wordpress.com/tutorials/:
+  name: Teaching Demos
+  description: |
+    "DemosTutorials, case studies and demonstrations of metabolomic data analyses"
+  url: https://imdevsoftware.wordpress.com/tutorials/
+  author: 
+    - name: Dmitry Grapov
+      email: dgrapov@gmail.com
+  license: 
+    kind: Creative Commons Attribution-NonCommercial 4.0 International License.
+    url: https://creativecommons.org/licenses/by-nc/4.0/
+
+#paid service
+tibco.com/products/tibco-spotfire:
+  name: Tibco Spotfire
+  description: |
+    "Tools for statistical analysis of data."
+  url: https://www.tibco.com/products/tibco-spotfire
+  author:
+    - name: Tibco
+      email: analyst.relations@tibco.com
+  license:
+    kind: 
+    url:
+
+waters.com/waters/library.htm?lid=134683264&locale=en_US:
+  name: TransOmics Informatics Powered by Nonlinear Dynamics
+  description: |
+    "Platform for bioinformatics, statistical analysis, and reporting of key results."
+  author:
+    - name: Lee Gethings
+    - name: Martha Stapels
+    - name: Ian Mons
+    - name: Jackson Pope
+    - name: James Langridge
+  license:
+    kind: 
+    url:
