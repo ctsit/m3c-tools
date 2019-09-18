@@ -145,27 +145,11 @@ def get_projects(mwb_cur, sup_cur, people, orgs):
         last_name = row[6]
         first_name = row[7]
         if row[8]:
-            if row[8].lower() != 'none':
-                institute = row[8].replace('\n', '')
-            else:
-                institute = None
-        else:
-            institute = None
+            institute = row[8]
         if row[9]:
-            if row[9].lower() != 'none':
-                department = row[9].replace('\n', '')
-                department = department
-            else:
-                department = None
-        else:
-            department = None
+            department = row[9]
         if row[10]:
-            if row[10].lower() != 'none':
-                lab = row[10].replace('\n', '')
-            else:
-                institute = None
-        else:
-            lab = None
+            lab = row[10]
 
         if institute:
             sup_cur.execute("""\
@@ -274,26 +258,11 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
         last_name = row[6]
         first_name = row[7]
         if row[8]:
-            if row[8].lower() != 'none':
-                institute = row[8].replace('\n', '')
-            else:
-                institute = None
-        else:
-            institute = None
+            institute = row[8]
         if row[9]:
-            if row[9].lower() != 'none':
-                department = row[9].replace('\n', '')
-            else:
-                department = None
-        else:
-            department = None
+            department = row[9]
         if row[10]:
-            if row[10].lower() != 'none':
-                lab = row[10].replace('\n', '')
-            else:
-                institute = None
-        else:
-            lab = None
+            lab = row[10]
 
         if institute:
             sup_cur.execute("""\
