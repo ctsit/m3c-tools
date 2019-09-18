@@ -146,10 +146,16 @@ def get_projects(mwb_cur, sup_cur, people, orgs):
         first_name = row[7]
         if row[8]:
             institute = row[8]
+        else:
+            institute = None
         if row[9]:
             department = row[9]
+        else:
+            department = None
         if row[10]:
             lab = row[10]
+        else:
+            lab = None
 
         if institute:
             sup_cur.execute("""\
@@ -259,10 +265,16 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
         first_name = row[7]
         if row[8]:
             institute = row[8]
+        else:
+            institute = None
         if row[9]:
             department = row[9]
+        else:
+            department = None
         if row[10]:
             lab = row[10]
+        else:
+            lab = None
 
         if institute:
             sup_cur.execute("""\
