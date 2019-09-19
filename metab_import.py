@@ -480,10 +480,10 @@ def main():
         sys.exit()
 
     if sys.argv[1] in ["-d", "--dry-run"]:
-        DRY_RUN = True
+        dry_run = True
         config_path = sys.argv[2]
     else:
-        DRY_RUN = False
+        dry_run = False
         config_path = sys.argv[1]
 
     timestamp = datetime.now()
@@ -552,23 +552,25 @@ def main():
     print_to_file(all_study_triples, study_file)
 
     summary_triples = project_summaries + study_summaries
-    if not DRY_RUN:
-        # If you've made it this far, it's time to delete
-        aide.do_delete()
-        do_upload(aide, org_triples)
-        print("Organizations uploaded")
-        do_upload(aide, people_triples)
-        print("People uploaded")
-        do_upload(aide, project_triples)
-        print("Projects uploaded")
-        do_upload(aide, study_triples)
-        print("Studies uploaded")
-        do_upload(aide, dataset_triples)
-        print("Datasets uploaded")
-        do_upload(aide, tools_triples)
-        print("Tools uploaded")
-        do_upload(aide, summary_triples, 1)
-        print("Summaries uploaded")
+    if dry_run:
+        sys.exit()
+
+    # If you've made it this far, it's time to delete
+    aide.do_delete()
+    do_upload(aide, org_triples)
+    print("Organizations uploaded")
+    do_upload(aide, people_triples)
+    print("People uploaded")
+    do_upload(aide, project_triples)
+    print("Projects uploaded")
+    do_upload(aide, study_triples)
+    print("Studies uploaded")
+    do_upload(aide, dataset_triples)
+    print("Datasets uploaded")
+    do_upload(aide, tools_triples)
+    print("Tools uploaded")
+    do_upload(aide, summary_triples, 1)
+    print("Summaries uploaded")
 
 
 if __name__ == "__main__":
