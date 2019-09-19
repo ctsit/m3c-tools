@@ -27,5 +27,6 @@ class Aide(object):
             return True
 
     def do_delete(self):
-        query = "CLEAR GRAPH <http://vitro.mannlib.cornell.edu/default/vitro-kb-2>"
+        query = \
+            "CLEAR GRAPH <http://vitro.mannlib.cornell.edu/default/vitro-kb-2>"
         self.do_update(query)

@@ -2,10 +2,11 @@
 Metab Importer
 Usage:
     import.py (-h | --help)
-    import.py <path_to_config>
+    import.py [-d | --dry-run] <path_to_config>
 
 Options:
     -h --help       Show this message and exit
+    -d --dry-run    Create rdf files without deleting and uploading to VIVO
 
 Instructions:
     Run the importer where you have access to the postgres metabolomics
@@ -164,21 +165,21 @@ def get_projects(mwb_cur, sup_cur, people, orgs):
                         SELECT id, parent_id
                         FROM organizations
                         WHERE name=%s AND withheld = FALSE""",
-                        (institute,))
+                            (institute,))
             try:
                 inst_id = sup_cur.fetchone()[0]
                 project.institute_uri = orgs[inst_id].uri
             except TypeError:
                 print("Error: Organization does not exist.")
                 print("Organization for project " + project.project_id)
-                print("Organization name: " + org_name)
+                print("Organization name: " + institute)
                 sys.exit()
         if department:
             sup_cur.execute("""\
                         SELECT id, parent_id
                         FROM organizations
                         WHERE name=%s AND withheld = FALSE""",
-                        (department,))
+                            (department,))
             try:
                 dept_options = {}
                 for row in sup_cur:
@@ -189,14 +190,14 @@ def get_projects(mwb_cur, sup_cur, people, orgs):
             except TypeError:
                 print("Error: Organization does not exist.")
                 print("Organization for project " + project.project_id)
-                print("Organization name: " + org_name)
+                print("Organization name: " + department)
                 sys.exit()
         if lab:
             sup_cur.execute("""\
                         SELECT id, parent_id
                         FROM organizations
                         WHERE name=%s AND withheld = FALSE""",
-                        (lab,))
+                            (lab,))
             try:
                 lab_options = {}
                 for row in sup_cur:
@@ -207,14 +208,14 @@ def get_projects(mwb_cur, sup_cur, people, orgs):
             except TypeError:
                 print("Error: Organization does not exist.")
                 print("Organization for project " + project.project_id)
-                print("Organization name: " + org_name)
+                print("Organization name: " + lab)
                 sys.exit()
 
         sup_cur.execute("""\
                     SELECT person_id
                     FROM names
                     WHERE last_name=%s AND first_name=%s""",
-                    (last_name, first_name))
+                        (last_name, first_name))
         try:
             person_id = sup_cur.fetchone()[0]
             project.pi_uri = people[person_id].uri
@@ -283,21 +284,21 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
                         SELECT id, parent_id
                         FROM organizations
                         WHERE name=%s AND withheld = FALSE""",
-                        (institute,))
+                            (institute,))
             try:
                 inst_id = sup_cur.fetchone()[0]
                 study.institute_uri = orgs[inst_id].uri
             except TypeError:
                 print("Error: Organization does not exist.")
                 print("Organization for study " + study.study_id)
-                print("Organization name: " + org_name)
+                print("Organization name: " + institute)
                 sys.exit()
         if department:
             sup_cur.execute("""\
                         SELECT id, parent_id
                         FROM organizations
                         WHERE name=%s AND withheld = FALSE""",
-                        (department,))
+                            (department,))
             try:
                 dept_options = {}
                 for row in sup_cur:
@@ -308,14 +309,14 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
             except TypeError:
                 print("Error: Organization does not exist.")
                 print("Organization for study " + study.study_id)
-                print("Organization name: " + org_name)
+                print("Organization name: " + department)
                 sys.exit()
         if lab:
             sup_cur.execute("""\
                         SELECT id, parent_id
                         FROM organizations
                         WHERE name=%s AND withheld = FALSE""",
-                        (lab,))
+                            (lab,))
             try:
                 lab_options = {}
                 for row in sup_cur:
@@ -326,14 +327,14 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
             except TypeError:
                 print("Error: Organization does not exist.")
                 print("Organization for study " + study.study_id)
-                print("Organization name: " + org_name)
+                print("Organization name: " + lab)
                 sys.exit()
 
         sup_cur.execute("""\
                     SELECT person_id
                     FROM names
                     WHERE last_name=%s AND first_name=%s""",
-                    (last_name, first_name))
+                        (last_name, first_name))
         try:
             person_id = sup_cur.fetchone()[0]
             study.runner_uri = people[person_id].uri
@@ -456,7 +457,8 @@ def print_to_file(triples, file):
 
 
 def do_upload(aide, triples, chunk_size=20):
-    chunks = [triples[x:x+chunk_size] for x in range(0, len(triples), chunk_size)]
+    chunks = \
+        [triples[x:x+chunk_size] for x in range(0, len(triples), chunk_size)]
     for chunk in chunks:
         query = """
             INSERT DATA {{
@@ -477,7 +479,12 @@ def main():
         print(__doc__)
         sys.exit()
 
-    config_path = sys.argv[1]
+    if sys.argv[1] in ["-d", "--dry-run"]:
+        dry_run = True
+        config_path = sys.argv[2]
+    else:
+        dry_run = False
+        config_path = sys.argv[1]
 
     timestamp = datetime.now()
     path = 'data_out/' + timestamp.strftime("%Y") + '/' + \
@@ -524,33 +531,46 @@ def main():
 
     # Projects
     projects = get_projects(mwb_cur, sup_cur, people, orgs)
-    project_triples, project_summaries = make_projects(aide.namespace, projects)
+    project_triples, project_summaries = \
+        make_projects(aide.namespace, projects)
     all_proj_triples = project_triples + project_summaries
     print_to_file(all_proj_triples, project_file)
 
     # Studies
     # Study file printed after datasets
     studies = get_studies(mwb_cur, sup_cur, people, orgs)
-    study_triples, study_summaries = make_studies(aide.namespace, studies, projects)
+    study_triples, study_summaries = \
+        make_studies(aide.namespace, studies, projects)
 
     # Datasets
     datasets = get_datasets(mwb_cur)
-    dataset_triples, study_sup_triples = make_datasets(aide.namespace, datasets, studies)
+    dataset_triples, study_sup_triples = \
+        make_datasets(aide.namespace, datasets, studies)
     print_to_file(dataset_triples, dataset_file)
 
     all_study_triples = study_triples + study_summaries + study_sup_triples
     print_to_file(all_study_triples, study_file)
 
     summary_triples = project_summaries + study_summaries
+    if dry_run:
+        sys.exit()
+
     # If you've made it this far, it's time to delete
     aide.do_delete()
     do_upload(aide, org_triples)
+    print("Organizations uploaded")
     do_upload(aide, people_triples)
+    print("People uploaded")
     do_upload(aide, project_triples)
+    print("Projects uploaded")
     do_upload(aide, study_triples)
+    print("Studies uploaded")
     do_upload(aide, dataset_triples)
+    print("Datasets uploaded")
     do_upload(aide, tools_triples)
+    print("Tools uploaded")
     do_upload(aide, summary_triples, 1)
+    print("Summaries uploaded")
 
 
 if __name__ == "__main__":
