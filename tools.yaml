@@ -36,6 +36,7 @@ batman.r-forge.r-project.org:
     url: "https://r-forge.r-project.org/scm/viewvc.php/*checkout*/pkg/batman/LICENSE_1_0.txt?root=batman"
   tags:
   - R
+
 github.com/dgrapov/CTSgetR:
   name: CTSgetR
   description: |
@@ -168,8 +169,8 @@ CHEMDATA.NIST.GOV:
 cts.fiehnlab.ucdavis.edu/:
   name: Chemical Translation Service
   description: >
-    Web-based service for metabolite identifier translation between > 200 common biological databases, including; 
-    Chemical Name, InChIKey, PubChem, ChemSpider, BioCyc, ChEBI, CAS, HMDB, KEGG and LIPID MAPS.
+    "Web-based service for metabolite identifier translation between > 200 common biological databases, including; 
+    Chemical Name, InChIKey, PubChem, ChemSpider, BioCyc, ChEBI, CAS, HMDB, KEGG and LIPID MAPS."
   url: http://cts.fiehnlab.ucdavis.edu/
   author: 
     - name: Sajjan Mehta
@@ -183,7 +184,7 @@ cts.fiehnlab.ucdavis.edu/:
 # paid product
 chenomx.com:
   name: Chenomx NMR Suite
-  description: |
+  description: >
     "Chenomx specializes in mixture analysis for applications in life sciences such as 
     metabolomics, food/nutrition, and cell culture research."
   url: https://www.chenomx.com
@@ -197,7 +198,7 @@ chenomx.com:
 
 cytoscape.org:
   name: Cytoscape
-  description: |
+  description: >
     "Cytoscape is an open source software platform for visualizing complex networks and 
     integrating these with any type of attribute data"
   url: https://cytoscape.org
@@ -267,7 +268,7 @@ metaboanalyst.ca:
   
 github.com/dgrapov/MetaMapR:
   name: MetaMapR
-  description: |
+  description: >
     "Local or web-based tool for generating biochemical interaction (KEGG), structural similarity 
     (PubChem Substructure Fingerprints), mass spectral similarity and correlation based networks."
   url: http://dgrapov.github.io/MetaMapR/
@@ -285,7 +286,7 @@ github.com/dgrapov/MetaMapR:
 metap.helmholtz-muenchen.de/metap2:
   name: metaP-server
   description: |
-    "automates data analysis for the processing of metabolomics experiments."
+    "Automates data analysis for the processing of metabolomics experiments."
   url: http://metap.helmholtz-muenchen.de/metap2/
   author: 
     - name: Gabi Kastenmüller
@@ -348,7 +349,7 @@ umetrics.com/products/simca: 
 statsoft.com/Products/STATISTICA-Features:
   name: Statistica product features
   description: |
-    "tools for statistical analysis of data"
+    "Tools for statistical analysis of data"
   url: http://www.statsoft.com/Products/STATISTICA-Features
   author:
     - name: 
