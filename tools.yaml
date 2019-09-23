@@ -35,7 +35,8 @@ batman.r-forge.r-project.org:
     kind: Boost Software License Version 1.0
     url: "https://r-forge.r-project.org/scm/viewvc.php/*checkout*/pkg/batman/LICENSE_1_0.txt?root=batman"
   tags:
-  - R
+  - r
+
 github.com/dgrapov/CTSgetR:
   name: CTSgetR
   description: |
@@ -45,10 +46,10 @@ github.com/dgrapov/CTSgetR:
     - name: Dmitry Grapov
       email: dgrapov@gmail.com
   license:
-    - kind: MIT
-    - url: https://opensource.org/licenses/MIT
+    kind: MIT
+    url: https://opensource.org/licenses/MIT
   tags:
-    - R
+    - r
 
 stat.ethz.ch/R-manual/R-patched/library/stats/html/hclust.html:
   name: Hierarchical Clustering
@@ -62,7 +63,7 @@ stat.ethz.ch/R-manual/R-patched/library/stats/html/hclust.html:
     kind: GNU GENERAL PUBLIC LICENSE
     url: https://cran.r-project.org/web/licenses/GPL-3
   tags:
-    - R
+    - r
   
 stat.ethz.ch/R-manual/R-devel/library/MASS/html/lda.html:
   name: Linear Discriminant Analysis
@@ -74,7 +75,7 @@ stat.ethz.ch/R-manual/R-devel/library/MASS/html/lda.html:
     kind: GNU General Public License
     url: https://www.r-project.org/Licenses/GPL-2
   tags:
-    - R
+    - r
 
 cran.r-project.org/web/packages/muma/index.html:
   name: Metabolomics Univariate and Multivariate Analysis
@@ -93,19 +94,18 @@ cran.r-project.org/web/packages/muma/index.html:
     kind: GNU GENERAL PUBLIC LICENSE
     url: https://cran.r-project.org/web/licenses/GPL-3
   tags:
-    - R
+    - r
   
 stat.ethz.ch/R-manual/R-patched/library/stats/html/prcomp.html:
   name: Principal Components Analysis
   description: |
     "Performs a principal components analysis on the given data matrix and returns the results as an object of class prcomp."
   url: https://stat.ethz.ch/R-manual/R-patched/library/stats/html/prcomp.html
-  author: 
   license:
     kind: GNU General Public License
     url: https://www.r-project.org/Licenses/GPL-2
   tags:
-    - R
+    - r
 
 cran.cnr.berkeley.edu/:
   name: The Comprehensive R Archive Network
@@ -113,13 +113,11 @@ cran.cnr.berkeley.edu/:
     "freely available language and environment for statistical computing and graphics which provides a
     wide variety of statistical and graphical techniques."
   url: http://cran.cnr.berkeley.edu/
-  author: 
-    - name: 
   license:
     kind: GNU GENERAL PUBLIC LICENSE
     url: https://www.r-project.org/Licenses/GPL-2
   tags:
-  - R
+  - r
 
 # odd site 
 3omics.cmdm.tw:
@@ -127,13 +125,8 @@ cran.cnr.berkeley.edu/:
   description: |
     "Web tool for visualizing and rapidly integrating multiple inter- or intra-transcriptomic, proteomic, and metabolomic human data."
   url: https://3omics.cmdm.tw
-  author:
-    - name:
-  license: 
-    kind: 
-    url:
   tags:
-    - Service 
+    - service 
 
 # paid product
 acdlabs.com/products/adh/spectrusprocessor/index.php:
@@ -141,13 +134,8 @@ acdlabs.com/products/adh/spectrusprocessor/index.php:
   description: |
     "Free NMR processing software for academic and non-commercial use only"
   url: https://www.acdlabs.com/products/adh/spectrusprocessor/index.php
-  author:
-    - name:
-  license: 
-    kind: 
-    url:
   tags: 
-    - Service
+    - service
 
 CHEMDATA.NIST.GOV:
   name: Mass Spectrometry Data Center
@@ -155,58 +143,46 @@ CHEMDATA.NIST.GOV:
     "Mass spectral libraries and data analysis tools include AMDIS 
     (Automated Mass Spectral Deconvolution and Identification System for GC/MS) 
     and MS Interpreter (for fragmentation analysis)."
-  url: https://chemdata.nist.gov
-  author:
-    - name: 
-      email:
-  license: 
-    kind:
-    url:
+  url: https://chemdata.nist.gov
   tags:
-    - Data Center
+    - data base
 
 cts.fiehnlab.ucdavis.edu/:
-  name: Chemical Translation Service
+  name: Chemical Translation Service
   description: >
-    Web-based service for metabolite identifier translation between > 200 common biological databases, including; 
-    Chemical Name, InChIKey, PubChem, ChemSpider, BioCyc, ChEBI, CAS, HMDB, KEGG and LIPID MAPS.
+    "Web-based service for metabolite identifier translation between > 200 common biological databases, including; 
+    Chemical Name, InChIKey, PubChem, ChemSpider, BioCyc, ChEBI, CAS, HMDB, KEGG and LIPID MAPS."
   url: http://cts.fiehnlab.ucdavis.edu/
-  author: 
-    - name: Sajjan Mehta
-    - name: Diego Pedrosa
-  license: 
-    kind: GNU LESSER GENERAL PUBLIC LICENSE
-    url: http://www.gnu.org/licenses/lgpl-3.0.html
+  author: 
+    - name: Sajjan Mehta
+    - name: Diego Pedrosa
+  license: 
+    kind: GNU LESSER GENERAL PUBLIC LICENSE
+    url: http://www.gnu.org/licenses/lgpl-3.0.html
   tags: 
-    - AngularJS 
+    - angularJS 
 
 # paid product
 chenomx.com:
   name: Chenomx NMR Suite
-  description: |
+  description: >
     "Chenomx specializes in mixture analysis for applications in life sciences such as 
     metabolomics, food/nutrition, and cell culture research."
   url: https://www.chenomx.com
-  author: 
-    - name: 
-  license:
-    kind:
-    url:
   tags:
-    - Service
+    - service
 
 cytoscape.org:
   name: Cytoscape
-  description: |
+  description: >
     "Cytoscape is an open source software platform for visualizing complex networks and 
     integrating these with any type of attribute data"
   url: https://cytoscape.org
-  author: 
   license: 
     kind: GNU LESSER GENERAL PUBLIC LICENSE
     url: http://www.gnu.org/licenses/lgpl-3.0.html
   tags:
-    - R
+    - r
 
 github.com/dgrapov/DeviumWeb:
   name: DeviumWeb
@@ -220,7 +196,7 @@ github.com/dgrapov/DeviumWeb:
     kind: AGPLv3
     url: http://www.tldrlegal.com/l/AGPL3
   tags:
-    - R
+    - r
 
 genome.jp/kegg/:
   name: Kyoto Encyclopedia of Genes and Genomes
@@ -230,12 +206,11 @@ genome.jp/kegg/:
     and the ecosystem, from molecular-level information, especially large-scale molecular datasets generated by 
     genome sequencing and other high-throughput experimental technologies"
   url: https://www.genome.jp/kegg/
-  author:
   license: 
     kind: Multiple
     url: https://www.kegg.jp/kegg/legal.html
   tags:
-    - Data Base
+    - data base
 
 csbg.cnb.csic.es/mbrole2/:
   name: MBrole 2.0
@@ -249,7 +224,7 @@ author:
     kind: Creative Commons Attribution-NonCommercial 4.0 International License
     url: https://creativecommons.org/licenses/by-nc/4.0/
   tags:
-    - Data Base
+    - data base
 
 metaboanalyst.ca:
   name: MetaboAnalyst
@@ -263,11 +238,11 @@ metaboanalyst.ca:
     kind: GNU General Public License
     url: http://www.gnu.org/licenses/
   tags:
-    - Service
+    - service
   
 github.com/dgrapov/MetaMapR:
   name: MetaMapR
-  description: |
+  description: >
     "Local or web-based tool for generating biochemical interaction (KEGG), structural similarity 
     (PubChem Substructure Fingerprints), mass spectral similarity and correlation based networks."
   url: http://dgrapov.github.io/MetaMapR/
@@ -278,14 +253,14 @@ github.com/dgrapov/MetaMapR:
     kind: GNU General Public License
     url: https://github.com/dgrapov/MetaMapR/blob/master/LICENSE
   tags:
-    - HTML
-    - CSS
-    - JavaScrip
+    - html
+    - css
+    - javascrip
 
 metap.helmholtz-muenchen.de/metap2:
   name: metaP-server
   description: |
-    "automates data analysis for the processing of metabolomics experiments."
+    "Automates data analysis for the processing of metabolomics experiments."
   url: http://metap.helmholtz-muenchen.de/metap2/
   author: 
     - name: Gabi Kastenmüller
@@ -295,7 +270,7 @@ metap.helmholtz-muenchen.de/metap2:
     kind: Multiple
     url:  https://www.pathway.jp/licensing/commercial.html
   tags:
-    - Service 
+    - service 
 
 metexplore.fr:
   name: MetaExplore
@@ -310,7 +285,7 @@ metexplore.fr:
     kind: Creative Commons Attribution-NonCommercial 4.0 International License.
     url: https://creativecommons.org/licenses/by-nc/4.0/
   tags:
-    - Servive
+    - service
 
 metscape.ncibi.org/: 
   name: MetScape 3 for Cytoscape
@@ -324,10 +299,8 @@ metscape.ncibi.org/: 
     - name: Terry E. Weymouth
     - name: Tim Hull
     - name: Alla Karnovsky
-  license:
-    kind: 
-    url: 
   tags:
+    - plugin
 
 # Paid service 
 umetrics.com/products/simca: 
@@ -342,23 +315,17 @@ umetrics.com/products/simca: 
     kind:
     url:
   tags:
-    - Application 
+    - application 
 
 # paid service
 statsoft.com/Products/STATISTICA-Features:
   name: Statistica product features
   description: |
-    "tools for statistical analysis of data"
+    "Tools for statistical analysis of data"
   url: http://www.statsoft.com/Products/STATISTICA-Features
-  author:
-    - name: 
-      email:
-  license: 
-    kind:
-    url:
   tags:
-    - Visual Basic
-    - R
+    - visual basic
+    - r
 
 imdevsoftware.wordpress.com/tutorials/:
   name: Teaching Demos
@@ -372,7 +339,19 @@ imdevsoftware.wordpress.com/tutorials/:
     kind: Creative Commons Attribution-NonCommercial 4.0 International License.
     url: https://creativecommons.org/licenses/by-nc/4.0/
   tags:
-  - Tutorial
+  - tutorial
+
+  #paid service	
+tibco.com/products/tibco-spotfire:	
+  name: Tibco Spotfire	
+  description: |	
+    "Tools for statistical analysis of data."	
+  url: https://www.tibco.com/products/tibco-spotfire	
+  author:	
+    - name: Tibco	
+      email: analyst.relations@tibco.com	
+  tags:
+    - service
 
 waters.com/waters/library.htm?lid=134683264&locale=en_US:
   name: TransOmics Informatics Powered by Nonlinear Dynamics
@@ -385,6 +364,5 @@ waters.com/waters/library.htm?lid=134683264&locale=en_US:
     - name: Ian Mons
     - name: Jackson Pope
     - name: James Langridge
-  license:
-    kind: 
-    url:
+  tags:
+    - documentation 
