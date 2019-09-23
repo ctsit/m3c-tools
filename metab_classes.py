@@ -295,14 +295,14 @@ class Publication(object):
 
     def get_triples(self):
         dtv_uri = self.uri + 'dtv'
-        self.make_datetime()
         rdf = []
         rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://purl.org/ontology/bibo/Article>".format(self.uri))
         rdf.append("<{}> <http://www.w3.org/2000/01/rdf-schema#label> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(self.uri, self.title))
         rdf.append("<{}> <http://purl.org/ontology/bibo/pmid> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(self.uri, self.pmid))
         if self.doi:
             rdf.append("<{}> <http://purl.org/ontology/bibo/doi> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(self.uri, self.doi))
-        if self.datetime:
+        if self.publication_year:
+            self.make_datetime()
             rdf.append("<{}> <http://vivoweb.org/ontology/core#dateTimeValue> <{}>".format(self.uri, dtv_uri))
             rdf.append("<{}> <http://vivoweb.org/ontology/core#dateTime> \"{}\"^^<http://www.w3.org/2001/XMLSchema#dateTime>".format(dtv_uri, self.datetime))
 
