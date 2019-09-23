@@ -98,7 +98,7 @@ class Study(object):
     def get_species_triples(self):
         rdf = []
         for species in self.subject_species:
-            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#subjectSpecies> \"{}\"".format(self.uri, species))
+            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#subjectSpecies> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(self.uri, species))
         return rdf
 
 
@@ -112,7 +112,6 @@ class Dataset(object):
     def get_triples(self, study_uri=None):
         rdf = []
         rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#Dataset>".format(self.uri))
-        # rdf.append("<{}> <http://www.w3.org/2000/01/rdf-schema#label> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(self.uri, self.mb_sample_id))
         rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#sampleId> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(self.uri, self.mb_sample_id))
         if self.subject_species:
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#subjectSpecies> \"{}\"".format(self.uri, self.subject_species))
@@ -279,6 +278,47 @@ class Tool(object):
             if not author.uri:
                 raise Exception('Unknown author "%s" for tool: %s' %
                                 (author.name, self.tool_id))
+
+
+class Publication(object):
+    def __init__(self):
+        self.uri = None
+        self.pmid = None
+        self.title = None
+        self.publication_year = None
+        self.datetime = None
+        self.doi = None
+
+    def make_datetime(self):
+        datetime = self.publication_year + "-01-01T00:00:00"
+        self.datetime = datetime
+
+    def get_triples(self):
+        dtv_uri = self.uri + 'dtv'
+        self.make_datetime()
+        rdf = []
+        rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://purl.org/ontology/bibo/Article>".format(self.uri))
+        rdf.append("<{}> <http://www.w3.org/2000/01/rdf-schema#label> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(self.uri, self.title))
+        rdf.append("<{}> <http://purl.org/ontology/bibo/pmid> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(self.uri, self.pmid))
+        if self.doi:
+            rdf.append("<{}> <http://purl.org/ontology/bibo/doi> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(self.uri, self.doi))
+        if self.datetime:
+            rdf.append("<{}> <http://vivoweb.org/ontology/core#dateTimeValue> <{}>".format(self.uri, dtv_uri))
+            rdf.append("<{}> <http://vivoweb.org/ontology/core#dateTime> \"{}\"^^<http://www.w3.org/2001/XMLSchema#dateTime>".format(dtv_uri, self.datetime))
+
+        return rdf
+
+    def add_person(self, namespace, person_id):
+        person_uri = namespace + str(person_id)
+        relation_uri = namespace + str(person_id) + 'r' + self.pmid
+        rdf = []
+        rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://vivoweb.org/ontology/core#Authorship>".format(relation_uri))
+        rdf.append("<{}> <http://vivoweb.org/ontology/core#relatedBy> <{}>".format(self.uri, relation_uri))
+        rdf.append("<{}> <http://vivoweb.org/ontology/core#relates> <{}>".format(relation_uri, self.uri))
+        rdf.append("<{}> <http://vivoweb.org/ontology/core#relatedBy> <{}>".format(person_uri, relation_uri))
+        rdf.append("<{}> <http://vivoweb.org/ontology/core#relates> <{}>".format(relation_uri, person_uri))
+
+        return rdf
 
 
 def escape(text):
