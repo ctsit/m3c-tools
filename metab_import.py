@@ -83,9 +83,9 @@ def get_people(sup_cur):
     sup_cur.execute("""\
             SELECT id, first_name, last_name, display_name, email, phone
             FROM people
-            WHERE withheld = FALSE
             JOIN names
-            ON id=person_id""")
+            ON id=person_id
+            WHERE withheld = FALSE""")
     for row in sup_cur:
         person = Person()
         person.person_id = row[0]
@@ -481,6 +481,7 @@ def main():
 
     if sys.argv[1] in ["-d", "--dry-run"]:
         dry_run = True
+        print("This is a dry run.")
         config_path = sys.argv[2]
     else:
         dry_run = False

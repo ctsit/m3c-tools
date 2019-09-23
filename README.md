@@ -38,7 +38,11 @@ Next, run:
 
     $ python metab_import.py $CONFIG_PATH
 
-This will produce up to four files: projects.rdf, studies.rdf, datasets.rdf, and people.rdf. These files contain the triples for each respective class. They can be uploaded to VIVO via the Add/Remove RDF data option under the Site Admin menu.
+This will produce up to four files: projects.rdf, studies.rdf, datasets.rdf, and people.rdf. These files contain the triples for each respective class. After the files are printed, the importer will delete the entire http://vitro.mannlib.cornell.edu/default/vitro-kb-2 graph on your VIVO instance. **Everything in this graph will be removed**. If you have manually added triples that are not a part of the import process, they *will* be lost.
+
+If you wish to print the files without deleting the database or automatically uploading the importer output, you can use the `-d` or `--dry-run` flag.
+
+    $ python metab_import.py -d $CONFIG_PATH
 
 ## Running the Admin Page
 
