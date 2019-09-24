@@ -1,0 +1,6 @@
+Changelog
+=========
+## [0.1.0] - 2019-09-24
+### Added
+* Added metab_prefill script, which goes through databases and adds new people and organizations to supplemental database
+* Added metab_import script, which creates profiles for first class objects in metabolomics base and supplemental databases
