@@ -1,0 +1,23 @@
+# MWB Database
+mwb_host: "your_host"
+mwb_database: "your_mwb_db"
+mwb_username: "your_username"
+mwb_password: "your_password"
+mwb_port: "your_open_port"
+
+# Supplemental Database
+sup_host: "your_host"
+sup_database: "your_supplemental_db"
+sup_username: "your_username"
+sup_password: "your_password"
+sup_port: "your_open_port"
+
+# Metabolomics VIVO
+vivo_email: "update_api_authorized_account@email.com"
+vivo_password: "vivo_password"
+update_endpoint: "http://vivo.domain.info/api/sparqlUpdate"
+namespace: "https://vivo.domain.info/individual/"
+
+# Admin Page Requirements
+picturepath: 'pictures'
+secret: 'secret_hex_string'
