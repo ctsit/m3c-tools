@@ -1,5 +1,7 @@
 import json
+import os
 import re
+import textwrap
 import typing
 
 
@@ -158,6 +160,68 @@ class Person(object):
             rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2006/vcard/ns#Telephone>".format(phone_uri))
             rdf.append("<{}> <http://www.w3.org/2006/vcard/ns#telephone> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(phone_uri, self.phone))
         return rdf
+
+
+class Photo(object):
+    def __init__(self, file_storage_root: str, person_id: str, extension: str):
+        self.root = file_storage_root
+        self.person_id = person_id
+        assert int(self.person_id)
+
+        extension = extension.lower()
+        assert extension in ('png', 'jpeg', 'jpg')
+        self.extension = 'jpg'
+        self.mimetype = 'image/jpeg'
+        if extension == 'png':
+            self.extension = 'png'
+            self.mimetype = 'image/png'
+
+    def download_url(self):
+        return f"/file/p{self.person_id}/{self.filename()}"
+
+    def filename(self):
+        return f"photo.{self.extension}"
+
+    def get_triples(self, namespace: typing.Text) -> typing.List[typing.Text]:
+        pid = self.person_id
+        person = f"<{namespace}{pid}>"
+        image = f"<{namespace}{pid}photo>"
+        thumb = f"<{namespace}{pid}thumb>"
+        image_dl = f"<{namespace}p{pid}>"
+        thumb_dl = f"<{namespace}t{pid}>"
+
+        rdf = []
+        rdf.append(f"{person} <http://vitro.mannlib.cornell.edu/ns/vitro/public#mainImage> {image}")
+
+        rdf.append(f"{image} <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://vitro.mannlib.cornell.edu/ns/vitro/public#File>")
+        rdf.append(f"{image} <http://vitro.mannlib.cornell.edu/ns/vitro/public#downloadLocation> {image_dl}")
+        rdf.append(f'{image} <http://vitro.mannlib.cornell.edu/ns/vitro/public#filename> "{self.filename()}"')
+        rdf.append(f'{image} <http://vitro.mannlib.cornell.edu/ns/vitro/public#mimeType> "{self.mimetype}"')
+        rdf.append(f"{image} <http://vitro.mannlib.cornell.edu/ns/vitro/public#thumbnailImage> {thumb}")
+
+        rdf.append(f"{image_dl} <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://vitro.mannlib.cornell.edu/ns/vitro/public#FileByteStream>")
+        rdf.append(f'{image_dl} <http://vitro.mannlib.cornell.edu/ns/vitro/public#directDownloadUrl> "{self.download_url()}"')
+
+        rdf.append(f"{thumb} <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://vitro.mannlib.cornell.edu/ns/vitro/public#File>")
+        rdf.append(f"{thumb} <http://vitro.mannlib.cornell.edu/ns/vitro/public#downloadLocation> {thumb_dl}")
+        rdf.append(f'{thumb} <http://vitro.mannlib.cornell.edu/ns/vitro/public#filename> "{self.filename()}"')
+        rdf.append(f'{thumb} <http://vitro.mannlib.cornell.edu/ns/vitro/public#mimeType> "{self.mimetype}"')
+
+        # TODO: actually generate a thumbnail instead of using the full photo
+        rdf.append(f"{thumb_dl} <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://vitro.mannlib.cornell.edu/ns/vitro/public#FileByteStream>")
+        rdf.append(f'{thumb_dl} <http://vitro.mannlib.cornell.edu/ns/vitro/public#directDownloadUrl> "{self.download_url()}"')
+
+        return rdf
+
+    def path(self):
+        """Get the directory path for the specified person with `person_id`."""
+        # "b~" is shorthand for https://vivo.metabolomics.info/individual/
+        path = f"b~p{self.person_id}"
+        # VIVO expects each directory to be no longer than 3 characters.
+        # See: https://wiki.duraspace.org/display/VIVODOC110x/Image+storage
+        path = textwrap.wrap(path, 3)
+        path = os.path.join(self.root, *path)
+        return path
 
 
 class Organization(object):

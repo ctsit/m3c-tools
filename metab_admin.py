@@ -13,13 +13,17 @@ Instructions:
 Example:
     $ python metab_admin.py config.yaml
 """
+import os
 import sys
+from yaml import safe_load
 
 from flask import Flask, request, flash, redirect, render_template_string
+import werkzeug.datastructures
 from werkzeug.utils import secure_filename
-from yaml import safe_load
 import psycopg2
 import psycopg2.errorcodes
+
+import metab_classes
 
 # Globals
 app = Flask(__name__)
@@ -61,18 +65,28 @@ def main_menu():
     </html>
     '''
 
+
 @app.route('/uploadimage', methods=['GET', 'POST'])
 def upload_image():
     if request.method == 'POST':
         cur = conn.cursor()
         try:
-            first_name = request.form['first_name']
-            last_name = request.form['last_name']
-            person_id = request.form['person_id']
-            picture_file = request.files['picture']
-            extension = picture_file.filename.split('.')[-1]
+            picture_file: werkzeug.datastructures.FileStorage = \
+                request.files['picture']
+            extension: str = picture_file.filename.split('.')[-1]
+            person_id: str = request.form['person_id']
 
-            picture_file.save('{}/'.format(picture_path) + secure_filename('{}.{}'.format(person_id, extension)))
+            person_id = person_id.strip()
+
+            photo = metab_classes.Photo(picture_path, person_id, extension)
+            dirname = photo.path()
+            os.makedirs(dirname, exist_ok=True)
+
+            filename = secure_filename('photo.{}'.format(extension))
+            path = os.path.join(dirname, filename)
+
+            picture_file.save(path)
+
             flash('Completed save sucessfully')
             return redirect(request.url)
         except Exception:
@@ -163,7 +177,7 @@ def upload_image():
 def associate_and_insert_orgs(cur, institute, department, lab, person_id):
     '''
         Takes in a cursor and creates the association between the id and the different organization types. Creates
-        the organization with the right parents if they don't already exist. 
+        the organization with the right parents if they don't already exist.
     '''
     inst_id = None
     if institute is not '':
@@ -259,7 +273,7 @@ def create_person():
         finally:
             cur.close()
         return redirect(request.url)
-    
+
     return render_template_string('''
     <!doctype html>
     <head>
@@ -291,7 +305,7 @@ def create_person():
                     <label>Last Name</label>
                     <input class="form-control" type=text name=last_name required>
                 </div>
-                
+
                 <div class="form-group">
                     <label>Email</label>
                     <input class="form-control" type=email name=email>
@@ -376,7 +390,7 @@ def associate_person():
             if person_id is '':
                 flash('Please search and select someone')
                 return redirect(request.url)
-            
+
             if institute is '' and department is '' and lab is '':
                 flash('Please select or enter at least one institute, department, OR lab.')
                 return redirect(request.url)
@@ -496,7 +510,7 @@ def parent_organization():
     cur.execute('SELECT id, name, type, parent_id from organizations')
     for row in cur.fetchall():
         organizations.append('{} | {} | {} | {}'.format(row[1], row[2], row[0], row[3]))
-    
+
     if request.method == 'POST':
         cur = conn.cursor()
         try:
