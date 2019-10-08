@@ -608,6 +608,8 @@ def main():
     print("Datasets uploaded")
     do_upload(aide, tools_triples)
     print("Tools uploaded")
+    do_upload(aide, photos_triples)
+    print("Photos uploaded")
     do_upload(aide, summary_triples, 1)
     print("Summaries uploaded")
 
