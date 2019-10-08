@@ -100,9 +100,7 @@ def upload_image():
             dirname = photo.path()
             os.makedirs(dirname, exist_ok=True)
 
-            filename = secure_filename(f'photo.{extension}')
-            path = os.path.join(dirname, filename)
-
+            path = os.path.join(dirname, photo.filename())
             pic.save(path)
 
             flash('Completed save sucessfully')
