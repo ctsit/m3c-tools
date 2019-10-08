@@ -163,23 +163,25 @@ class Person(object):
 
 
 class Photo(object):
-    def __init__(self, file_storage_root: str, person_id: str, extension: str):
+    def __init__(self, file_storage_root: str, person_id: str, extension: str,
+                 file_storage_alias: str = "b"):
         self.root = file_storage_root
         self.person_id = person_id
         assert int(self.person_id)
+        self.alias = file_storage_alias
 
         extension = extension.lower()
-        assert extension in ('png', 'jpeg', 'jpg')
-        self.extension = 'jpg'
-        self.mimetype = 'image/jpeg'
-        if extension == 'png':
-            self.extension = 'png'
-            self.mimetype = 'image/png'
+        assert extension in ("png", "jpeg", "jpg")
+        self.extension = "jpg"
+        self.mimetype = "image/jpeg"
+        if extension == "png":
+            self.extension = "png"
+            self.mimetype = "image/png"
 
-    def download_url(self):
+    def download_url(self) -> str:
         return f"/file/p{self.person_id}/{self.filename()}"
 
-    def filename(self):
+    def filename(self) -> str:
         return f"photo.{self.extension}"
 
     def get_triples(self, namespace: typing.Text) -> typing.List[typing.Text]:
@@ -213,10 +215,10 @@ class Photo(object):
 
         return rdf
 
-    def path(self):
+    def path(self) -> str:
         """Get the directory path for the specified person with `person_id`."""
         # "b~" is shorthand for https://vivo.metabolomics.info/individual/
-        path = f"b~p{self.person_id}"
+        path = f"{self.alias}~p{self.person_id}"
         # VIVO expects each directory to be no longer than 3 characters.
         # See: https://wiki.duraspace.org/display/VIVODOC110x/Image+storage
         path = textwrap.wrap(path, 3)

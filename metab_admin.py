@@ -13,11 +13,12 @@ Instructions:
 Example:
     $ python metab_admin.py config.yaml
 """
+import logging
 import os
 import sys
 from yaml import safe_load
 
-from flask import Flask, request, flash, redirect, render_template_string
+from flask import Blueprint, Flask, request, flash, redirect, render_template_string
 import werkzeug.datastructures
 from werkzeug.utils import secure_filename
 import psycopg2
@@ -26,9 +27,11 @@ import psycopg2.errorcodes
 import metab_classes
 
 # Globals
-app = Flask(__name__)
+app = Blueprint('metab_admin', __name__)
+
 conn = None
-picture_path = ''
+picture_path = '.'
+file_storage_alias = 'b'
 
 INST_TYPE = 'institute'
 DEPT_TYPE = 'department'
@@ -36,7 +39,7 @@ LAB_TYPE = 'laboratory'
 
 @app.route('/')
 def main_menu():
-    return '''
+    return render_template_string('''
     <!DOCTYPE html>
     <html>
         <head>
@@ -49,21 +52,21 @@ def main_menu():
                     <h1 class="mx-auto">M3C Admin Form</h1>
                 </div>
                 <div class="row my-3">
-                    <button class="btn btn-info w-100" onclick="window.location.href = '/uploadimage'">Upload Profile Picture</button>
+                    <button class="btn btn-info w-100" onclick="window.location.href = '{{ url_for('metab_admin.upload_image') }}'">Upload Profile Picture</button>
                 </div>
                 <div class="row my-3">
-                    <button class="btn btn-info w-100" onclick="window.location.href = '/createperson'">Create New Person</button>
+                    <button class="btn btn-info w-100" onclick="window.location.href = '{{ url_for('metab_admin.create_person') }}'">Create New Person</button>
                 </div>
                 <div class="row my-3">
-                    <button class="btn btn-info w-100" onclick="window.location.href = '/associateperson'">Associate a Person with Inst/Dept/Lab</button>
+                    <button class="btn btn-info w-100" onclick="window.location.href = '{{ url_for('metab_admin.associate_person') }}'">Associate a Person with Inst/Dept/Lab</button>
                 </div>
                 <div class="row my-3">
-                    <button class="btn btn-info w-100" onclick="window.location.href = '/parentorganization'">Modify an Organization's Parent</button>
+                    <button class="btn btn-info w-100" onclick="window.location.href = '{{ url_for('metab_admin.parent_organization') }}'">Modify an Organization's Parent</button>
                 </div>
             </div>
         </body>
     </html>
-    '''
+    ''')
 
 
 @app.route('/uploadimage', methods=['GET', 'POST'])
@@ -71,25 +74,26 @@ def upload_image():
     if request.method == 'POST':
         cur = conn.cursor()
         try:
-            picture_file: werkzeug.datastructures.FileStorage = \
-                request.files['picture']
-            extension: str = picture_file.filename.split('.')[-1]
+            pic: werkzeug.datastructures.FileStorage = request.files['picture']
+            extension: str = pic.filename.split('.')[-1]
             person_id: str = request.form['person_id']
 
             person_id = person_id.strip()
 
-            photo = metab_classes.Photo(picture_path, person_id, extension)
+            photo = metab_classes.Photo(picture_path, person_id, extension,
+                                        file_storage_alias)
             dirname = photo.path()
             os.makedirs(dirname, exist_ok=True)
 
-            filename = secure_filename('photo.{}'.format(extension))
+            filename = secure_filename(f'photo.{extension}')
             path = os.path.join(dirname, filename)
 
-            picture_file.save(path)
+            pic.save(path)
 
             flash('Completed save sucessfully')
             return redirect(request.url)
         except Exception:
+            logging.exception('upload_image')
             flash('Error uploading file')
             return redirect(request.url)
 
@@ -112,7 +116,7 @@ def upload_image():
             <div class="row">
                 <h1 class="mx-auto">Upload new profile picture</h1>
             </div>
-            <a href="/">Back to Home</a>
+            <a href="{{ url_for('main_menu') }}">Back to Home</a>
             {% with messages = get_flashed_messages() %}
                 {% if messages %}
                     {% for message in messages %}
@@ -285,7 +289,7 @@ def create_person():
             <div class="row">
                 <h1 class="mx-auto">Create a new Person</h1>
             </div>
-            <a href="/">Back to Home</a>
+            <a href="{{ url_for('metab_admin.main_menu') }}">Back to Home</a>
             {% with messages = get_flashed_messages() %}
                 {% if messages %}
                     {% for message in messages %}
@@ -416,7 +420,7 @@ def associate_person():
     <body>
         <div class="container mx-auto" style="width: 50%;">
             <h1 class="mx-auto">Associate a Person with a Inst/Dept/Lab</h1>
-            <a href="/">Back to Home</a>
+            <a href="{{ url_for('metab_admin.main_menu') }}">Back to Home</a>
             {% with messages = get_flashed_messages() %}
                 {% if messages %}
                     {% for message in messages %}
@@ -546,7 +550,7 @@ def parent_organization():
     <body>
         <div class="container mx-auto" style="width: 50%;">
             <h1 class="mx-auto">Modify an Orgaization's Parent</h1>
-            <a href="/">Back to Home</a>
+            <a href="{{ url_for('metab_admin.main_menu') }}">Back to Home</a>
             {% with messages = get_flashed_messages() %}
                 {% if messages %}
                     {% for message in messages %}
@@ -663,6 +667,7 @@ def main():
     '''Sets up a simple website for admin tasks'''
     global conn
     global picture_path
+    global file_storage_alias
 
     if len(sys.argv) < 2:
         print(__doc__)
@@ -676,7 +681,9 @@ def main():
 
     with open(config_path, 'r') as f:
         config_map = safe_load(f)
-        picture_path = config_map['picturepath']
+        picture_path = config_map.get('file_storage_root', picture_path)
+        file_storage_alias = config_map.get('file_storage_alias',
+                                            file_storage_alias)
         secret_key = config_map['secret']
         db_host = config_map['sup_host']
         db_database = config_map['sup_database']
@@ -690,8 +697,10 @@ def main():
         print('Cannot connect to the database')
         sys.exit(-1)
 
-    app.secret_key = secret_key
-    app.run()
+    server = Flask(__name__)
+    server.register_blueprint(app, url_prefix=os.getenv('APPLICATION_ROOT', ''))
+    server.secret_key = secret_key
+    server.run()
 
 
 if __name__ == "__main__":
