@@ -172,7 +172,7 @@ def upload_image():
                 <button class="btn btn-primary" type=submit>Upload</button>
             </form>
 
-            <img id="current" style="width: 200; height: auto;" alt="Current Photo" />
+            <img id="current" style="width: 200px; height: auto;" alt="Current Photo" />
         </div>
         <script>
             const displayNameInput = document.getElementById('searchInput');
