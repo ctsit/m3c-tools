@@ -18,7 +18,7 @@ import os
 import sys
 from yaml import safe_load
 
-from flask import Blueprint, Flask, request, flash, redirect, render_template_string
+from flask import Blueprint, Flask, request, flash, redirect, render_template_string, send_file
 import werkzeug.datastructures
 from werkzeug.utils import secure_filename
 import psycopg2
@@ -67,6 +67,21 @@ def main_menu():
         </body>
     </html>
     ''')
+
+
+@app.route('/photo', methods=['GET'])
+def get_photo():
+    pid: int = int(request.args.get('id')) or 0
+    if not pid:
+        return 'id required', 400
+
+    for type in ('jpg', 'png'):
+        pic = metab_classes.Photo(picture_path, pid, type, file_storage_alias)
+        filename = os.path.join(pic.path(), pic.filename())
+        if os.path.isfile(filename):
+            return send_file(filename, mimetype=pic.mimetype)
+
+    return '', 404
 
 
 @app.route('/uploadimage', methods=['GET', 'POST'])
@@ -156,6 +171,8 @@ def upload_image():
 
                 <button class="btn btn-primary" type=submit>Upload</button>
             </form>
+
+            <img id="current" style="width: 200; height: auto;" alt="Current Photo" />
         </div>
         <script>
             const displayNameInput = document.getElementById('searchInput');
@@ -163,6 +180,9 @@ def upload_image():
             const firstName = document.getElementById('firstName');
             const lastName = document.getElementById('lastName');
             const personId = document.getElementById('personId');
+
+            var previousPersonId
+
             displayNameInput.addEventListener('change', (e) => {
                 if (displayNames.includes(e.srcElement.value)) {
                     const splitName = e.srcElement.value.split(' ');
@@ -171,6 +191,12 @@ def upload_image():
                     lastName.value = splitName[1];
                     if (splitId.length > 0) {
                         personId.value = splitId[1];
+
+                        if (personId.value !== previousPersonId) {
+                            previousPersonId = personId.value;
+                            document.getElementById('current').src =
+                                "{{ url_for('metab_admin.get_photo') }}?id=" + previousPersonId;
+                        }
                     }
                 }
             });
@@ -681,7 +707,7 @@ def main():
 
     with open(config_path, 'r') as f:
         config_map = safe_load(f)
-        picture_path = config_map.get('file_storage_root', picture_path)
+        picture_path = config_map.get('picturepath', picture_path)
         file_storage_alias = config_map.get('file_storage_alias',
                                             file_storage_alias)
         secret_key = config_map['secret']
