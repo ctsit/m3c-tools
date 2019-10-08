@@ -116,7 +116,7 @@ def upload_image():
             <div class="row">
                 <h1 class="mx-auto">Upload new profile picture</h1>
             </div>
-            <a href="{{ url_for('main_menu') }}">Back to Home</a>
+            <a href="{{ url_for('metab_admin.main_menu') }}">Back to Home</a>
             {% with messages = get_flashed_messages() %}
                 {% if messages %}
                     {% for message in messages %}
