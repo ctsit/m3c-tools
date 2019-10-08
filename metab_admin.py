@@ -25,6 +25,7 @@ import psycopg2
 import psycopg2.errorcodes
 
 import metab_classes
+import metab_import
 
 # Globals
 app = Blueprint('metab_admin', __name__)
@@ -32,6 +33,7 @@ app = Blueprint('metab_admin', __name__)
 conn = None
 picture_path = '.'
 file_storage_alias = 'b'
+aide = None
 
 INST_TYPE = 'institute'
 DEPT_TYPE = 'department'
@@ -92,6 +94,7 @@ def upload_image():
             pic: werkzeug.datastructures.FileStorage = request.files['picture']
             extension: str = pic.filename.split('.')[-1]
             person_id: str = request.form['person_id']
+            update_triples: bool = request.form.get('update_triples') == 'on'
 
             person_id = person_id.strip()
 
@@ -105,8 +108,33 @@ def upload_image():
 
             pic.save(path)
 
-            flash('Completed save sucessfully')
+            if not update_triples:
+                flash('Completed save sucessfully')
+                return redirect(request.url)
+
+            triples = photo.get_triples(aide.namespace)
+            triples = [t + ' . ' for t in triples]
+            triples = '\n'.join(triples)
+            query = f'''
+                DELETE DATA {{
+                    GRAPH <http://vitro.mannlib.cornell.edu/default/vitro-kb-2> {{
+                            {triples}
+                        }}
+                }} ;
+                INSERT DATA {{
+                    GRAPH <http://vitro.mannlib.cornell.edu/default/vitro-kb-2> {{
+                            {triples}
+                        }}
+                }}
+            '''
+
+            if aide.do_update(query):
+                flash('Completed save sucessfully')
+                return redirect(request.url)
+
+            flash('Completed upload sucessfully, but SPARQL failed to update')
             return redirect(request.url)
+
         except Exception:
             logging.exception('upload_image')
             flash('Error uploading file')
@@ -169,10 +197,17 @@ def upload_image():
                     <input type="file" class="form-control-file" id="inputGroupFile01" name=picture>
                 </div>
 
+                <div class="form-group">
+                    <label>Update Triples?</label>
+                    <input id=update_triples class="form-control" type=checkbox name=update_triples>
+                </div>
+
                 <button class="btn btn-primary" type=submit>Upload</button>
             </form>
 
-            <img id="current" style="width: 200px; height: auto;" alt="Current Photo" />
+            <hr />
+            <p>Old photo</p>
+            <img id="current" style="width: 200px; height: auto;" alt="Old Photo" />
         </div>
         <script>
             const displayNameInput = document.getElementById('searchInput');
@@ -694,6 +729,7 @@ def main():
     global conn
     global picture_path
     global file_storage_alias
+    global aide
 
     if len(sys.argv) < 2:
         print(__doc__)
@@ -716,6 +752,11 @@ def main():
         db_user = config_map['sup_username']
         db_password = config_map['sup_password']
         db_port = config_map['sup_port']
+
+        aide = metab_import.Aide(config_map.get('update_endpoint'),
+                                config_map.get('vivo_email'),
+                                config_map.get('vivo_password'),
+                                config_map.get('namespace'))
 
     try:
         conn = psycopg2.connect(database=db_database, user=db_user, password=db_password, host=db_host, port=db_port)
