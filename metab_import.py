@@ -24,6 +24,7 @@ from aide import Aide
 from metab_classes import Dataset
 from metab_classes import Organization
 from metab_classes import Person
+from metab_classes import Photo
 from metab_classes import Project
 from metab_classes import Study
 from metab_classes import Tool
@@ -122,6 +123,37 @@ def link_people_to_org(sup_cur, people, orgs):
         for row in sup_cur:
             triples.extend(orgs[row[1]].add_person(person.uri))
     return triples
+
+
+def make_photos(namespace: str, photos: list):
+    print("Making Photo triples")
+
+    triples = []
+    for photo in photos:
+        triples.extend(photo.get_triples(namespace))
+
+    print(f"There are {len(photos)} photos.")
+
+    return triples
+
+
+def get_photos(file_storage_root: str, people):
+    photos = []
+    for person in people.values():
+        photo = Photo(file_storage_root, person.person_id, 'jpg')
+
+        jpg = os.path.join(photo.path(), photo.filename())
+        if os.path.isfile(jpg):
+            photos.append(photo)
+            continue
+
+        photo = Photo(file_storage_root, person.person_id, 'png')
+        png = os.path.join(photo.path(), photo.filename())
+        if os.path.isfile(png):
+            photos.append(photo)
+            continue
+
+    return photos
 
 
 def get_projects(mwb_cur, sup_cur, people, orgs):
@@ -500,6 +532,7 @@ def main():
     study_file = os.path.join(path, 'studies.rdf')
     dataset_file = os.path.join(path, 'datasets.rdf')
     tools_file = os.path.join(path, 'tools.rdf')
+    photos_file = os.path.join(path, 'photos.rdf')
 
     config = get_config(config_path)
 
@@ -524,6 +557,11 @@ def main():
     people_triples = make_people(aide.namespace, people)
     people_triples.extend(link_people_to_org(sup_cur, people, orgs))
     print_to_file(people_triples, people_file)
+
+    # Photos
+    photos = get_photos(config.get("picturepath", "."), people)
+    photos_triples = make_photos(aide.namespace, photos)
+    print_to_file(photos_triples, photos_file)
 
     # Tools
     tools = get_tools(config)
@@ -570,6 +608,8 @@ def main():
     print("Datasets uploaded")
     do_upload(aide, tools_triples)
     print("Tools uploaded")
+    do_upload(aide, photos_triples)
+    print("Photos uploaded")
     do_upload(aide, summary_triples, 1)
     print("Summaries uploaded")
 
