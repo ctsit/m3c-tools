@@ -276,9 +276,10 @@ class Tool(object):
         self.description: typing.Text = data['description'].strip()
         self.url: typing.Text = data['url'].strip()
         self.authors: typing.List[Tool.Author] = []
-        for author in data['authors']:
+        authors = data.get('authors', None) or []
+        for author in authors:
             self.authors.append(Tool.Author(**author))
-        license = data['license']
+        license = data.get('license', dict(kind=''))
         self.license: Tool.License = Tool.License(**license)
         self.tags: typing.List[typing.Text] = data.get('tags', [])
 
@@ -311,13 +312,12 @@ class Tool(object):
         rdf.append('<{uri}> <{m3c}homepage> {desc}'
                    .format(uri=uri, m3c=m3c, desc=escape(self.url)))
 
-        if not self.license or not self.license.kind or not self.license.url:
-            raise Exception('Bad license for tool: ' + self.tool_id)
-
-        rdf.append('<{uri}> <{m3c}licenseType> {kind}'
-                   .format(uri=uri, m3c=m3c, kind=escape(self.license.kind)))
-        rdf.append('<{uri}> <{m3c}licenseUrl> {link}'
-                   .format(uri=uri, m3c=m3c, link=escape(self.license.url)))
+        if self.license and self.license.kind and self.license.url:
+            license = self.license
+            rdf.append('<{uri}> <{m3c}licenseType> {kind}'
+                       .format(uri=uri, m3c=m3c, kind=escape(license.kind)))
+            rdf.append('<{uri}> <{m3c}licenseUrl> {link}'
+                       .format(uri=uri, m3c=m3c, link=escape(license.url)))
 
         for author in self.authors:
             if not author.uri:
@@ -336,14 +336,19 @@ class Tool(object):
         return rdf
 
     def match_authors(self, people: typing.Dict[int, Person]):
+        all_matched = True
         for author in self.authors:
             for person in people.values():
                 if person.display_name == author.name:
                     author.uri = person.uri
                     break
-            if not author.uri:
-                raise Exception('Unknown author "%s" for tool: %s' %
-                                (author.name, self.tool_id))
+            if author.uri:
+                continue
+
+            all_matched = False
+            print(f'Unknown author "{author.name}" for tool: {self.tool_id}')
+
+        return all_matched
 
 
 class Publication(object):

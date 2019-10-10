@@ -459,9 +459,10 @@ def get_tools(config):
                 try:
                     tool = Tool(tool_id, data)
                     tools.append(tool)
-                except Exception:
+                except Exception as e:
+                    print(f'{e!r}')
                     print('Error: check configuration for tool "%s"' % tool_id)
-                    raise
+                    continue
             return tools
     except Exception:
         print('Error parsing tools config file: %s' % tools_path)
@@ -474,7 +475,8 @@ def make_tools(namespace, tools, people):
     tool_count = 0
     for tool in tools:
         # First, find all the authors' URIs
-        tool.match_authors(people)
+        if not tool.match_authors(people):
+            continue
         # Now, generate the triples.
         triples.extend(tool.get_triples(namespace))
         tool_count += 1
