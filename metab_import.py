@@ -91,21 +91,27 @@ def diff(prev_path: str, path: str) -> \
 
 
 def diff_upload(aide: Aide, add: typing.List[str], sub: typing.List[str]):
-    print("Differential update: removing old triples")
-    triples = []
+    lines = []
     for line in sub:
-        parts = line.remove(" . \n").split()
-        s, p, o = parts[0], parts[1], parts[2:]
-        triples.append([s, p, o])
-    delete(aide, triples)
+        line = line.strip()
+        if line.endswith(" ."):
+            line = line[:-2]
+        lines.append(line)
 
-    print("Differential update: adding new triples")
-    triples = []
+    if lines:
+        print(f"Differential update: removing {len(lines)} old triples")
+        delete(aide, lines)
+
+    lines = []
     for line in add:
-        parts = line.remove(" . \n").split()
-        s, p, o = parts[0], parts[1], parts[2:]
-        triples.append([s, p, o])
-    insert(aide, triples)
+        line = line.strip()
+        if line.endswith(" ."):
+            line = line[:-2]
+        lines.append(line)
+
+    if lines:
+        print(f"Differential update: adding {len(lines)} new triples")
+        insert(aide, lines)
 
 
 def get_organizations(sup_cur):
@@ -559,18 +565,18 @@ def insert(aide, triples, chunk_size=20):
     do_upload(aide, triples, chunk_size, "INSERT")
 
 
-def do_upload(aide, triples, chunk_size=20, type="INSERT"):
-    assert type in ["INSERT", "DELETE"]
+def do_upload(aide, triples, chunk_size=20, upload_type="INSERT"):
+    assert upload_type in ["INSERT", "DELETE"]
     chunks = [triples[x:x+chunk_size]
               for x in range(0, len(triples), chunk_size)]
     for chunk in chunks:
-        query = """
-            {} DATA {{
+        query = upload_type + """
+            DATA {{
                 GRAPH <http://vitro.mannlib.cornell.edu/default/vitro-kb-2> {{
                     {}
                 }}
             }}
-        """.format(type, " . \n".join(chunk))
+        """.format(" . \n".join(chunk))
         aide.do_update(query)
 
 
