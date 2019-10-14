@@ -528,13 +528,13 @@ def main():
         os.makedirs(path)
     except FileExistsError:
         pass
-    org_file = os.path.join(path, 'orgs.rdf')
-    people_file = os.path.join(path, 'people.rdf')
-    project_file = os.path.join(path, 'projects.rdf')
-    study_file = os.path.join(path, 'studies.rdf')
-    dataset_file = os.path.join(path, 'datasets.rdf')
-    tools_file = os.path.join(path, 'tools.rdf')
-    photos_file = os.path.join(path, 'photos.rdf')
+    org_file = os.path.join(path, 'orgs.nt')
+    people_file = os.path.join(path, 'people.nt')
+    project_file = os.path.join(path, 'projects.nt')
+    study_file = os.path.join(path, 'studies.nt')
+    dataset_file = os.path.join(path, 'datasets.nt')
+    tools_file = os.path.join(path, 'tools.nt')
+    photos_file = os.path.join(path, 'photos.nt')
 
     config = get_config(config_path)
 
