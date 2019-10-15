@@ -2,11 +2,22 @@
 Metab Importer
 Usage:
     import.py (-h | --help)
-    import.py [-d | --dry-run] <path_to_config>
+    import.py [-d | --dry-run] [-x <prev> | --diff=<prev>] <path_to_config>
 
 Options:
-    -h --help       Show this message and exit
-    -d --dry-run    Create rdf files without deleting and uploading to VIVO
+    -h --help     Show this message and exit
+    -d --dry-run  Create N-Triples files without deleting and uploading to VIVO
+    -x --diff     See Differential Update.
+
+Differential Update:
+    A differential update compares the triples produced by a run with that of
+    an older one (<prev>). Two distinct sets of triples are produced:
+     - an "Add" set which contains the set of triples that are in the current
+       run's triples, but not in the older sets.
+     - a "Sub" set which contains the set of triples that are in the older
+       set, but not in the current run's.
+
+    The corresponding files are written to add.nt and sub.nt.
 
 Instructions:
     Run the importer where you have access to the postgres metabolomics
@@ -14,8 +25,11 @@ Instructions:
 """
 
 from datetime import datetime
+import getopt
 import os
+import pathlib
 import sys
+import typing
 import yaml
 
 import psycopg2
@@ -45,6 +59,59 @@ def connect(host, db, user, pg_password, port):
                             password=pg_password, port=port)
     cur = conn.cursor()
     return cur
+
+
+def diff(prev_path: str, path: str) -> \
+        typing.Tuple[typing.List[str], typing.List[str]]:
+    prev = pathlib.Path(prev_path)
+    previous = []
+    for file in prev.glob("*.nt"):
+        if file in ["add.nt", "sub.nt"]:
+            continue
+        with open(file) as f:
+            previous += [line for line in list(f) if line]
+    previous.sort()
+
+    curr = pathlib.Path(path)
+    current = []
+    for file in curr.glob("*.nt"):
+        if file in ["add.nt", "sub.nt"]:
+            continue
+        with open(file) as f:
+            current += [line for line in list(f) if line]
+    current.sort()
+
+    previous = set(previous)
+    current = set(current)
+
+    add = current - previous
+    sub = previous - current
+
+    return (add, sub)
+
+
+def diff_upload(aide: Aide, add: typing.List[str], sub: typing.List[str]):
+    lines = []
+    for line in sub:
+        line = line.strip()
+        if line.endswith(" ."):
+            line = line[:-2]
+        lines.append(line)
+
+    if lines:
+        print(f"Differential update: removing {len(lines)} old triples")
+        delete(aide, lines)
+
+    lines = []
+    for line in add:
+        line = line.strip()
+        if line.endswith(" ."):
+            line = line[:-2]
+        lines.append(line)
+
+    if lines:
+        print(f"Differential update: adding {len(lines)} new triples")
+        insert(aide, lines)
 
 
 def get_organizations(sup_cur):
@@ -490,15 +557,24 @@ def print_to_file(triples, file):
         rdf.write("\n".join(triples))
 
 
-def do_upload(aide, triples, chunk_size=20):
-    chunks = \
-        [triples[x:x+chunk_size] for x in range(0, len(triples), chunk_size)]
+def delete(aide, triples, chunk_size=20):
+    do_upload(aide, triples, chunk_size, "DELETE")
+
+
+def insert(aide, triples, chunk_size=20):
+    do_upload(aide, triples, chunk_size, "INSERT")
+
+
+def do_upload(aide, triples, chunk_size=20, upload_type="INSERT"):
+    assert upload_type in ["INSERT", "DELETE"]
+    chunks = [triples[x:x+chunk_size]
+              for x in range(0, len(triples), chunk_size)]
     for chunk in chunks:
-        query = """
-            INSERT DATA {{
+        query = upload_type + """
+            DATA {{
                 GRAPH <http://vitro.mannlib.cornell.edu/default/vitro-kb-2> {{
-                        {}
-                    }}
+                    {}
+                }}
             }}
         """.format(" . \n".join(chunk))
         aide.do_update(query)
@@ -509,17 +585,32 @@ def main():
         print(__doc__)
         sys.exit(2)
 
-    if sys.argv[1] in ["-h", "--help"]:
+    try:
+        optlist, args = getopt.getopt(sys.argv[1:],
+                                      "dhx:", ["dry-run", "help", "diff="])
+    except getopt.GetoptError:
         print(__doc__)
-        sys.exit()
+        sys.exit(2)
 
-    if sys.argv[1] in ["-d", "--dry-run"]:
-        dry_run = True
-        print("This is a dry run.")
-        config_path = sys.argv[2]
-    else:
-        dry_run = False
-        config_path = sys.argv[1]
+    dry_run = False
+    old_path = ""
+
+    for o, a in optlist:
+        if o in ["-h", "--help"]:
+            print(__doc__)
+            sys.exit()
+        elif o in ["-d", "--dry-run"]:
+            dry_run = True
+            print("This is a dry run.")
+        elif o in ["-x", "--diff"]:
+            old_path = a
+            print("Differential update with previous run: " + old_path)
+
+    if len(args) != 1:
+        print(__doc__)
+        sys.exit(2)
+
+    config_path = args[0]
 
     timestamp = datetime.now()
     path = 'data_out/' + timestamp.strftime("%Y") + '/' + \
@@ -535,6 +626,8 @@ def main():
     dataset_file = os.path.join(path, 'datasets.nt')
     tools_file = os.path.join(path, 'tools.nt')
     photos_file = os.path.join(path, 'photos.nt')
+    add_file = os.path.join(path, 'add.nt')
+    sub_file = os.path.join(path, 'sub.nt')
 
     config = get_config(config_path)
 
@@ -593,26 +686,38 @@ def main():
     print_to_file(all_study_triples, study_file)
 
     summary_triples = project_summaries + study_summaries
+
+    if old_path:
+        add, sub = diff(old_path, path)
+        with open(add_file, 'w') as f:
+            f.writelines(add)
+        with open(sub_file, 'w') as f:
+            f.writelines(sub)
+
+        if not dry_run:
+            diff_upload(aide, add, sub)
+            return
+
     if dry_run:
         sys.exit()
 
     # If you've made it this far, it's time to delete
     aide.do_delete()
-    do_upload(aide, org_triples)
+    insert(aide, org_triples)
     print("Organizations uploaded")
-    do_upload(aide, people_triples)
+    insert(aide, people_triples)
     print("People uploaded")
-    do_upload(aide, project_triples)
+    insert(aide, project_triples)
     print("Projects uploaded")
-    do_upload(aide, study_triples)
+    insert(aide, study_triples)
     print("Studies uploaded")
-    do_upload(aide, dataset_triples)
+    insert(aide, dataset_triples)
     print("Datasets uploaded")
-    do_upload(aide, tools_triples)
+    insert(aide, tools_triples)
     print("Tools uploaded")
-    do_upload(aide, photos_triples)
+    insert(aide, photos_triples)
     print("Photos uploaded")
-    do_upload(aide, summary_triples, 1)
+    insert(aide, summary_triples, 1)
     print("Summaries uploaded")
 
 
