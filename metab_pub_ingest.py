@@ -1,8 +1,8 @@
 """
 Metab Importer
 Usage:
-    import.py (-h | --help)
-    import.py [-id <id_number>] <path_to_config>
+    metab_pub_ingest.py (-h | --help)
+    metab_pub_ingest.py [-id <id_number>] <path_to_config>
 
 Options:
     -h --help       Show this message and exit
