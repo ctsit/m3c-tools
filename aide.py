@@ -14,7 +14,7 @@ class Aide(object):
         self.used_n_numbers = []
 
         # Pubmed related
-        self.retsart = 0
+        self.retstart = 0
         self.count_up = 0
 
     def do_update(self, query):
