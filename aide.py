@@ -43,7 +43,7 @@ class Aide(object):
         res = Entrez.esearch(term=term,
                              db='pubmed',
                              retmax=100000,
-                             retstart=self.retsart)
+                             retstart=self.retstart)
         result = Entrez.read(res)
         id_list = result['IdList']
         total = result['Count']
