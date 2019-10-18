@@ -111,6 +111,46 @@ def parse_api(results, namespace):
         if pub.pmid:
             pub.uri = namespace + pub.pmid
             publications[pub.pmid] = pub
+        
+        # create citation
+        author_list = citation.check_key(['Article', 'AuthorList'])
+        names = []
+        for author in author_list:
+            last_name = author['LastName']
+            initial = author['Initials']
+            name = last_name + ", " + initial
+            names.append(name)
+        volume = citation.check_key(['Article', 'Journal', 'JournalIssue',
+                                    'Volume'])
+        issue = citation.check_key(['Article', 'Journal', 'JournalIssue',
+                                   'Issue'])
+        pages = citation.check_key(['Article', 'Pagination', 'MedlinePgn'])
+        journal = citation.check_key(['Article', 'Journal', 'Title']).title()
+        
+        citation = ', '.join(names)
+        citation += '. '
+        if pub.publication_year:
+            citation += '(' + pub.publication_year + '). '
+        citation += pub.title
+        if not citation.endswith('.'):
+            citation += '. '
+        else:
+            citation += ' '
+        if journal:
+            citation += journal
+            if volume or issue:
+                citation += ', '
+                if volume:
+                    citation += volume
+                if issue:
+                    citation += '(' + issue + ')'
+            if pages:
+                citation += ', ' + pages
+            citation += '. '
+        if pub.doi:
+            citation += 'doi:' + pub.doi
+        pub.citation = citation
+
     return publications
 
 
