@@ -127,29 +127,29 @@ def parse_api(results, namespace):
         pages = citation.check_key(['Article', 'Pagination', 'MedlinePgn'])
         journal = citation.check_key(['Article', 'Journal', 'Title']).title()
         
-        citation = ', '.join(names)
-        citation += '. '
+        cite = ', '.join(names)
+        cite += '. '
         if pub.publication_year:
-            citation += '(' + pub.publication_year + '). '
-        citation += pub.title
-        if not citation.endswith('.'):
-            citation += '. '
+            cite += '(' + pub.publication_year + '). '
+        cite += pub.title
+        if not cite.endswith('.'):
+            cite += '. '
         else:
-            citation += ' '
+            cite += ' '
         if journal:
-            citation += journal
+            cite += journal
             if volume or issue:
-                citation += ', '
+                cite += ', '
                 if volume:
-                    citation += volume
+                    cite += volume
                 if issue:
-                    citation += '(' + issue + ')'
+                    cite += '(' + issue + ')'
             if pages:
-                citation += ', ' + pages
-            citation += '. '
+                cite += ', ' + pages
+            cite += '. '
         if pub.doi:
-            citation += 'doi:' + pub.doi
-        pub.citation = citation
+            cite += 'doi:' + pub.doi
+        pub.citation = cite
 
     return publications
 
