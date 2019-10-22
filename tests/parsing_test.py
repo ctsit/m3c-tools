@@ -31,7 +31,6 @@ class TestParse(unittest.TestCase):
         <PMID Version="1">999999</PMID>
         <Article PubModel="Print">
             <Journal>
-                <ISSN IssnType="Electronic">1932-2968</ISSN>
                 <JournalIssue CitedMedium="Internet">
                     <Volume>1</Volume>
                     <Issue>5</Issue>
