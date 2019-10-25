@@ -66,6 +66,9 @@ def main_menu():
                 <div class="row my-3">
                     <button class="btn btn-info w-100" onclick="window.location.href = '{{ url_for('metab_admin.withheld_people') }}'">Change a Person's Withholding</button>
                 </div>
+                <div class="row my-3">
+                    <button class="btn btn-info w-100" onclick="window.location.href = '{{ url_for('metab_admin.withheld_organizations') }}'">Change an Organization's Withholding</button>
+                </div>
             </div>
         </body>
     </html>
@@ -794,6 +797,111 @@ def withheld_people():
         </script>
     </body>
     ''', people=people)
+
+
+@app.route('/withheldorgs', methods=['GET', 'POST'])
+def withheld_organizations():
+    orgs = []
+
+    with conn.cursor() as cur:
+        cur.execute('SELECT id, name, type, withheld from organizations ORDER BY id;')
+        rows = cur.fetchall()
+        for row in rows:
+            orgs.append((row[0], row[1], row[2], row[3]))
+
+    if request.method == 'POST':
+        try:
+            form_data = request.json
+            with conn.cursor() as cur:
+                cur.execute('UPDATE organizations SET withheld = %s WHERE id = %s;', (form_data['checked'], form_data['id'].strip()))
+            conn.commit()
+            return 'OK'
+        except Exception as e:
+            print(e)
+            return 'ERROR', 500
+
+    return render_template_string('''
+    <!doctype html>
+    <head>
+        <title>Change Person Withholding</title>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+        <style>
+            .hide {
+                display: none;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container mx-auto" style="width: 50%;">
+            <h1 class="mx-auto">Change the withholding status of a person</h1>
+            <a href="{{ url_for('metab_admin.main_menu') }}">Back to Home</a>
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-warning" role="alert">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+             <div class="form-group">
+                <input type="text" class="form-control" id="search-bar">
+            </div>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th scope="col">Id</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Email</th>
+                        <th scope="col">Withheld</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for org in orgs %}
+                        <tr id="row-{{org.0}}-{{org.1}}-{{org.2}}">
+                            <th scope="row">{{ org.0 }}</th>
+                            <td>{{org.1}}</td>
+                            <td>{{org.2}}</td>
+                            <td><input type="checkbox" id="check-{{org.0}}" {{ "checked" if org.3 else ""}}></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <script>
+            const withChecks = document.querySelectorAll("[id^='check']");
+            const tableRows = document.querySelectorAll("[id^='row']");
+            const search = document.getElementById('search-bar');
+            withChecks.forEach((check) => {
+                check.addEventListener('change', (e) => {
+                    fetch(window.location.href, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                                checked: e.target.checked,
+                                id: e.target.id.slice(6)
+                            })
+                        }).then((data) => {
+                            console.log(data);
+                        });
+                    });
+            });
+            search.addEventListener('input', (e) => {
+                console.log(e.target.value);
+                tableRows.forEach((row) => {
+                    if (!row.id.toLowerCase().includes(e.target.value.toLowerCase())) {
+                        row.className = 'hide';
+                    } else {
+                        row.className = '';
+                    }
+                });
+            });
+        </script>
+    </body>
+    ''', orgs=orgs)
 
 
 def main():
