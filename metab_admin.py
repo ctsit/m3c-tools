@@ -63,6 +63,9 @@ def main_menu():
                 <div class="row my-3">
                     <button class="btn btn-info w-100" onclick="window.location.href = '{{ url_for('metab_admin.parent_organization') }}'">Modify an Organization's Parent</button>
                 </div>
+                <div class="row my-3">
+                    <button class="btn btn-info w-100" onclick="window.location.href = '{{ url_for('metab_admin.withheld_people') }}'">Change a Person's Withholding</button>
+                </div>
             </div>
         </body>
     </html>
@@ -686,6 +689,92 @@ def parent_organization():
         </script>
     </body>
     ''', orgList=organizations)
+
+
+@app.route('/withheldpeople', methods=['GET', 'POST'])
+def withheld_people():
+    people = []
+
+    with conn.cursor() as cur:
+        cur.execute('SELECT id, display_name, email, withheld from people ORDER BY id;')
+        rows = cur.fetchall()
+        for row in rows:
+            people.append((row[0], row[1], row[2], row[3]))
+
+    if request.method == 'POST':
+        try:
+            form_data = request.json
+            with conn.cursor() as cur:
+                cur.execute('UPDATE people SET withheld = %s WHERE id = %s;', (form_data['checked'], form_data['id'].strip()))
+            conn.commit()
+            return 'OK'
+        except Exception as e:
+            print(e)
+            return 'ERROR', 500
+
+    return render_template_string('''
+    <!doctype html>
+    <head>
+        <title>Change Person Withholding</title>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    </head>
+    <body>
+        <div class="container mx-auto" style="width: 50%;">
+            <h1 class="mx-auto">Change the withholding status of a person</h1>
+            <a href="{{ url_for('metab_admin.main_menu') }}">Back to Home</a>
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-warning" role="alert">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th scope="col">Id</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Email</th>
+                        <th scope="col">Withheld</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for person in people %}
+                        <tr>
+                            <th scope="row">{{ person.0 }}</th>
+                            <td>{{person.1}}</td>
+                            <td>{{person.2}}</td>
+                            <td><input type="checkbox" id="check-{{person.0}}" {{ "checked" if person.3 else ""}}></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <script>
+            const withChecks = document.querySelectorAll("[id^='check']");
+            withChecks.forEach((check) => {
+                check.addEventListener('change', (e) => {
+                    fetch(window.location.href, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                                checked: e.target.checked,
+                                id: e.target.id.slice(6)
+                            })
+                        }).then((data) => {
+                            console.log(data);
+                        });
+                    });
+            });
+        </script>
+    </body>
+    ''', people=people)
+
 
 def main():
     '''Sets up a simple website for admin tasks'''
