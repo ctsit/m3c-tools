@@ -717,6 +717,11 @@ def withheld_people():
     <head>
         <title>Change Person Withholding</title>
         <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+        <style>
+            .hide {
+                display: none;
+            }
+        </style>
     </head>
     <body>
         <div class="container mx-auto" style="width: 50%;">
@@ -732,6 +737,9 @@ def withheld_people():
                 {% endif %}
             {% endwith %}
 
+             <div class="form-group">
+                <input type="text" class="form-control" id="search-bar">
+            </div>
             <table class="table">
                 <thead>
                     <tr>
@@ -743,7 +751,7 @@ def withheld_people():
                 </thead>
                 <tbody>
                     {% for person in people %}
-                        <tr>
+                        <tr id="row-{{person.0}}-{{person.1}}-{{person.2}}">
                             <th scope="row">{{ person.0 }}</th>
                             <td>{{person.1}}</td>
                             <td>{{person.2}}</td>
@@ -755,6 +763,8 @@ def withheld_people():
         </div>
         <script>
             const withChecks = document.querySelectorAll("[id^='check']");
+            const tableRows = document.querySelectorAll("[id^='row']");
+            const search = document.getElementById('search-bar');
             withChecks.forEach((check) => {
                 check.addEventListener('change', (e) => {
                     fetch(window.location.href, {
@@ -770,6 +780,16 @@ def withheld_people():
                             console.log(data);
                         });
                     });
+            });
+            search.addEventListener('input', (e) => {
+                console.log(e.target.value);
+                tableRows.forEach((row) => {
+                    if (!row.id.toLowerCase().includes(e.target.value.toLowerCase())) {
+                        row.className = 'hide';
+                    } else {
+                        row.className = '';
+                    }
+                });
             });
         </script>
     </body>
