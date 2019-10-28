@@ -54,7 +54,7 @@ To start the admin page run:
 
 To run a single test, run:
 
-    $ python -m unittest test/<desired_test>
+    $ python -m unittest tests/<desired_test>
 
 To run all the tests, run:
     
