@@ -92,26 +92,69 @@ def parse_api(results, namespace):
     publications = {}
     for citing in results['PubmedArticle']:
         pub = Publication()
-        citation = Citation(citing['MedlineCitation'])
+        citation = Citation(citing)
 
-        pub.title = (citation.check_key(['Article', 'ArticleTitle'])).replace('"', '\\"')
-        pub.publication_year = (citation.check_key(['Article', 'Journal',
-                                'JournalIssue', 'PubDate', 'Year']))
-        pub.pmid = str(citation.check_key(['PMID']))
-        try:
-            count = 0
-            proto_doi = citation.check_key(['Article', 'ELocationID'])[count]
-            while proto_doi.attributes['EIdType'] != 'doi':
-                count += 1
-                proto_doi = citation.check_key(['Article',
-                                                'ELocationID'])[count]
-            pub.doi = str(proto_doi)
-        except IndexError:
-            pub.doi = ''
+        fill_pub(pub, citation)
+
         if pub.pmid:
             pub.uri = namespace + pub.pmid
             publications[pub.pmid] = pub
     return publications
+
+
+def fill_pub(pub, citation):
+    pub.title = (citation.check_key(['MedlineCitation', 'Article', 'ArticleTitle'])).replace('"', '\\"')
+    pub.publication_year = (citation.check_key(['MedlineCitation', 'Article', 'Journal',
+                            'JournalIssue', 'PubDate', 'Year']))
+    pub.pmid = str(citation.check_key(['MedlineCitation', 'PMID']))
+    try:
+        count = 0
+        proto_doi = citation.check_key(['PubmedData', 'ArticleIdList'])[count]
+        while proto_doi.attributes['IdType'] != 'doi':
+            count += 1
+            proto_doi = citation.check_key(['PubmedData',
+                                            'ArticleIdList'])[count]
+        pub.doi = str(proto_doi)
+    except IndexError:
+        pub.doi = ''
+    # create citation
+    author_list = citation.check_key(['MedlineCitation', 'Article', 'AuthorList'])
+    names = []
+    for author in author_list:
+        last_name = author['LastName']
+        initial = author['Initials']
+        name = last_name + ", " + initial + "."
+        names.append(name)
+    volume = citation.check_key(['MedlineCitation', 'Article', 'Journal', 'JournalIssue',
+                                'Volume'])
+    issue = citation.check_key(['MedlineCitation', 'Article', 'Journal', 'JournalIssue',
+                                'Issue'])
+    pages = citation.check_key(['MedlineCitation', 'Article', 'Pagination', 'MedlinePgn'])
+    journal = citation.check_key(['MedlineCitation', 'Article', 'Journal', 'Title']).title()
+
+    cite = ', '.join(names)
+    if pub.publication_year:
+        cite += ' (' + pub.publication_year + '). '
+    cite += pub.title
+    if not cite.endswith('.'):
+        cite += '. '
+    else:
+        cite += ' '
+    if journal:
+        cite += journal
+        if volume or issue:
+            cite += ', '
+            if volume:
+                cite += volume
+            if issue:
+                cite += '(' + issue + ')'
+        if pages:
+            cite += ', ' + pages
+        cite += '. '
+    if pub.doi:
+        cite += 'doi:' + pub.doi
+    pub.citation = cite
+    return
 
 
 def write_triples(aide, person, pubs):

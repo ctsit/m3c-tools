@@ -359,6 +359,7 @@ class Publication(object):
         self.publication_year = None
         self.datetime = None
         self.doi = None
+        self.citation = None
 
     def make_datetime(self):
         datetime = self.publication_year + "-01-01T00:00:00"
@@ -376,6 +377,8 @@ class Publication(object):
             self.make_datetime()
             rdf.append("<{}> <http://vivoweb.org/ontology/core#dateTimeValue> <{}>".format(self.uri, dtv_uri))
             rdf.append("<{}> <http://vivoweb.org/ontology/core#dateTime> \"{}\"^^<http://www.w3.org/2001/XMLSchema#dateTime>".format(dtv_uri, self.datetime))
+        if self.citation:
+            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#citation> \"{}\"^^<http://www.w3.org/2001/XMLSchema#dateTime>".format(self.uri, self.citation))
 
         return rdf
 
