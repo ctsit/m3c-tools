@@ -49,3 +49,15 @@ If you wish to print the files without deleting the database or automatically up
 To start the admin page run:
 
     $ python metab_admin.py $CONFIG_PATH
+
+## Testing
+
+To run a single test, run:
+
+    $ python -m unittest test/<desired_test>
+
+To run all the tests, run:
+    
+    $ python -m unittest
+
+If you add additional tests, the filename should begin with 'test'.
