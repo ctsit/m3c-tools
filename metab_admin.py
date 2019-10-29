@@ -792,11 +792,13 @@ def withheld_people():
                                 id: e.target.id.slice(6)
                             })
                         }).then(async data => {
+                            messages.innerHTML = '';
                             if (data.status !== 200) {
                                 const alertMsg = document.createElement('div');
                                 alertMsg.textContent = await data.text();
                                 alertMsg.className = 'alert alert-danger';
                                 messages.appendChild(alertMsg);
+                                e.target.checked = !e.target.checked;
                             }
                             console.log(data);
                         });
