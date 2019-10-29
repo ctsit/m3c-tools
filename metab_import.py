@@ -150,10 +150,10 @@ def get_people(sup_cur):
     people = {}
     sup_cur.execute("""\
             SELECT id, first_name, last_name, display_name, email, phone
-            FROM people
-            JOIN names
+            FROM people p
+            JOIN names n
             ON id=person_id
-            WHERE withheld = FALSE""")
+            WHERE p.withheld = FALSE AND n.withheld = FALSE""")
     for row in sup_cur:
         person = Person()
         person.person_id = row[0]
