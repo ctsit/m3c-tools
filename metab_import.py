@@ -519,7 +519,7 @@ def make_datasets(namespace, datasets, studies):
     return dataset_triples, study_triples
 
 
-def get_authors_pmid(aide: Aide, pmid: typing.Text):
+def get_authors_pmid(aide: Aide, pmid: typing.Text) -> typing.List[typing.Dict]:
     count = 0
     authors = []
     redo = True
@@ -561,7 +561,7 @@ def get_yaml_tools(config):
         return []
 
 
-def strip_http(url: typing.Text):
+def strip_http(url: typing.Text) -> typing.Text:
     return url.replace('http://', '').replace('https://', '')
 
 
