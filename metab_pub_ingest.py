@@ -1,5 +1,5 @@
 """
-Metab Importer
+Metab Pub Ingest
 Usage:
     metab_pub_ingest.py (-h | --help)
     metab_pub_ingest.py [-id <id_number>] <path_to_config>
@@ -58,7 +58,7 @@ def connect(host, db, user, pg_password, port):
 
 
 def get_people(cur, person_id=None):
-    people = []
+    people = {}
     if person_id:
         cur.execute("""\
                 SELECT id, first_name, last_name
@@ -77,13 +77,38 @@ def get_people(cur, person_id=None):
         person.person_id = row[0]
         person.first_name = row[1]
         person.last_name = row[2]
-        people.append(person)
+        people[row[0]] = person
     return people
 
 
-def query_pubmed(aide, person):
+def get_supplemtals(cur, person_id=None):
+    extras = {}
+    if person_id:
+        cur.execute("""\
+            SELECT pmid, person_id
+            FROM publications
+            WHERE person_id=%s""", (int(person_id),))
+    else:
+        cur.execute("""\
+            SELECT pmid, person_id
+            FROM publications""")
+    for row in cur:
+        pmid = row[0]
+        person_id = row[1]
+        if person_id in extras.keys():
+            extras[person_id].append(pmid)
+        else:
+            extras[person_id] = [pmid]
+    return extras
+
+
+def get_ids(aide, person):
     query = person.last_name + ', ' + person.first_name + ' [Full Author Name]'
     id_list = aide.get_id_list(query)
+    return id_list
+
+
+def query_pubmed(aide, id_list):
     results = aide.get_details(id_list)
     return results
 
@@ -183,6 +208,7 @@ def main():
         person_id = sys.argv[2]
         config_path = sys.argv[3]
     else:
+        person_id = None
         config_path = sys.argv[1]
 
     timestamp = datetime.now()
@@ -211,8 +237,14 @@ def main():
     people = get_people(cur, person_id)
     triples = []
     pub_collective = {}
+
+    extra_pubs = get_supplemtals(cur, person_id)
     for person in people:
-        results = query_pubmed(aide, person)
+        pmids = get_ids(aide, person)
+        for pub in extra_pubs[person.id]:
+            if pub not in pmids:
+                pmids.extend(pub)
+        results = aide.get_details(pmids)
         pubs = parse_api(results, aide.namespace)
         pub_collective.update(pubs)
         triples.extend(write_triples(aide, person, pubs))
