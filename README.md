@@ -12,7 +12,7 @@ Setup a Python Virtual Environment, then install the required dependencies.
 
 ## Preparing your config file
 
-To run the importer, you will need a config file containing two sections: one related to the Postgres database, and one related to accessing VIVO. The Postgres section includes credentials for accessing the database, the open port you used to set up the SSH tunnel, and the name of the database. The VIVO section includes credentials for accessing the VIVO query API, as well as the query endpoint and the namespace used for VIVO URIs. There is an example config file with the required fields.
+To run the importer, you will need a config file containing two sections: one related to the Postgres database, and one related to accessing VIVO. The Postgres section includes credentials for accessing the database, the open port you used to set up the SSH tunnel, and the name of the database. The VIVO section includes credentials for accessing the VIVO query API, as well as the query endpoint and the namespace used for VIVO URIs. There is an example config file with the required fields. Download a CSV export from the [Metabolomics Software Tools](https://docs.google.com/spreadsheets/d/1a096jlzbAwTxUdvTtJB2bwfkBRdDcMKrkywS8YZf344/edit?usp=sharing) and note the file name in the config for 'csv_tools'.
 
 
 ## Connect to the database
