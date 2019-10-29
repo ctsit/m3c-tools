@@ -282,12 +282,15 @@ class Tool(object):
         license = data.get('license', dict(kind=''))
         self.license: Tool.License = Tool.License(**license)
         self.tags: typing.List[typing.Text] = data.get('tags', [])
+        self.pmid: typing.Text = data.get('pmid', None)
 
     def uri(self, namespace: typing.Text) -> typing.Text:
         encoded = self.tool_id
         encoded = encoded.replace('_', '__')
         encoded = encoded.replace('-', '_d')
         encoded = encoded.replace('/', '_s')
+        encoded = encoded.replace('?', '_p')
+        encoded = encoded.replace('=', '_e')
 
         contains_unhandled_char = re.search('[^A-Za-z0-9._/]', encoded)
         if contains_unhandled_char:
