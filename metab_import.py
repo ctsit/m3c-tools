@@ -25,10 +25,13 @@ Instructions:
 """
 
 from datetime import datetime
+from typing import List
+import csv
 import getopt
 import os
 import pathlib
 import sys
+import time
 import typing
 import yaml
 
@@ -516,7 +519,29 @@ def make_datasets(namespace, datasets, studies):
     return dataset_triples, study_triples
 
 
-def get_tools(config):
+def get_authors_pmid(aide: Aide, pmid: typing.Text) -> typing.List[typing.Dict]:
+    count = 0
+    authors = []
+    redo = True
+    while redo and count < 2:
+        count += 1
+        redo = False
+        try:
+            data = aide.get_details([pmid])
+            for author in data['PubmedArticle'][0]['MedlineCitation']['Article']['AuthorList']:
+                authors.append({
+                    'name': f"{author['ForeName'].split(' ')[0].strip()} {author['LastName']}"
+                })
+        except IOError:
+            print('Error getting PubMed Data for tool with PMID %s. Trying again in 3 seconds' % pmid)
+            redo = True
+            time.sleep(3)
+        except Exception:
+            print('Error parsing PubMed Data for tool with PMID %s' % pmid)
+    return authors
+
+
+def get_yaml_tools(config):
     try:
         tools_path = config.get('tools', 'tools.yaml')
         with open(tools_path, 'r') as tools_file:
@@ -533,6 +558,42 @@ def get_tools(config):
             return tools
     except Exception:
         print('Error parsing tools config file: %s' % tools_path)
+        return []
+
+
+def strip_http(url: typing.Text) -> typing.Text:
+    return url.replace('http://', '').replace('https://', '')
+
+
+def get_csv_tools(config, aide: Aide) -> List[Tool]:
+    try:
+        csv_tools_path = config.get('tools_csv', 'tools.csv')
+        with open(csv_tools_path, 'r') as tools_file:
+            t = csv.reader(tools_file)
+            # Skip the header row
+            next(t)
+
+            tools = []
+            for tool_data in t:
+                pmid = tool_data[19].strip()
+                authors = None
+                if pmid.isnumeric():
+                    authors = get_authors_pmid(aide, pmid)
+                if not tool_data[24].replace('-', '').strip():
+                    continue
+                tool = Tool(strip_http(tool_data[24]), {
+                    'name': tool_data[21],
+                    'description': tool_data[1],
+                    'url': tool_data[24],
+                    'authors': authors,
+                    'pmid': pmid,
+                    'tags': tool_data[6].split(',')
+                })
+                tools.append(tool)
+            return tools
+    except Exception as e:
+        print(e)
+        print('Error parsing tools config file: %s' % csv_tools_path)
         return []
 
 
@@ -659,8 +720,9 @@ def main():
     print_to_file(photos_triples, photos_file)
 
     # Tools
-    tools = get_tools(config)
-    tools_triples = make_tools(aide.namespace, tools, people)
+    yaml_tools = get_yaml_tools(config)
+    csv_tools = get_csv_tools(config, aide)
+    tools_triples = make_tools(aide.namespace, yaml_tools + csv_tools, people)
     print_to_file(tools_triples, tools_file)
 
     # Projects
