@@ -83,23 +83,26 @@ def get_people(cur, person_id=None):
 
 def get_supplemtals(cur, person_id=None):
     extras = {}
+    exceptions = {}
     if person_id:
         cur.execute("""\
-            SELECT pmid, person_id
+            SELECT pmid, person_id, include
             FROM publications
             WHERE person_id=%s""", (person_id,))
     else:
         cur.execute("""\
-            SELECT pmid, person_id
+            SELECT pmid, person_id, include
             FROM publications""")
     for row in cur:
         pmid = row[0]
         person_id = int(row[1])
         if person_id in extras.keys():
             extras[person_id].append(pmid)
+            exceptions[person_id].append(pmid)
         else:
             extras[person_id] = [pmid]
-    return extras
+            exceptions[person_id] = [pmid]
+    return extras, exceptions
 
 
 def get_ids(aide, person):
@@ -233,13 +236,17 @@ def main():
     triples = []
     pub_collective = {}
 
-    extra_pubs = get_supplemtals(cur, person_id)
+    extras, exceptions = get_supplemtals(cur, person_id)
     for person in people.values():
         pmids = get_ids(aide, person)
-        if person.person_id in extra_pubs.keys():
-            for pub in extra_pubs[person.person_id]:
+        if person.person_id in extras.keys():
+            for pub in extras[person.person_id]:
                 if pub not in pmids:
                     pmids.append(pub)
+        if person.person_id in exceptions.keys():
+            for pub in exceptions[person.person_id]:
+                if pub in pmids:
+                    pmids.remove(pub)
         if pmids:
             results = aide.get_details(pmids)
             pubs = parse_api(results, aide.namespace)
