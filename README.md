@@ -44,6 +44,16 @@ If you wish to print the files without deleting the database or automatically up
 
     $ python metab_import.py -d $CONFIG_PATH
 
+
+## Running the Publication Ingest
+
+This will produce a file containing triples for adding publications. The publications are gathered using the full name of the person in a query to PubMed. Supplemental PMIDs can be added to a person by using the `publications` table in your supplemental database. The admin page can be used to add PMIDs.
+
+This tool can be run on all people in the database, or for a single person by making use of the `-id` flag.
+
+    $ python metab_pub_ingest.py [-id <id_number>] $CONFIG_PATH
+
+
 ## Running the Admin Page
 
 To start the admin page run:
