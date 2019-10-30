@@ -936,10 +936,13 @@ def add_pmid():
                 return redirect(request.url)
 
             for pmid in pmid_list:
-                cur.execute('INSERT INTO publications (pmid, person_id) VALUES (%s, %s) ON CONFLICT DO NOTHING', (pmid, int(person_id)))
+                if 'include' in request.form:
+                    cur.execute("INSERT INTO publications (pmid, person_id, include) VALUES (%s, %s, %s) ON CONFLICT (pmid, person_id) DO UPDATE SET include='t'", (pmid, int(person_id), True))
+                elif 'exclude' in request.form:
+                    cur.execute("INSERT INTO publications (pmid, person_id, include) VALUES (%s, %s, %s) ON CONFLICT (pmid, person_id) DO UPDATE SET include='f'", (pmid, int(person_id), False))
 
             conn.commit()
-            flash('PMID(s) ' + pmid_string + ' added to ' + request.form['name'].strip())
+            flash('PMID(s) ' + pmid_string + ' modified for ' + request.form['name'].strip())
         except Exception as e:
             print(e)
             conn.rollback()
@@ -993,7 +996,8 @@ def add_pmid():
                     <input class="form-control" type=text name=pmid placeholder="separate ids with a comma i.e. 11111, 22222">
                 </div>
 
-                <button class="btn btn-primary" type=submit>Add PMID</button>
+                <button class="btn btn-primary" type=submit name=include>Add PMID</button>
+                <button class="btn btn-primary" type=submit name=exclude>Exclude PMID</button>
             </form>
         </div>
         <script>
