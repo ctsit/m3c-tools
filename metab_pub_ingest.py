@@ -193,9 +193,9 @@ def main():
     except FileExistsError:
         pass
     if sys.argv[1] == "-id":
-        pub_file = os.path.join(path, person_id + "_pubs.rdf")
+        pub_file = os.path.join(path, person_id + "_pubs.nt")
     else:
-        pub_file = os.path.join(path, 'pubs.rdf')
+        pub_file = os.path.join(path, 'pubs.nt')
 
     config = get_config(config_path)
 
