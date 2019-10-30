@@ -81,7 +81,7 @@ def get_people(cur, person_id=None):
     return people
 
 
-def get_supplemtals(cur, person_id=None):
+def get_supplementals(cur, person_id=None):
     extras = {}
     exceptions = {}
     if person_id:
@@ -236,7 +236,7 @@ def main():
     triples = []
     pub_collective = {}
 
-    extras, exceptions = get_supplemtals(cur, person_id)
+    extras, exceptions = get_supplementals(cur, person_id)
     for person in people.values():
         pmids = get_ids(aide, person)
         if person.person_id in extras.keys():
