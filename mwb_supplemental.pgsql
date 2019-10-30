@@ -40,3 +40,12 @@ CREATE TABLE IF NOT EXISTS public.names
 
     UNIQUE(first_name, last_name, withheld)
 );
+
+CREATE TABLE IF NOT EXISTS public.publications
+(
+    pmid TEXT NOT NULL,
+    person_id INT NOT NULL,
+    include BOOL NOT NULL,
+
+    PRIMARY KEY(pmid, person_id)
+);
