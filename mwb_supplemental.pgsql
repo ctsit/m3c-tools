@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS public.names
     person_id   INTEGER  REFERENCES public.people(id),
     first_name  TEXT     NOT NULL,
     last_name   TEXT     NOT NULL,
+    withheld    BOOLEAN  NOT NULL DEFAULT FALSE,
 
-    UNIQUE(first_name, last_name)
+    UNIQUE(first_name, last_name, withheld)
 );

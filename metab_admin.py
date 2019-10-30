@@ -13,6 +13,7 @@ Instructions:
 Example:
     $ python metab_admin.py config.yaml
 """
+import json
 import logging
 import os
 import sys
@@ -20,7 +21,7 @@ from yaml import safe_load
 
 from flask import Blueprint, Flask, request, flash, redirect, render_template_string, send_file
 import werkzeug.datastructures
-from werkzeug.utils import secure_filename
+
 import psycopg2
 import psycopg2.errorcodes
 
@@ -68,6 +69,9 @@ def main_menu():
                 </div>
                 <div class="row my-3">
                     <button class="btn btn-info w-100" onclick="window.location.href = '{{ url_for('metab_admin.withheld_organizations') }}'">Change an Organization's Withholding</button>
+                </div>
+                <div class="row my-3">
+                    <button class="btn btn-info w-100" onclick="window.location.href = '{{ url_for('metab_admin.person_alias') }}'">Modify an Person's Aliases</button>
                 </div>
             </div>
         </body>
@@ -709,6 +713,11 @@ def withheld_people():
             form_data = request.json
             with conn.cursor() as cur:
                 cur.execute('UPDATE people SET withheld = %s WHERE id = %s;', (form_data['checked'], form_data['id'].strip()))
+                try:
+                    cur.execute('UPDATE names SET withheld = %s where person_id = %s;', (form_data['checked'], form_data['id'].strip()))
+                except Exception:
+                    conn.reset()
+                    return 'Error updating names withholding. Have you checked if theres a conflicting alias for unique constrait?', 500
             conn.commit()
             return 'OK'
         except Exception as e:
@@ -730,6 +739,7 @@ def withheld_people():
         <div class="container mx-auto" style="width: 50%;">
             <h1 class="mx-auto">Change the withholding status of a person</h1>
             <a href="{{ url_for('metab_admin.main_menu') }}">Back to Home</a>
+            <div id="messages">
             {% with messages = get_flashed_messages() %}
                 {% if messages %}
                     {% for message in messages %}
@@ -739,6 +749,7 @@ def withheld_people():
                     {% endfor %}
                 {% endif %}
             {% endwith %}
+            </div>
 
              <div class="form-group">
                 <input type="text" class="form-control" id="search-bar">
@@ -768,6 +779,7 @@ def withheld_people():
             const withChecks = document.querySelectorAll("[id^='check']");
             const tableRows = document.querySelectorAll("[id^='row']");
             const search = document.getElementById('search-bar');
+            const messages = document.getElementById('messages');
             withChecks.forEach((check) => {
                 check.addEventListener('change', (e) => {
                     fetch(window.location.href, {
@@ -779,7 +791,15 @@ def withheld_people():
                                 checked: e.target.checked,
                                 id: e.target.id.slice(6)
                             })
-                        }).then((data) => {
+                        }).then(async data => {
+                            messages.innerHTML = '';
+                            if (data.status !== 200) {
+                                const alertMsg = document.createElement('div');
+                                alertMsg.textContent = await data.text();
+                                alertMsg.className = 'alert alert-danger';
+                                messages.appendChild(alertMsg);
+                                e.target.checked = !e.target.checked;
+                            }
                             console.log(data);
                         });
                     });
@@ -902,6 +922,204 @@ def withheld_organizations():
         </script>
     </body>
     ''', orgs=orgs)
+
+
+@app.route('/personalias', methods=['GET', 'POST', 'DELETE'])
+def person_alias():
+    if request.method == 'POST':
+        data = request.json
+        with conn.cursor() as cur:
+            try:
+                cur.execute('INSERT INTO names (person_id, first_name, last_name) VALUES (%s, %s, %s)', (data['id'], data['first'], data['last']))
+            except Exception:
+                conn.reset()
+                return 'Error inserting new name', 400
+        conn.commit()
+        return 'Added new alias for person'
+
+    if request.method == 'DELETE':
+        data = request.json
+        with conn.cursor() as cur:
+            try:
+                cur.execute('DELETE FROM names WHERE person_id = %s AND first_name = %s AND last_name = %s', (data['id'], data['first'], data['last']))
+            except Exception:
+                conn.reset()
+                return 'Error deleting new name', 400
+        conn.commit()
+        return 'Delete alias for person'
+
+    display_names = []
+    alias = {}
+    with conn.cursor() as cur:
+        cur.execute('SELECT id, display_name from people;')
+        rows = cur.fetchall()
+        for row in rows:
+            display_names.append(str(row[0]) + ' | ' + str(row[1]))
+
+        cur.execute('SELECT person_id, first_name, last_name FROM names;')
+        rows = cur.fetchall()
+        for row in rows:
+            if not alias.get(row[0]):
+                alias[row[0]] = []
+            alias[row[0]].append({
+                'first': row[1],
+                'last': row[2]
+            })
+
+    return render_template_string('''
+    <!doctype html>
+    <head>
+        <title>Update a Person's Aliases</title>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    </head>
+    <body>
+        <div class="container mx-auto" style="width: 50%;">
+            <h1 class="mx-auto">Update a Person's Aliases</h1>
+            <a href="{{ url_for('metab_admin.main_menu') }}">Back to Home</a>
+            <div id="messages">
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-warning" role="alert">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+                        </div>
+
+            <div class="form-group">
+                <label>Search Display Name</label>
+                <input id=searchInput class="form-control" list=displaynames name=displayname>
+                <datalist id=displaynames>
+                    {% for name in dispNameList %}
+                        <option value="{{name}}">
+                    {% endfor %}
+                </datalist>
+            </div>
+
+            <div class="form-group">
+                <label>Name</label>
+                <input readonly id=name class="form-control" type=text name=name>
+            </div>
+            <input hidden readonly id=id type=text name=id>
+
+            <div class="form-group">
+                <label>New First Name</label>
+                <input class="form-control" id="new-first">
+            </div>
+            <div class="form-group">
+                <label>New Last Name</label>
+                <input class="form-control" id="new-last">
+            </div>
+            <div class="form-group">
+                <button id="new-btn" class="btn btn-outline-primary">Add New Alias</button>
+            </div>
+
+            <div class="form-group">
+                <label>Current Aliases</label>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>First</th>
+                            <th>Last</th>
+                            <th>Remove</th>
+                        </tr>
+                    </thead>
+                    <tbody id="t-body">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <script>
+            const messages = document.getElementById('messages');
+            const aliasData = {{aliasData|tojson|safe}};
+            const displayNameInput = document.getElementById('searchInput');
+            const displayNames = [...document.getElementById('displaynames').childNodes].filter(name => name.value).map(name => name.value);
+            const name = document.getElementById('name');
+            const id = document.getElementById('id');
+            const tbody = document.getElementById('t-body');
+            const addBtn = document.getElementById('new-btn');
+            const newFirst = document.getElementById('new-first');
+            const newLast = document.getElementById('new-last');
+            const updateTable = (alias) => {
+                tbody.innerHTML = '';
+                alias.forEach(a => {
+                    const row = document.createElement('tr');
+                    const firstCell = document.createElement('td');
+                    const lastCell = document.createElement('td');
+                    const removeCell = document.createElement('td');
+                    const removeBtn = document.createElement('button');
+                    firstCell.textContent = a.first;
+                    lastCell.textContent = a.last;
+                    removeBtn.textContent = '❌';
+                    removeBtn.className = 'btn btn-outline-danger';
+                    removeBtn.addEventListener('click', e => {
+                        updateAlias(false, id.value, a.first, a.last);
+                    })
+                    removeCell.appendChild(removeBtn);
+
+                    row.appendChild(firstCell);
+                    row.appendChild(lastCell);
+                    row.appendChild(removeCell);
+
+                    tbody.appendChild(row);
+                })
+            };
+            const updateAlias = (isNew, personId, firstName, lastName) => {
+                fetch(window.location.href, {
+                    method: isNew ? 'POST' : 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        id: personId,
+                        first: firstName,
+                        last: lastName
+                    })
+                }).then(async resp => {
+                    messages.innerHTML = '';
+                    if (resp.status === 200) {
+                        const alertMsg = document.createElement('div');
+                        alertMsg.textContent = await resp.text();
+                        alertMsg.className = 'alert alert-success';
+                        messages.appendChild(alertMsg);
+                        if (isNew) {
+                            aliasData[personId].push({first: firstName, last: lastName});
+                            newFirst.value = '';
+                            newLast.value = '';
+                        } else {
+                            aliasData[personId].splice(aliasData[personId].findIndex(a => a.first === firstName && a.last === lastName), 1);
+                        }
+                        updateTable(aliasData[personId]);
+                    } else {
+                        const alertMsg = document.createElement('div');
+                        alertMsg.textContent = await resp.text();
+                        alertMsg.className = 'alert alert-danger';
+                        messages.appendChild(alertMsg);
+                    }
+                })
+            };
+            addBtn.addEventListener('click', (e) => {
+                if (id.value && newFirst.value && newLast.value) {
+                    updateAlias(true, id.value, newFirst.value, newLast.value);
+                }
+            });
+            displayNameInput.addEventListener('change', (e) => {
+                if (displayNames.includes(e.srcElement.value)) {
+                    const splitName = e.srcElement.value.split('|');
+                    name.value = splitName[1].trim();
+                    id.value = splitName[0].trim();
+                    const alias = aliasData[splitName[0].trim()];
+                    tbody.innerHTML = "";
+                    if (alias) {
+                        updateTable(alias);
+                    }
+                }
+            });
+        </script>
+    </body>
+    ''', dispNameList=display_names, aliasData=alias)
 
 
 def main():
