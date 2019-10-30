@@ -924,20 +924,22 @@ def add_pmid():
         cur = conn.cursor()
         try:
             person_id = request.form['id'].strip()
-            pmid = request.form['pmid'].strip()
+            pmid_string = request.form['pmid'].strip()
+            pmid_list = pmid_string.replace(' ', '').split(',')
 
             if person_id is '':
                 flash('Please search and select someone')
                 return redirect(request.url)
 
-            if pmid is '':
+            if pmid_string is '':
                 flash('Please enter a PMID')
                 return redirect(request.url)
 
-            cur.execute('INSERT INTO publications (pmid, person_id) VALUES (%s, %s) ON CONFLICT DO NOTHING', (pmid, person_id))
+            for pmid in pmid_list:
+                cur.execute('INSERT INTO publications (pmid, person_id) VALUES (%s, %s) ON CONFLICT DO NOTHING', (pmid, int(person_id)))
 
             conn.commit()
-            flash('PMID ' + pmid + ' added to ' + request.form['name'].strip())
+            flash('PMID(s) ' + pmid_string + ' added to ' + request.form['name'].strip())
         except Exception as e:
             print(e)
             conn.rollback()
@@ -987,8 +989,8 @@ def add_pmid():
                 <input hidden readonly id=id type=text name=id>
 
                 <div class="form-group">
-                    <label>PubMed ID</label>
-                    <input class="form-control" type=text name=pmid>
+                    <label>PubMed IDs</label>
+                    <input class="form-control" type=text name=pmid placeholder="separate ids with a comma i.e. 11111, 22222">
                 </div>
 
                 <button class="btn btn-primary" type=submit>Add PMID</button>
