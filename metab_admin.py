@@ -1190,7 +1190,7 @@ def add_pmid():
                     {% endfor %}
                 {% endif %}
             {% endwith %}
-            
+
             <div class="form-group">
                 <label>Search Display Name</label>
                 <input id=searchInput class="form-control" list=displaynames name=displayname>
