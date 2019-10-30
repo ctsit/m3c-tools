@@ -87,14 +87,14 @@ def get_supplemtals(cur, person_id=None):
         cur.execute("""\
             SELECT pmid, person_id
             FROM publications
-            WHERE person_id=%s""", (int(person_id),))
+            WHERE person_id=%s""", (person_id,))
     else:
         cur.execute("""\
             SELECT pmid, person_id
             FROM publications""")
     for row in cur:
         pmid = row[0]
-        person_id = row[1]
+        person_id = int(row[1])
         if person_id in extras.keys():
             extras[person_id].append(pmid)
         else:
@@ -106,11 +106,6 @@ def get_ids(aide, person):
     query = person.last_name + ', ' + person.first_name + ' [Full Author Name]'
     id_list = aide.get_id_list(query)
     return id_list
-
-
-def query_pubmed(aide, id_list):
-    results = aide.get_details(id_list)
-    return results
 
 
 def parse_api(results, namespace):
@@ -239,15 +234,17 @@ def main():
     pub_collective = {}
 
     extra_pubs = get_supplemtals(cur, person_id)
-    for person in people:
+    for person in people.values():
         pmids = get_ids(aide, person)
-        for pub in extra_pubs[person.id]:
-            if pub not in pmids:
-                pmids.extend(pub)
-        results = aide.get_details(pmids)
-        pubs = parse_api(results, aide.namespace)
-        pub_collective.update(pubs)
-        triples.extend(write_triples(aide, person, pubs))
+        if person.person_id in extra_pubs.keys():
+            for pub in extra_pubs[person.person_id]:
+                if pub not in pmids:
+                    pmids.append(pub)
+        if pmids:
+            results = aide.get_details(pmids)
+            pubs = parse_api(results, aide.namespace)
+            pub_collective.update(pubs)
+            triples.extend(write_triples(aide, person, pubs))
 
     pub_count = 0
     for pub in pub_collective.values():
