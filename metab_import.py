@@ -208,41 +208,31 @@ def get_photos(file_storage_root: str, people):
     return photos
 
 
-def get_projects(mwb_cur, sup_cur, people, orgs):
+def get_projects(mwb_cur, sup_cur,
+                 people: List[Person], orgs: List[Organization]):
     print("Gathering Workbench Projects")
     projects = {}
     mwb_cur.execute("""\
-        SELECT project_id, project_title, project_type, project_summary,
-               doi, funding_source, last_name, first_name, institute,
-               department, laboratory
+        SELECT project_id, project_title, COALESCE(project_type, ''),
+               COALESCE(project_summary, ''), COALESCE(doi, ''),
+               COALESCE(funding_source, ''),
+               last_name, first_name, institute, department, laboratory
           FROM project
     """)
     for row in mwb_cur:
-        project = Project()
-        project.project_id = row[0].replace('\n', '')
-        project.project_title = row[1].replace('\n', '').replace('"', '\\"')
-        if row[2]:
-            project.project_type = row[2].replace('\n', '')
-        if row[3]:
-            project.summary = row[3].replace('\n', '').replace('"', '\\"')
-        if row[4]:
-            project.doi = row[4].replace('\n', '')
-        if row[5]:
-            project.funding_source = row[5].replace('\n', '')
+        project = Project(
+            project_id=row[0].replace('\n', ''),
+            project_title=row[1].replace('\n', '').replace('"', '\\"'),
+            project_type=row[2].replace('\n', ''),
+            summary=row[3].replace('\n', '').replace('"', '\\"'),
+            doi=row[4].replace('\n', ''),
+            funding_source=row[5].replace('\n', ''))
+
         last_name = row[6]
         first_name = row[7]
-        if row[8]:
-            institute = row[8]
-        else:
-            institute = None
-        if row[9]:
-            department = row[9]
-        else:
-            department = None
-        if row[10]:
-            lab = row[10]
-        else:
-            lab = None
+        institute = row[8]
+        department = row[9]
+        lab = row[10]
 
         if institute:
             sup_cur.execute("""\
@@ -252,7 +242,7 @@ def get_projects(mwb_cur, sup_cur, people, orgs):
                             (institute,))
             try:
                 inst_id = sup_cur.fetchone()[0]
-                project.institute_uri = orgs[inst_id].uri
+                project.institute = orgs[inst_id].org_id
             except TypeError:
                 print("Error: Organization does not exist.")
                 print("Organization for project " + project.project_id)
@@ -270,7 +260,7 @@ def get_projects(mwb_cur, sup_cur, people, orgs):
                     dept_options[row[0]] = row[1]
                 for dept_id, parent in dept_options.items():
                     if inst_id == parent:
-                        project.department_uri = orgs[dept_id].uri
+                        project.department = orgs[dept_id].org_id
             except TypeError:
                 print("Error: Organization does not exist.")
                 print("Organization for project " + project.project_id)
@@ -288,7 +278,7 @@ def get_projects(mwb_cur, sup_cur, people, orgs):
                     lab_options[row[0]] = row[1]
                 for lab_id, parent in lab_options.items():
                     if dept_id == parent:
-                        project.lab_uri = orgs[lab_id].uri
+                        project.lab = orgs[lab_id].org_id
             except TypeError:
                 print("Error: Organization does not exist.")
                 print("Organization for project " + project.project_id)
@@ -302,25 +292,24 @@ def get_projects(mwb_cur, sup_cur, people, orgs):
                         (last_name, first_name))
         try:
             person_id = sup_cur.fetchone()[0]
-            project.pi_uri = people[person_id].uri
+            project.pi = people[person_id].person_id
         except KeyError:
             print("Error: Person does not exist.")
             print("PI for project " + project.project_id)
-            print("Last name: " + project.last_name)
-            print("First name: " + project.first_name)
+            print("Last name: " + last_name)
+            print("First name: " + first_name)
             sys.exit()
         projects[project.project_id] = project
     return projects
 
 
-def make_projects(namespace, projects):
+def make_projects(namespace, projects: typing.Mapping[str, Project]):
     print("Making Workbench Projects")
     triples = []
     summaries = []
     project_count = 0
     for project in projects.values():
-        project.uri = namespace + project.project_id
-        project_triples, summary_line = project.get_triples()
+        project_triples, summary_line = project.get_triples(namespace)
         triples.extend(project_triples)
         if summary_line:
             summaries.append(summary_line)
@@ -333,35 +322,30 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
     print("Gathering Workbench Studies")
     studies = {}
     mwb_cur.execute("""\
-        SELECT study_id, study_title, study_type, study_summary, submit_date,
+        SELECT study_id, study_title, COALESCE(study_type, ''),
+            COALESCE(study_summary, ''), submit_date,
             project_id, last_name, first_name, institute, department,
             laboratory
         FROM study""")
     for row in mwb_cur:
-        study = Study()
-        study.study_id = row[0].replace('\n', '')
-        study.study_title = row[1].replace('\n', '').replace('"', '\\"')
-        if row[2]:
-            study.study_type = row[2].replace('\n', '')
-        if row[3]:
-            study.summary = row[3].replace('\n', '').replace('"', '\\"')
+
+        submit_date = ""
         if row[4]:
-            study.submit_date = str(row[4]) + "T00:00:00"
-        study.project_id = row[5].replace('\n', '')
+            submit_date = f"{row[4]}T00:00:00"
+
+        study = Study(
+            study_id=row[0].replace('\n', ''),
+            study_title=row[1].replace('\n', '').replace('"', '\\"'),
+            study_type=row[2].replace('\n', ''),
+            summary=row[3].replace('\n', '').replace('"', '\\"'),
+            submit_date=submit_date,
+            project_id=row[5].replace('\n', ''))
+
         last_name = row[6]
         first_name = row[7]
-        if row[8]:
-            institute = row[8]
-        else:
-            institute = None
-        if row[9]:
-            department = row[9]
-        else:
-            department = None
-        if row[10]:
-            lab = row[10]
-        else:
-            lab = None
+        institute = row[8]
+        department = row[9]
+        lab = row[10]
 
         if institute:
             sup_cur.execute("""\
@@ -371,7 +355,7 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
                             (institute,))
             try:
                 inst_id = sup_cur.fetchone()[0]
-                study.institute_uri = orgs[inst_id].uri
+                study.institute = orgs[inst_id].org_id
             except TypeError:
                 print("Error: Organization does not exist.")
                 print("Organization for study " + study.study_id)
@@ -389,7 +373,7 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
                     dept_options[row[0]] = row[1]
                 for dept_id, parent in dept_options.items():
                     if inst_id == parent:
-                        study.department_uri = orgs[dept_id].uri
+                        study.department = orgs[dept_id].org_id
             except TypeError:
                 print("Error: Organization does not exist.")
                 print("Organization for study " + study.study_id)
@@ -407,7 +391,7 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
                     lab_options[row[0]] = row[1]
                 for lab_id, parent in lab_options.items():
                     if dept_id == parent:
-                        study.lab_uri = orgs[lab_id].uri
+                        study.lab = orgs[lab_id].org_id
             except TypeError:
                 print("Error: Organization does not exist.")
                 print("Organization for study " + study.study_id)
@@ -421,13 +405,14 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
                         (last_name, first_name))
         try:
             person_id = sup_cur.fetchone()[0]
-            study.runner_uri = people[person_id].uri
+            study.runner = people[person_id].person_id
         except IndexError:
             print("Error: Person does not exist.")
             print("Runner for study " + study.study_id)
-            print("Last name: " + study.last_name)
-            print("First name: " + study.first_name)
+            print("Last name: " + last_name)
+            print("First name: " + first_name)
             sys.exit()
+
         studies[study.study_id] = study
     return studies
 
@@ -439,9 +424,8 @@ def make_studies(namespace, studies, projects):
     study_count = 0
     no_proj_study = 0
     for study in studies.values():
-        study.uri = namespace + study.study_id
         if study.project_id in projects.keys():
-            project_uri = projects[study.project_id].uri
+            project_uri = namespace + projects[study.project_id].project_id
         else:
             project_uri = None
             no_proj_study += 1
@@ -484,7 +468,7 @@ def make_datasets(namespace, datasets, studies):
         dataset.uri = namespace + dataset.mb_sample_id
         if dataset.study_id in studies.keys():
             parent_study = studies[dataset.study_id]
-            study_uri = parent_study.uri
+            study_uri = namespace + parent_study.study_id
             if dataset.subject_species not in parent_study.subject_species:
                 parent_study.subject_species.append(dataset.subject_species)
         else:
@@ -497,7 +481,7 @@ def make_datasets(namespace, datasets, studies):
         print("There are {} datasets without studies"
               .format(no_study_datasets))
     for study in studies.values():
-        study_triples.extend(study.get_species_triples())
+        study_triples.extend(study.get_species_triples(namespace))
     return dataset_triples, study_triples
 
 
