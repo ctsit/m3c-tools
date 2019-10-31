@@ -74,7 +74,7 @@ def main_menu():
                     <button class="btn btn-info w-100" onclick="window.location.href = '{{ url_for('metab_admin.person_alias') }}'">Modify an Person's Aliases</button>
                 </div>
                 <div class="row my-3">
-                    <button class="btn btn-info w-100" onclick="window.location.href = '{{ url_for('metab_admin.add_pmid') }}'">Add a Publication to a Person</button>
+                    <button class="btn btn-info w-100" onclick="window.location.href = '{{ url_for('metab_admin.add_pmid') }}'">Edit Publications for a Person</button>
                 </div>
             </div>
         </body>
@@ -1171,14 +1171,14 @@ def add_pmid():
 
     return render_template_string('''
     <!doctype html>
-    <head> 
-        <title>Add a new PMID to a Person</title>
+    <head>
+        <title>Edit Publications for a Person</title>
         <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
     </head>
     <body>
         <div class="container mx-auto" style="width: 50%;">
             <div class="row">
-                <h1 class="mx-auto">Add a new PMID to a Person</h1>
+                <h1 class="mx-auto">Edit Publications for a Person</h1>
             </div>
             <a href="{{ url_for('metab_admin.main_menu') }}">Back to Home</a>
             {% with messages = get_flashed_messages() %}
@@ -1206,7 +1206,7 @@ def add_pmid():
                     <label>Name</label>
                     <input readonly id=name class="form-control" type=text name=name>
                 </div>
-                
+
                 <input hidden readonly id=id type=text name=id>
 
                 <div class="form-group">
@@ -1215,7 +1215,7 @@ def add_pmid():
                 </div>
 
                 <button class="btn btn-primary" type=submit name=include>Add PMID</button>
-                <button class="btn btn-primary" type=submit name=exclude>Exclude PMID</button>
+                <button class="btn btn-danger" type=submit name=exclude>Exclude PMID</button>
             </form>
         </div>
         <script>
