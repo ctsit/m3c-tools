@@ -85,7 +85,7 @@ def query_pubmed(aide, person):
     return results
 
 
-def parse_api(results, namespace):
+def parse_api(results):
     publications = {}
     for citing in results['PubmedArticle']:
         pub = Publication()
@@ -94,7 +94,6 @@ def parse_api(results, namespace):
         fill_pub(pub, citation)
 
         if pub.pmid:
-            pub.uri = namespace + pub.pmid
             publications[pub.pmid] = pub
     return publications
 
@@ -213,13 +212,13 @@ def main():
     pub_collective = {}
     for person in people:
         results = query_pubmed(aide, person)
-        pubs = parse_api(results, aide.namespace)
+        pubs = parse_api(results)
         pub_collective.update(pubs)
         triples.extend(write_triples(aide, person, pubs))
 
     pub_count = 0
     for pub in pub_collective.values():
-        triples.extend(pub.get_triples())
+        triples.extend(pub.get_triples(aide.namespace))
         pub_count += 1
     print("There are " + str(pub_count) + " publications.")
 

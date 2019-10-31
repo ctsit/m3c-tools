@@ -387,7 +387,6 @@ class Tool(object):
 
 class Publication(object):
     def __init__(self):
-        self.uri = None
         self.pmid = None
         self.title = None
         self.publication_year = None
@@ -399,34 +398,40 @@ class Publication(object):
         datetime = self.publication_year + "-01-01T00:00:00"
         self.datetime = datetime
 
-    def get_triples(self):
-        dtv_uri = self.uri + 'dtv'
+    def get_triples(self, namespace):
+        uri = Publication.uri(namespace, self.pmid)
+        dtv_uri = f"{uri}dtv"
         rdf = []
-        rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://purl.org/ontology/bibo/Article>".format(self.uri))
-        rdf.append("<{}> <http://www.w3.org/2000/01/rdf-schema#label> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(self.uri, self.title))
-        rdf.append("<{}> <http://purl.org/ontology/bibo/pmid> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(self.uri, self.pmid))
+        rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://purl.org/ontology/bibo/Article>".format(uri))
+        rdf.append("<{}> <http://www.w3.org/2000/01/rdf-schema#label> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.title))
+        rdf.append("<{}> <http://purl.org/ontology/bibo/pmid> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.pmid))
         if self.doi:
-            rdf.append("<{}> <http://purl.org/ontology/bibo/doi> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(self.uri, self.doi))
+            rdf.append("<{}> <http://purl.org/ontology/bibo/doi> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.doi))
         if self.publication_year:
             self.make_datetime()
-            rdf.append("<{}> <http://vivoweb.org/ontology/core#dateTimeValue> <{}>".format(self.uri, dtv_uri))
+            rdf.append("<{}> <http://vivoweb.org/ontology/core#dateTimeValue> <{}>".format(uri, dtv_uri))
             rdf.append("<{}> <http://vivoweb.org/ontology/core#dateTime> \"{}\"^^<http://www.w3.org/2001/XMLSchema#dateTime>".format(dtv_uri, self.datetime))
         if self.citation:
-            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#citation> \"{}\"^^<http://www.w3.org/2001/XMLSchema#dateTime>".format(self.uri, self.citation))
+            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#citation> \"{}\"^^<http://www.w3.org/2001/XMLSchema#dateTime>".format(uri, self.citation))
 
         return rdf
 
     def add_person(self, namespace, person_id):
+        uri = Publication.uri(namespace, self.pmid)
         person_uri = Person.uri(namespace, person_id)
         relation_uri = f"{person_uri}r{self.pmid}"
         rdf = []
         rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://vivoweb.org/ontology/core#Authorship>".format(relation_uri))
-        rdf.append("<{}> <http://vivoweb.org/ontology/core#relatedBy> <{}>".format(self.uri, relation_uri))
-        rdf.append("<{}> <http://vivoweb.org/ontology/core#relates> <{}>".format(relation_uri, self.uri))
+        rdf.append("<{}> <http://vivoweb.org/ontology/core#relatedBy> <{}>".format(uri, relation_uri))
+        rdf.append("<{}> <http://vivoweb.org/ontology/core#relates> <{}>".format(relation_uri, uri))
         rdf.append("<{}> <http://vivoweb.org/ontology/core#relatedBy> <{}>".format(person_uri, relation_uri))
         rdf.append("<{}> <http://vivoweb.org/ontology/core#relates> <{}>".format(relation_uri, person_uri))
 
         return rdf
+
+    @staticmethod
+    def uri(namespace: str, pmid: str) -> str:
+        return f"{namespace}pmid{pmid}"
 
 
 def escape(text):
