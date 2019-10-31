@@ -203,7 +203,7 @@ class Photo(object):
             self.mimetype = "image/png"
 
     def download_url(self) -> str:
-        return f"/file/{Person.n_number(self.person_id)}/{self.filename()}"
+        return f"/file/{Person.n_number(self.person_id)}pic/{self.filename()}"
 
     def filename(self) -> str:
         return f"photo.{self.extension}"
@@ -213,8 +213,8 @@ class Photo(object):
         person = f"<{person_uri}>"
         image = f"<{person_uri}photo>"
         thumb = f"<{person_uri}thumb>"
-        image_dl = f"<{person_uri}photoloc>"
-        thumb_dl = f"<{person_uri}thumbloc>"
+        image_dl = f"<{person_uri}pic>"
+        thumb_dl = f"<{person_uri}tn>"
 
         rdf = []
         rdf.append(f"{person} <http://vitro.mannlib.cornell.edu/ns/vitro/public#mainImage> {image}")
