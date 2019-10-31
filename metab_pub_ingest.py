@@ -73,10 +73,7 @@ def get_people(cur, person_id=None):
                 JOIN names
                 ON id=person_id""")
     for row in cur:
-        person = Person()
-        person.person_id = row[0]
-        person.first_name = row[1]
-        person.last_name = row[2]
+        person = Person(person_id=row[0], first_name=row[1], last_name=row[2])
         people.append(person)
     return people
 
