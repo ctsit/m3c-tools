@@ -274,7 +274,8 @@ class Organization(object):
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#parentOf> <{}>".format(parent_uri, uri))
         return rdf
 
-    def add_person(self, namespace: str, person_uri):
+    def add_person(self, namespace: str, person_id):
+        person_uri = Person.uri(namespace, person_id)
         uri = Organization.uri(namespace, self.org_id)
         rdf = []
         rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#associatedWith> <{}>".format(person_uri, uri))
@@ -416,8 +417,8 @@ class Publication(object):
         return rdf
 
     def add_person(self, namespace, person_id):
-        person_uri = namespace + str(person_id)
-        relation_uri = namespace + str(person_id) + 'r' + self.pmid
+        person_uri = Person.uri(namespace, person_id)
+        relation_uri = f"{person_uri}r{self.pmid}"
         rdf = []
         rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://vivoweb.org/ontology/core#Authorship>".format(relation_uri))
         rdf.append("<{}> <http://vivoweb.org/ontology/core#relatedBy> <{}>".format(self.uri, relation_uri))

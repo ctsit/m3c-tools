@@ -167,13 +167,12 @@ def make_people(namespace, people):
 
 def link_people_to_org(namespace: str, sup_cur, people, orgs):
     triples = []
-    for person in people.values():
-        sup_cur.execute("""\
-                    SELECT person_id, organization_id
-                    FROM associations
-                    WHERE person_id=%s""", (person.person_id,))
-        for row in sup_cur:
-            triples.extend(orgs[row[1]].add_person(namespace, person.uri))
+    sup_cur.execute("""\
+        SELECT person_id, organization_id
+        FROM associations
+    """)
+    for row in sup_cur:
+        triples.extend(orgs[row[1]].add_person(namespace, row[0]))
     return triples
 
 
