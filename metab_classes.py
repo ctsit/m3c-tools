@@ -242,7 +242,7 @@ class Photo(object):
     def path(self) -> str:
         """Get the directory path for the specified person with `person_id`."""
         # "b~" is shorthand for https://vivo.metabolomics.info/individual/
-        path = f"{self.alias}~{Person.n_number(self.person_id)}"
+        path = f"{self.alias}~{Person.n_number(self.person_id)}pic"
         # VIVO expects each directory to be no longer than 3 characters.
         # See: https://wiki.duraspace.org/display/VIVODOC110x/Image+storage
         path = textwrap.wrap(path, 3)
