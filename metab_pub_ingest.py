@@ -118,6 +118,8 @@ def fill_pub(pub, citation):
     author_list = citation.check_key(['MedlineCitation', 'Article', 'AuthorList'])
     names = []
     for author in author_list:
+        if 'CollectiveName' in author:
+            continue
         last_name = author['LastName']
         initial = author['Initials']
         name = last_name + ", " + initial + "."
