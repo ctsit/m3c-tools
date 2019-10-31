@@ -119,6 +119,7 @@ def fill_pub(pub, citation):
     names = []
     for author in author_list:
         if 'CollectiveName' in author:
+            names.append(author['CollectiveName'])
             continue
         last_name = author['LastName']
         initial = author['Initials']
