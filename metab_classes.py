@@ -10,6 +10,7 @@ class Project(object):
         self.uri = None
         self.project_id = None
         self.project_type = None
+        self.project_title = None
         self.summary = None
         self.doi = None
         self.funding_source = None
@@ -124,26 +125,29 @@ class Dataset(object):
 
 
 class Person(object):
-    def __init__(self):
-        self.uri = None
-        self.person_id = None
-        self.first_name = None
-        self.last_name = None
-        self.display_name = None
-        self.email = None
-        self.phone = None
+    def __init__(self, person_id: str, first_name: str, last_name: str,
+                 display_name: str = "", email: str = "", phone: str = ""):
+        assert person_id and first_name and last_name
 
-    def make_display_name(self):
-        self.display_name = self.first_name + ' ' + self.last_name
+        self.person_id = person_id
+        self.first_name = first_name
+        self.last_name = last_name
+        self.email = email
+        self.phone = phone
+        self.display_name = display_name
 
-    def get_triples(self):
+        if not self.display_name:
+            self.display_name = f"{self.first_name} {self.last_name}"
+
+    def get_triples(self, namespace: str):
+        uri = Person.uri(namespace, self.person_id)
         rdf = []
-        vcard_uri = self.uri + "vcard"
+        vcard_uri = uri + "vcard"
         name_uri = vcard_uri + "name"
-        rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person>".format(self.uri))
-        rdf.append("<{}> <http://www.w3.org/2000/01/rdf-schema#label> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(self.uri, self.display_name).replace('\n', ''))
-        rdf.append("<{}> <http://purl.obolibrary.org/obo/ARG_2000028> <{}>".format(self.uri, vcard_uri))
-        rdf.append("<{}> <http://purl.obolibrary.org/obo/ARG_2000029> <{}>".format(vcard_uri, self.uri))
+        rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person>".format(uri))
+        rdf.append("<{}> <http://www.w3.org/2000/01/rdf-schema#label> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.display_name).replace('\n', ''))
+        rdf.append("<{}> <http://purl.obolibrary.org/obo/ARG_2000028> <{}>".format(uri, vcard_uri))
+        rdf.append("<{}> <http://purl.obolibrary.org/obo/ARG_2000029> <{}>".format(vcard_uri, uri))
         rdf.append("<{}> <http://www.w3.org/2006/vcard/ns#hasName> <{}>".format(vcard_uri, name_uri))
         rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2006/vcard/ns#Name>".format(name_uri))
         rdf.append("<{}> <http://www.w3.org/2006/vcard/ns#familyName> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(vcard_uri, self.last_name).replace('\n', ''))
@@ -160,6 +164,10 @@ class Person(object):
             rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2006/vcard/ns#Telephone>".format(phone_uri))
             rdf.append("<{}> <http://www.w3.org/2006/vcard/ns#telephone> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(phone_uri, self.phone))
         return rdf
+
+    @staticmethod
+    def uri(namespace: str, person_id: str) -> str:
+        return f"{namespace}/p{person_id}"
 
 
 class Photo(object):
@@ -179,7 +187,7 @@ class Photo(object):
             self.mimetype = "image/png"
 
     def download_url(self) -> str:
-        return f"/file/p{self.person_id}/{self.filename()}"
+        return f"/file/{self.person_id}pdl/{self.filename()}"
 
     def filename(self) -> str:
         return f"photo.{self.extension}"
@@ -189,8 +197,8 @@ class Photo(object):
         person = f"<{namespace}{pid}>"
         image = f"<{namespace}{pid}photo>"
         thumb = f"<{namespace}{pid}thumb>"
-        image_dl = f"<{namespace}p{pid}>"
-        thumb_dl = f"<{namespace}t{pid}>"
+        image_dl = f"<{namespace}{pid}pdl>"
+        thumb_dl = f"<{namespace}{pid}tdl>"
 
         rdf = []
         rdf.append(f"{person} <http://vitro.mannlib.cornell.edu/ns/vitro/public#mainImage> {image}")
@@ -227,33 +235,39 @@ class Photo(object):
 
 
 class Organization(object):
-    def __init__(self):
-        self.uri = None
-        self.org_id = None
-        self.name = None
-        self.type = None
-        self.parent_id = None
-        self.parent_uri = None
+    def __init__(self, org_id: str, name: str, type: str, parent_id: str):
+        assert org_id
+        self.org_id = org_id
+        self.name = name
+        self.type = type
+        self.parent_id = parent_id
 
-    def get_triples(self):
+    def get_triples(self, namespace: str):
+        uri = Organization.uri(namespace, self.org_id)
         rdf = []
         if self.type == "institute":
-            rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://vivoweb.org/ontology/core#Institute>".format(self.uri))
+            rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://vivoweb.org/ontology/core#Institute>".format(uri))
         if self.type == "department":
-            rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://vivoweb.org/ontology/core#Department>".format(self.uri))
+            rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://vivoweb.org/ontology/core#Department>".format(uri))
         if self.type == "laboratory":
-            rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://vivoweb.org/ontology/core#Laboratory>".format(self.uri))
-        rdf.append("<{}> <http://www.w3.org/2000/01/rdf-schema#label> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(self.uri, self.name.replace('\n', '')))
-        if self.parent_uri:
-            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#hasParent> <{}>".format(self.uri, self.parent_uri))
-            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#parentOf> <{}>".format(self.parent_uri, self.uri))
+            rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://vivoweb.org/ontology/core#Laboratory>".format(uri))
+        rdf.append("<{}> <http://www.w3.org/2000/01/rdf-schema#label> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.name.replace('\n', '')))
+        if self.parent_id:
+            parent_uri = Organization.uri(namespace, self.parent_id)
+            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#hasParent> <{}>".format(uri, parent_uri))
+            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#parentOf> <{}>".format(parent_uri, uri))
         return rdf
 
-    def add_person(self, person_uri):
+    def add_person(self, namespace: str, person_uri):
+        uri = Organization.uri(namespace, self.org_id)
         rdf = []
-        rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#associatedWith> <{}>".format(person_uri, self.uri))
-        rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#associationFor> <{}>".format(self.uri, person_uri))
+        rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#associatedWith> <{}>".format(person_uri, uri))
+        rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#associationFor> <{}>".format(uri, person_uri))
         return rdf
+
+    @staticmethod
+    def uri(namespace: str, org_id: str) -> str:
+        return f"{namespace}/o{org_id}"
 
 
 class Tool(object):

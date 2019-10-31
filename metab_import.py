@@ -125,11 +125,8 @@ def get_organizations(sup_cur):
                     FROM organizations
                     WHERE withheld = FALSE""")
     for row in sup_cur:
-        org = Organization()
-        org.org_id = row[0]
-        org.name = row[1]
-        org.type = row[2]
-        org.parent_id = row[3]
+        org = Organization(org_id=row[0], name=row[1], type=row[2],
+                           parent_id=row[3])
         orgs[org.org_id] = org
     return orgs
 
@@ -137,14 +134,9 @@ def get_organizations(sup_cur):
 def make_organizations(namespace, orgs):
     print("Making Organizations")
     triples = []
-    org_count = 0
     for org in orgs.values():
-        org.uri = namespace + str(org.org_id)
-        if org.parent_id:
-            org.parent_uri = namespace + str(org.parent_id)
-        triples.extend(org.get_triples())
-        org_count += 1
-    print("There are " + str(org_count) + " organizations.")
+        triples.extend(org.get_triples(namespace))
+    print(f"There are {len(orgs)} organizations.")
     return triples
 
 
@@ -158,13 +150,8 @@ def get_people(sup_cur):
             ON id=person_id
             WHERE p.withheld = FALSE AND n.withheld = FALSE""")
     for row in sup_cur:
-        person = Person()
-        person.person_id = row[0]
-        person.first_name = row[1]
-        person.last_name = row[2]
-        person.display_name = row[3]
-        person.email = row[4]
-        person.phone = row[5]
+        person = Person(person_id=row[0], first_name=row[1], last_name=row[2],
+                        display_name=row[3], email=row[4], phone=row[5])
         people[person.person_id] = person
     return people
 
@@ -172,18 +159,13 @@ def get_people(sup_cur):
 def make_people(namespace, people):
     print("Making People Profiles")
     triples = []
-    people_count = 0
     for person in people.values():
-        person.uri = namespace + str(person.person_id)
-        if not person.display_name:
-            person.make_display_name()
-        triples.extend(person.get_triples())
-        people_count += 1
-    print("There are " + str(people_count) + " people.")
+        triples.extend(person.get_triples(namespace))
+    print(f"There are {len(people)} people.")
     return triples
 
 
-def link_people_to_org(sup_cur, people, orgs):
+def link_people_to_org(namespace: str, sup_cur, people, orgs):
     triples = []
     for person in people.values():
         sup_cur.execute("""\
@@ -191,7 +173,7 @@ def link_people_to_org(sup_cur, people, orgs):
                     FROM associations
                     WHERE person_id=%s""", (person.person_id,))
         for row in sup_cur:
-            triples.extend(orgs[row[1]].add_person(person.uri))
+            triples.extend(orgs[row[1]].add_person(namespace, person.uri))
     return triples
 
 
@@ -711,7 +693,7 @@ def main():
     # People
     people = get_people(sup_cur)
     people_triples = make_people(aide.namespace, people)
-    people_triples.extend(link_people_to_org(sup_cur, people, orgs))
+    people_triples.extend(link_people_to_org(aide.namespace, sup_cur, people, orgs))
     print_to_file(people_triples, people_file)
 
     # Photos

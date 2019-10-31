@@ -73,11 +73,8 @@ def get_people(cur, person_id=None):
                 JOIN names
                 ON id=person_id""")
     for row in cur:
-        person = Person()
-        person.person_id = row[0]
-        person.first_name = row[1]
-        person.last_name = row[2]
-        people[row[0]] = person
+        person = Person(person_id=row[0], first_name=row[1], last_name=row[2])
+        people[person.person_id] = person
     return people
 
 
@@ -144,6 +141,8 @@ def fill_pub(pub, citation):
     author_list = citation.check_key(['MedlineCitation', 'Article', 'AuthorList'])
     names = []
     for author in author_list:
+        if 'CollectiveName' in author:
+            continue
         last_name = author['LastName']
         initial = author['Initials']
         name = last_name + ", " + initial + "."
@@ -217,9 +216,9 @@ def main():
     except FileExistsError:
         pass
     if sys.argv[1] == "-id":
-        pub_file = os.path.join(path, person_id + "_pubs.rdf")
+        pub_file = os.path.join(path, person_id + "_pubs.nt")
     else:
-        pub_file = os.path.join(path, 'pubs.rdf')
+        pub_file = os.path.join(path, 'pubs.nt')
 
     config = get_config(config_path)
 
