@@ -685,6 +685,9 @@ def main():
                       config.get('sup_username'), config.get('sup_password'),
                       config.get('sup_port'))
 
+    if not aide.namespace.endswith('/'):
+        print(f"WARNING! Namespace doesn't end with '/': {aide.namespace}")
+
     # Organizations
     orgs = get_organizations(sup_cur)
     org_triples = make_organizations(aide.namespace, orgs)

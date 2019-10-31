@@ -166,8 +166,12 @@ class Person(object):
         return rdf
 
     @staticmethod
+    def n_number(person_id: str) -> str:
+        return f"p{person_id}"
+
+    @staticmethod
     def uri(namespace: str, person_id: str) -> str:
-        return f"{namespace}/p{person_id}"
+        return f"{namespace}{Person.n_number(person_id)}"
 
 
 class Photo(object):
@@ -187,18 +191,18 @@ class Photo(object):
             self.mimetype = "image/png"
 
     def download_url(self) -> str:
-        return f"/file/{self.person_id}pdl/{self.filename()}"
+        return f"/file/{Person.n_number(self.person_id)}/{self.filename()}"
 
     def filename(self) -> str:
         return f"photo.{self.extension}"
 
     def get_triples(self, namespace: typing.Text) -> typing.List[typing.Text]:
-        pid = self.person_id
-        person = f"<{namespace}{pid}>"
-        image = f"<{namespace}{pid}photo>"
-        thumb = f"<{namespace}{pid}thumb>"
-        image_dl = f"<{namespace}{pid}pdl>"
-        thumb_dl = f"<{namespace}{pid}tdl>"
+        person_uri = Person.uri(namespace, self.person_id)
+        person = f"<{person_uri}>"
+        image = f"<{person_uri}photo>"
+        thumb = f"<{person_uri}thumb>"
+        image_dl = f"<{person_uri}photoloc>"
+        thumb_dl = f"<{person_uri}thumbloc>"
 
         rdf = []
         rdf.append(f"{person} <http://vitro.mannlib.cornell.edu/ns/vitro/public#mainImage> {image}")
@@ -226,7 +230,7 @@ class Photo(object):
     def path(self) -> str:
         """Get the directory path for the specified person with `person_id`."""
         # "b~" is shorthand for https://vivo.metabolomics.info/individual/
-        path = f"{self.alias}~p{self.person_id}"
+        path = f"{self.alias}~{Person.n_number(self.person_id)}"
         # VIVO expects each directory to be no longer than 3 characters.
         # See: https://wiki.duraspace.org/display/VIVODOC110x/Image+storage
         path = textwrap.wrap(path, 3)
@@ -267,7 +271,7 @@ class Organization(object):
 
     @staticmethod
     def uri(namespace: str, org_id: str) -> str:
-        return f"{namespace}/o{org_id}"
+        return f"{namespace}o{org_id}"
 
 
 class Tool(object):
