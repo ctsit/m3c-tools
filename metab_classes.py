@@ -10,6 +10,7 @@ class Project(object):
         self.uri = None
         self.project_id = None
         self.project_type = None
+        self.project_title = None
         self.summary = None
         self.doi = None
         self.funding_source = None
