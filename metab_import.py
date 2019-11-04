@@ -2,11 +2,22 @@
 Metab Importer
 Usage:
     import.py (-h | --help)
-    import.py [-d | --dry-run] <path_to_config>
+    import.py [-d | --dry-run] [-x <prev> | --diff=<prev>] <path_to_config>
 
 Options:
-    -h --help       Show this message and exit
-    -d --dry-run    Create rdf files without deleting and uploading to VIVO
+    -h --help     Show this message and exit
+    -d --dry-run  Create N-Triples files without deleting and uploading to VIVO
+    -x --diff     See Differential Update.
+
+Differential Update:
+    A differential update compares the triples produced by a run with that of
+    an older one (<prev>). Two distinct sets of triples are produced:
+     - an "Add" set which contains the set of triples that are in the current
+       run's triples, but not in the older sets.
+     - a "Sub" set which contains the set of triples that are in the older
+       set, but not in the current run's.
+
+    The corresponding files are written to add.nt and sub.nt.
 
 Instructions:
     Run the importer where you have access to the postgres metabolomics
@@ -14,8 +25,14 @@ Instructions:
 """
 
 from datetime import datetime
+from typing import List
+import csv
+import getopt
 import os
+import pathlib
 import sys
+import time
+import typing
 import yaml
 
 import psycopg2
@@ -24,6 +41,7 @@ from aide import Aide
 from metab_classes import Dataset
 from metab_classes import Organization
 from metab_classes import Person
+from metab_classes import Photo
 from metab_classes import Project
 from metab_classes import Study
 from metab_classes import Tool
@@ -46,6 +64,59 @@ def connect(host, db, user, pg_password, port):
     return cur
 
 
+def diff(prev_path: str, path: str) -> \
+        typing.Tuple[typing.List[str], typing.List[str]]:
+    prev = pathlib.Path(prev_path)
+    previous = []
+    for file in prev.glob("*.nt"):
+        if file in ["add.nt", "sub.nt"]:
+            continue
+        with open(file) as f:
+            previous += [line for line in list(f) if line]
+    previous.sort()
+
+    curr = pathlib.Path(path)
+    current = []
+    for file in curr.glob("*.nt"):
+        if file in ["add.nt", "sub.nt"]:
+            continue
+        with open(file) as f:
+            current += [line for line in list(f) if line]
+    current.sort()
+
+    previous = set(previous)
+    current = set(current)
+
+    add = current - previous
+    sub = previous - current
+
+    return (add, sub)
+
+
+def diff_upload(aide: Aide, add: typing.List[str], sub: typing.List[str]):
+    lines = []
+    for line in sub:
+        line = line.strip()
+        if line.endswith(" ."):
+            line = line[:-2]
+        lines.append(line)
+
+    if lines:
+        print(f"Differential update: removing {len(lines)} old triples")
+        delete(aide, lines)
+
+    lines = []
+    for line in add:
+        line = line.strip()
+        if line.endswith(" ."):
+            line = line[:-2]
+        lines.append(line)
+
+    if lines:
+        print(f"Differential update: adding {len(lines)} new triples")
+        insert(aide, lines)
+
+
 def get_organizations(sup_cur):
     print("Gathering Organizations")
     orgs = {}
@@ -54,11 +125,8 @@ def get_organizations(sup_cur):
                     FROM organizations
                     WHERE withheld = FALSE""")
     for row in sup_cur:
-        org = Organization()
-        org.org_id = row[0]
-        org.name = row[1]
-        org.type = row[2]
-        org.parent_id = row[3]
+        org = Organization(org_id=row[0], name=row[1], type=row[2],
+                           parent_id=row[3])
         orgs[org.org_id] = org
     return orgs
 
@@ -66,14 +134,9 @@ def get_organizations(sup_cur):
 def make_organizations(namespace, orgs):
     print("Making Organizations")
     triples = []
-    org_count = 0
     for org in orgs.values():
-        org.uri = namespace + str(org.org_id)
-        if org.parent_id:
-            org.parent_uri = namespace + str(org.parent_id)
-        triples.extend(org.get_triples())
-        org_count += 1
-    print("There are " + str(org_count) + " organizations.")
+        triples.extend(org.get_triples(namespace))
+    print(f"There are {len(orgs)} organizations.")
     return triples
 
 
@@ -82,18 +145,13 @@ def get_people(sup_cur):
     people = {}
     sup_cur.execute("""\
             SELECT id, first_name, last_name, display_name, email, phone
-            FROM people
-            JOIN names
+            FROM people p
+            JOIN names n
             ON id=person_id
-            WHERE withheld = FALSE""")
+            WHERE p.withheld = FALSE AND n.withheld = FALSE""")
     for row in sup_cur:
-        person = Person()
-        person.person_id = row[0]
-        person.first_name = row[1]
-        person.last_name = row[2]
-        person.display_name = row[3]
-        person.email = row[4]
-        person.phone = row[5]
+        person = Person(person_id=row[0], first_name=row[1], last_name=row[2],
+                        display_name=row[3], email=row[4], phone=row[5])
         people[person.person_id] = person
     return people
 
@@ -101,64 +159,79 @@ def get_people(sup_cur):
 def make_people(namespace, people):
     print("Making People Profiles")
     triples = []
-    people_count = 0
     for person in people.values():
-        person.uri = namespace + str(person.person_id)
-        if not person.display_name:
-            person.make_display_name()
-        triples.extend(person.get_triples())
-        people_count += 1
-    print("There are " + str(people_count) + " people.")
+        triples.extend(person.get_triples(namespace))
+    print(f"There are {len(people)} people.")
     return triples
 
 
-def link_people_to_org(sup_cur, people, orgs):
+def link_people_to_org(namespace: str, sup_cur, people, orgs):
     triples = []
-    for person in people.values():
-        sup_cur.execute("""\
-                    SELECT person_id, organization_id
-                    FROM associations
-                    WHERE person_id=%s""", (person.person_id,))
-        for row in sup_cur:
-            triples.extend(orgs[row[1]].add_person(person.uri))
+    sup_cur.execute("""\
+        SELECT person_id, organization_id
+        FROM associations
+    """)
+    for row in sup_cur:
+        triples.extend(orgs[row[1]].add_person(namespace, row[0]))
     return triples
 
 
-def get_projects(mwb_cur, sup_cur, people, orgs):
+def make_photos(namespace: str, photos: list):
+    print("Making Photo triples")
+
+    triples = []
+    for photo in photos:
+        triples.extend(photo.get_triples(namespace))
+
+    print(f"There are {len(photos)} photos.")
+
+    return triples
+
+
+def get_photos(file_storage_root: str, people):
+    photos = []
+    for person in people.values():
+        photo = Photo(file_storage_root, person.person_id, 'jpg')
+
+        jpg = os.path.join(photo.path(), photo.filename())
+        if os.path.isfile(jpg):
+            photos.append(photo)
+            continue
+
+        photo = Photo(file_storage_root, person.person_id, 'png')
+        png = os.path.join(photo.path(), photo.filename())
+        if os.path.isfile(png):
+            photos.append(photo)
+            continue
+
+    return photos
+
+
+def get_projects(mwb_cur, sup_cur,
+                 people: List[Person], orgs: List[Organization]):
     print("Gathering Workbench Projects")
     projects = {}
     mwb_cur.execute("""\
-        SELECT project_id, project_title, project_type, project_summary,
-               doi, funding_source, last_name, first_name, institute,
-               department, laboratory
+        SELECT project_id, project_title, COALESCE(project_type, ''),
+               COALESCE(project_summary, ''), COALESCE(doi, ''),
+               COALESCE(funding_source, ''),
+               last_name, first_name, institute, department, laboratory
           FROM project
     """)
     for row in mwb_cur:
-        project = Project()
-        project.project_id = row[0].replace('\n', '')
-        project.project_title = row[1].replace('\n', '').replace('"', '\\"')
-        if row[2]:
-            project.project_type = row[2].replace('\n', '')
-        if row[3]:
-            project.summary = row[3].replace('\n', '').replace('"', '\\"')
-        if row[4]:
-            project.doi = row[4].replace('\n', '')
-        if row[5]:
-            project.funding_source = row[5].replace('\n', '')
-        last_name = row[6]
-        first_name = row[7]
-        if row[8]:
-            institute = row[8]
-        else:
-            institute = None
-        if row[9]:
-            department = row[9]
-        else:
-            department = None
-        if row[10]:
-            lab = row[10]
-        else:
-            lab = None
+        project = Project(
+            project_id=row[0].replace('\n', ''),
+            project_title=row[1].replace('\n', '').replace('"', '\\"'),
+            project_type=row[2].replace('\n', ''),
+            summary=row[3].replace('\n', '').replace('"', '\\"'),
+            doi=row[4].replace('\n', ''),
+            funding_source=row[5].replace('\n', ''))
+
+        last_name: str = row[6]
+        first_name: str = row[7]
+        institute = row[8]
+        department = row[9]
+        lab = row[10]
 
         if institute:
             sup_cur.execute("""\
@@ -168,7 +241,7 @@ def get_projects(mwb_cur, sup_cur, people, orgs):
                             (institute,))
             try:
                 inst_id = sup_cur.fetchone()[0]
-                project.institute_uri = orgs[inst_id].uri
+                project.institute = orgs[inst_id].org_id
             except TypeError:
                 print("Error: Organization does not exist.")
                 print("Organization for project " + project.project_id)
@@ -186,7 +259,7 @@ def get_projects(mwb_cur, sup_cur, people, orgs):
                     dept_options[row[0]] = row[1]
                 for dept_id, parent in dept_options.items():
                     if inst_id == parent:
-                        project.department_uri = orgs[dept_id].uri
+                        project.department = orgs[dept_id].org_id
             except TypeError:
                 print("Error: Organization does not exist.")
                 print("Organization for project " + project.project_id)
@@ -204,7 +277,7 @@ def get_projects(mwb_cur, sup_cur, people, orgs):
                     lab_options[row[0]] = row[1]
                 for lab_id, parent in lab_options.items():
                     if dept_id == parent:
-                        project.lab_uri = orgs[lab_id].uri
+                        project.lab = orgs[lab_id].org_id
             except TypeError:
                 print("Error: Organization does not exist.")
                 print("Organization for project " + project.project_id)
@@ -214,29 +287,29 @@ def get_projects(mwb_cur, sup_cur, people, orgs):
         sup_cur.execute("""\
                     SELECT person_id
                     FROM names
-                    WHERE last_name=%s AND first_name=%s""",
-                        (last_name, first_name))
+                    WHERE last_name=%s AND first_name=%s
+                      AND withheld = FALSE""",
+                        (last_name.strip(), first_name.strip()))
         try:
             person_id = sup_cur.fetchone()[0]
-            project.pi_uri = people[person_id].uri
-        except KeyError:
+            project.pi = people[person_id].person_id
+        except (IndexError, KeyError, TypeError):
             print("Error: Person does not exist.")
             print("PI for project " + project.project_id)
-            print("Last name: " + project.last_name)
-            print("First name: " + project.first_name)
+            print("Last name: " + last_name)
+            print("First name: " + first_name)
             sys.exit()
         projects[project.project_id] = project
     return projects
 
 
-def make_projects(namespace, projects):
+def make_projects(namespace, projects: typing.Mapping[str, Project]):
     print("Making Workbench Projects")
     triples = []
     summaries = []
     project_count = 0
     for project in projects.values():
-        project.uri = namespace + project.project_id
-        project_triples, summary_line = project.get_triples()
+        project_triples, summary_line = project.get_triples(namespace)
         triples.extend(project_triples)
         if summary_line:
             summaries.append(summary_line)
@@ -249,35 +322,30 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
     print("Gathering Workbench Studies")
     studies = {}
     mwb_cur.execute("""\
-        SELECT study_id, study_title, study_type, study_summary, submit_date,
+        SELECT study_id, study_title, COALESCE(study_type, ''),
+            COALESCE(study_summary, ''), submit_date,
             project_id, last_name, first_name, institute, department,
             laboratory
         FROM study""")
     for row in mwb_cur:
-        study = Study()
-        study.study_id = row[0].replace('\n', '')
-        study.study_title = row[1].replace('\n', '').replace('"', '\\"')
-        if row[2]:
-            study.study_type = row[2].replace('\n', '')
-        if row[3]:
-            study.summary = row[3].replace('\n', '').replace('"', '\\"')
+
+        submit_date = ""
         if row[4]:
-            study.submit_date = str(row[4]) + "T00:00:00"
-        study.project_id = row[5].replace('\n', '')
-        last_name = row[6]
-        first_name = row[7]
-        if row[8]:
-            institute = row[8]
-        else:
-            institute = None
-        if row[9]:
-            department = row[9]
-        else:
-            department = None
-        if row[10]:
-            lab = row[10]
-        else:
-            lab = None
+            submit_date = f"{row[4]}T00:00:00"
+
+        study = Study(
+            study_id=row[0].replace('\n', ''),
+            study_title=row[1].replace('\n', '').replace('"', '\\"'),
+            study_type=row[2].replace('\n', ''),
+            summary=row[3].replace('\n', '').replace('"', '\\"'),
+            submit_date=submit_date,
+            project_id=row[5].replace('\n', ''))
+
+        last_name: str = row[6]
+        first_name: str = row[7]
+        institute = row[8]
+        department = row[9]
+        lab = row[10]
 
         if institute:
             sup_cur.execute("""\
@@ -287,7 +355,7 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
                             (institute,))
             try:
                 inst_id = sup_cur.fetchone()[0]
-                study.institute_uri = orgs[inst_id].uri
+                study.institute = orgs[inst_id].org_id
             except TypeError:
                 print("Error: Organization does not exist.")
                 print("Organization for study " + study.study_id)
@@ -305,7 +373,7 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
                     dept_options[row[0]] = row[1]
                 for dept_id, parent in dept_options.items():
                     if inst_id == parent:
-                        study.department_uri = orgs[dept_id].uri
+                        study.department = orgs[dept_id].org_id
             except TypeError:
                 print("Error: Organization does not exist.")
                 print("Organization for study " + study.study_id)
@@ -323,7 +391,7 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
                     lab_options[row[0]] = row[1]
                 for lab_id, parent in lab_options.items():
                     if dept_id == parent:
-                        study.lab_uri = orgs[lab_id].uri
+                        study.lab = orgs[lab_id].org_id
             except TypeError:
                 print("Error: Organization does not exist.")
                 print("Organization for study " + study.study_id)
@@ -333,42 +401,40 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
         sup_cur.execute("""\
                     SELECT person_id
                     FROM names
-                    WHERE last_name=%s AND first_name=%s""",
-                        (last_name, first_name))
+                    WHERE last_name=%s AND first_name=%s
+                      AND withheld = FALSE""",
+                        (last_name.strip(), first_name.strip()))
         try:
             person_id = sup_cur.fetchone()[0]
-            study.runner_uri = people[person_id].uri
-        except IndexError:
+            study.runner = people[person_id].person_id
+        except (IndexError, KeyError, TypeError):
             print("Error: Person does not exist.")
             print("Runner for study " + study.study_id)
-            print("Last name: " + study.last_name)
-            print("First name: " + study.first_name)
+            print("Last name: " + last_name)
+            print("First name: " + first_name)
             sys.exit()
+
         studies[study.study_id] = study
     return studies
 
 
-def make_studies(namespace, studies, projects):
+def make_studies(namespace, studies: typing.Dict[str, Study], projects):
     print("Making Workbench Studies")
     triples = []
     summaries = []
     study_count = 0
     no_proj_study = 0
     for study in studies.values():
-        study.uri = namespace + study.study_id
-        if study.project_id in projects.keys():
-            project_uri = projects[study.project_id].uri
-        else:
-            project_uri = None
+        if study.project_id not in projects.keys():
             no_proj_study += 1
-        study_triples, summary_line = study.get_triples(project_uri)
+        study_triples, summary_line = study.get_triples(namespace)
         triples.extend(study_triples)
         if summary_line:
             summaries.append(summary_line)
         study_count += 1
     print("There are " + str(study_count) + " studies.")
     if no_proj_study > 0:
-        print("There are " + str(no_proj_study) + " studies without projects")
+        print(f"WARNING! There are {no_proj_study} studies without projects")
     return triples, summaries
 
 
@@ -400,7 +466,7 @@ def make_datasets(namespace, datasets, studies):
         dataset.uri = namespace + dataset.mb_sample_id
         if dataset.study_id in studies.keys():
             parent_study = studies[dataset.study_id]
-            study_uri = parent_study.uri
+            study_uri = namespace + parent_study.study_id
             if dataset.subject_species not in parent_study.subject_species:
                 parent_study.subject_species.append(dataset.subject_species)
         else:
@@ -413,11 +479,33 @@ def make_datasets(namespace, datasets, studies):
         print("There are {} datasets without studies"
               .format(no_study_datasets))
     for study in studies.values():
-        study_triples.extend(study.get_species_triples())
+        study_triples.extend(study.get_species_triples(namespace))
     return dataset_triples, study_triples
 
 
-def get_tools(config):
+def get_authors_pmid(aide: Aide, pmid: typing.Text) -> typing.List[typing.Dict]:
+    count = 0
+    authors = []
+    redo = True
+    while redo and count < 2:
+        count += 1
+        redo = False
+        try:
+            data = aide.get_details([pmid])
+            for author in data['PubmedArticle'][0]['MedlineCitation']['Article']['AuthorList']:
+                authors.append({
+                    'name': f"{author['ForeName'].split(' ')[0].strip()} {author['LastName']}"
+                })
+        except IOError:
+            print('Error getting PubMed Data for tool with PMID %s. Trying again in 3 seconds' % pmid)
+            redo = True
+            time.sleep(3)
+        except Exception:
+            print('Error parsing PubMed Data for tool with PMID %s' % pmid)
+    return authors
+
+
+def get_yaml_tools(config):
     try:
         tools_path = config.get('tools', 'tools.yaml')
         with open(tools_path, 'r') as tools_file:
@@ -427,12 +515,49 @@ def get_tools(config):
                 try:
                     tool = Tool(tool_id, data)
                     tools.append(tool)
-                except Exception:
+                except Exception as e:
+                    print(f'{e!r}')
                     print('Error: check configuration for tool "%s"' % tool_id)
-                    raise
+                    continue
             return tools
     except Exception:
         print('Error parsing tools config file: %s' % tools_path)
+        return []
+
+
+def strip_http(url: typing.Text) -> typing.Text:
+    return url.replace('http://', '').replace('https://', '')
+
+
+def get_csv_tools(config, aide: Aide) -> List[Tool]:
+    try:
+        csv_tools_path = config.get('tools_csv', 'tools.csv')
+        with open(csv_tools_path, 'r') as tools_file:
+            t = csv.reader(tools_file)
+            # Skip the header row
+            next(t)
+
+            tools = []
+            for tool_data in t:
+                pmid = tool_data[19].strip()
+                authors = None
+                if pmid.isnumeric():
+                    authors = get_authors_pmid(aide, pmid)
+                if not tool_data[24].replace('-', '').strip():
+                    continue
+                tool = Tool(strip_http(tool_data[24]), {
+                    'name': tool_data[21],
+                    'description': tool_data[1],
+                    'url': tool_data[24],
+                    'authors': authors,
+                    'pmid': pmid,
+                    'tags': tool_data[6].split(',')
+                })
+                tools.append(tool)
+            return tools
+    except Exception as e:
+        print(e)
+        print('Error parsing tools config file: %s' % csv_tools_path)
         return []
 
 
@@ -442,7 +567,8 @@ def make_tools(namespace, tools, people):
     tool_count = 0
     for tool in tools:
         # First, find all the authors' URIs
-        tool.match_authors(people)
+        if not tool.match_authors(people):
+            continue
         # Now, generate the triples.
         triples.extend(tool.get_triples(namespace))
         tool_count += 1
@@ -456,15 +582,24 @@ def print_to_file(triples, file):
         rdf.write("\n".join(triples))
 
 
-def do_upload(aide, triples, chunk_size=20):
-    chunks = \
-        [triples[x:x+chunk_size] for x in range(0, len(triples), chunk_size)]
+def delete(aide, triples, chunk_size=20):
+    do_upload(aide, triples, chunk_size, "DELETE")
+
+
+def insert(aide, triples, chunk_size=20):
+    do_upload(aide, triples, chunk_size, "INSERT")
+
+
+def do_upload(aide, triples, chunk_size=20, upload_type="INSERT"):
+    assert upload_type in ["INSERT", "DELETE"]
+    chunks = [triples[x:x+chunk_size]
+              for x in range(0, len(triples), chunk_size)]
     for chunk in chunks:
-        query = """
-            INSERT DATA {{
+        query = upload_type + """
+            DATA {{
                 GRAPH <http://vitro.mannlib.cornell.edu/default/vitro-kb-2> {{
-                        {}
-                    }}
+                    {}
+                }}
             }}
         """.format(" . \n".join(chunk))
         aide.do_update(query)
@@ -475,17 +610,32 @@ def main():
         print(__doc__)
         sys.exit(2)
 
-    if sys.argv[1] in ["-h", "--help"]:
+    try:
+        optlist, args = getopt.getopt(sys.argv[1:],
+                                      "dhx:", ["dry-run", "help", "diff="])
+    except getopt.GetoptError:
         print(__doc__)
-        sys.exit()
+        sys.exit(2)
 
-    if sys.argv[1] in ["-d", "--dry-run"]:
-        dry_run = True
-        print("This is a dry run.")
-        config_path = sys.argv[2]
-    else:
-        dry_run = False
-        config_path = sys.argv[1]
+    dry_run = False
+    old_path = ""
+
+    for o, a in optlist:
+        if o in ["-h", "--help"]:
+            print(__doc__)
+            sys.exit()
+        elif o in ["-d", "--dry-run"]:
+            dry_run = True
+            print("This is a dry run.")
+        elif o in ["-x", "--diff"]:
+            old_path = a
+            print("Differential update with previous run: " + old_path)
+
+    if len(args) != 1:
+        print(__doc__)
+        sys.exit(2)
+
+    config_path = args[0]
 
     timestamp = datetime.now()
     path = 'data_out/' + timestamp.strftime("%Y") + '/' + \
@@ -494,12 +644,15 @@ def main():
         os.makedirs(path)
     except FileExistsError:
         pass
-    org_file = os.path.join(path, 'orgs.rdf')
-    people_file = os.path.join(path, 'people.rdf')
-    project_file = os.path.join(path, 'projects.rdf')
-    study_file = os.path.join(path, 'studies.rdf')
-    dataset_file = os.path.join(path, 'datasets.rdf')
-    tools_file = os.path.join(path, 'tools.rdf')
+    org_file = os.path.join(path, 'orgs.nt')
+    people_file = os.path.join(path, 'people.nt')
+    project_file = os.path.join(path, 'projects.nt')
+    study_file = os.path.join(path, 'studies.nt')
+    dataset_file = os.path.join(path, 'datasets.nt')
+    tools_file = os.path.join(path, 'tools.nt')
+    photos_file = os.path.join(path, 'photos.nt')
+    add_file = os.path.join(path, 'add.nt')
+    sub_file = os.path.join(path, 'sub.nt')
 
     config = get_config(config_path)
 
@@ -514,6 +667,9 @@ def main():
                       config.get('sup_username'), config.get('sup_password'),
                       config.get('sup_port'))
 
+    if not aide.namespace.endswith('/'):
+        print(f"WARNING! Namespace doesn't end with '/': {aide.namespace}")
+
     # Organizations
     orgs = get_organizations(sup_cur)
     org_triples = make_organizations(aide.namespace, orgs)
@@ -522,12 +678,18 @@ def main():
     # People
     people = get_people(sup_cur)
     people_triples = make_people(aide.namespace, people)
-    people_triples.extend(link_people_to_org(sup_cur, people, orgs))
+    people_triples.extend(link_people_to_org(aide.namespace, sup_cur, people, orgs))
     print_to_file(people_triples, people_file)
 
+    # Photos
+    photos = get_photos(config.get("picturepath", "."), people)
+    photos_triples = make_photos(aide.namespace, photos)
+    print_to_file(photos_triples, photos_file)
+
     # Tools
-    tools = get_tools(config)
-    tools_triples = make_tools(aide.namespace, tools, people)
+    yaml_tools = get_yaml_tools(config)
+    csv_tools = get_csv_tools(config, aide)
+    tools_triples = make_tools(aide.namespace, yaml_tools + csv_tools, people)
     print_to_file(tools_triples, tools_file)
 
     # Projects
@@ -553,24 +715,38 @@ def main():
     print_to_file(all_study_triples, study_file)
 
     summary_triples = project_summaries + study_summaries
+
+    if old_path:
+        add, sub = diff(old_path, path)
+        with open(add_file, 'w') as f:
+            f.writelines(add)
+        with open(sub_file, 'w') as f:
+            f.writelines(sub)
+
+        if not dry_run:
+            diff_upload(aide, add, sub)
+            return
+
     if dry_run:
         sys.exit()
 
     # If you've made it this far, it's time to delete
     aide.do_delete()
-    do_upload(aide, org_triples)
+    insert(aide, org_triples)
     print("Organizations uploaded")
-    do_upload(aide, people_triples)
+    insert(aide, people_triples)
     print("People uploaded")
-    do_upload(aide, project_triples)
+    insert(aide, project_triples)
     print("Projects uploaded")
-    do_upload(aide, study_triples)
+    insert(aide, study_triples)
     print("Studies uploaded")
-    do_upload(aide, dataset_triples)
+    insert(aide, dataset_triples)
     print("Datasets uploaded")
-    do_upload(aide, tools_triples)
+    insert(aide, tools_triples)
     print("Tools uploaded")
-    do_upload(aide, summary_triples, 1)
+    insert(aide, photos_triples)
+    print("Photos uploaded")
+    insert(aide, summary_triples, 1)
     print("Summaries uploaded")
 
 

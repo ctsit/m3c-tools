@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS public.organizations
     name      TEXT    NOT NULL,
     type      TEXT    NOT NULL, -- institute, department, or laboratory
     parent_id INTEGER REFERENCES public.organizations(id),
-    withheld  BOOLEAN NOT NULL DEFAULT FALSE
+    withheld  BOOLEAN NOT NULL DEFAULT FALSE,
 
     UNIQUE(name, type, parent_id)
 );
@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS public.names
     person_id   INTEGER  REFERENCES public.people(id),
     first_name  TEXT     NOT NULL,
     last_name   TEXT     NOT NULL,
+    withheld    BOOLEAN  NOT NULL DEFAULT FALSE,
 
-    UNIQUE(first_name, last_name)
+    UNIQUE(first_name, last_name, withheld)
 );
