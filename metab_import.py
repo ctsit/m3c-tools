@@ -227,8 +227,8 @@ def get_projects(mwb_cur, sup_cur,
             doi=row[4].replace('\n', ''),
             funding_source=row[5].replace('\n', ''))
 
-        last_name = row[6]
-        first_name = row[7]
+        last_name: str = row[6]
+        first_name: str = row[7]
         institute = row[8]
         department = row[9]
         lab = row[10]
@@ -287,12 +287,13 @@ def get_projects(mwb_cur, sup_cur,
         sup_cur.execute("""\
                     SELECT person_id
                     FROM names
-                    WHERE last_name=%s AND first_name=%s""",
-                        (last_name, first_name))
+                    WHERE last_name=%s AND first_name=%s
+                      AND withheld = FALSE""",
+                        (last_name.strip(), first_name.strip()))
         try:
             person_id = sup_cur.fetchone()[0]
             project.pi = people[person_id].person_id
-        except KeyError:
+        except (IndexError, KeyError, TypeError):
             print("Error: Person does not exist.")
             print("PI for project " + project.project_id)
             print("Last name: " + last_name)
@@ -340,8 +341,8 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
             submit_date=submit_date,
             project_id=row[5].replace('\n', ''))
 
-        last_name = row[6]
-        first_name = row[7]
+        last_name: str = row[6]
+        first_name: str = row[7]
         institute = row[8]
         department = row[9]
         lab = row[10]
@@ -400,12 +401,13 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
         sup_cur.execute("""\
                     SELECT person_id
                     FROM names
-                    WHERE last_name=%s AND first_name=%s""",
-                        (last_name, first_name))
+                    WHERE last_name=%s AND first_name=%s
+                      AND withheld = FALSE""",
+                        (last_name.strip(), first_name.strip()))
         try:
             person_id = sup_cur.fetchone()[0]
             study.runner = people[person_id].person_id
-        except IndexError:
+        except (IndexError, KeyError, TypeError):
             print("Error: Person does not exist.")
             print("Runner for study " + study.study_id)
             print("Last name: " + last_name)
