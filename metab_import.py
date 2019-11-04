@@ -416,26 +416,23 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
     return studies
 
 
-def make_studies(namespace, studies, projects):
+def make_studies(namespace, studies: typing.Dict[str, Study], projects):
     print("Making Workbench Studies")
     triples = []
     summaries = []
     study_count = 0
     no_proj_study = 0
     for study in studies.values():
-        if study.project_id in projects.keys():
-            project_uri = namespace + projects[study.project_id].project_id
-        else:
-            project_uri = None
+        if study.project_id not in projects.keys():
             no_proj_study += 1
-        study_triples, summary_line = study.get_triples(project_uri)
+        study_triples, summary_line = study.get_triples(namespace)
         triples.extend(study_triples)
         if summary_line:
             summaries.append(summary_line)
         study_count += 1
     print("There are " + str(study_count) + " studies.")
     if no_proj_study > 0:
-        print("There are " + str(no_proj_study) + " studies without projects")
+        print(f"WARNING! There are {no_proj_study} studies without projects")
     return triples, summaries
 
 

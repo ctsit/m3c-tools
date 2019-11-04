@@ -21,7 +21,7 @@ class Project(object):
         self.lab = None
 
     def get_triples(self, namespace: str):
-        uri = f"{namespace}{self.project_id}"
+        uri = Project.uri(namespace, self.project_id)
         rdf = []
         rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#Project>".format(uri))
         rdf.append("<{}> <http://www.w3.org/2000/01/rdf-schema#label> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.project_title))
@@ -53,6 +53,10 @@ class Project(object):
             summary_line = None
         return rdf, summary_line
 
+    @staticmethod
+    def uri(namespace: str, project_id: str) -> str:
+        return f"{namespace}{project_id}"
+
 
 class Study(object):
     def __init__(self, study_id: str, study_title: str, study_type: str,
@@ -73,8 +77,8 @@ class Study(object):
 
         self.subject_species = []
 
-    def get_triples(self, namespace: str, project_uri=None):
-        uri = f"{namespace}{self.study_id}"
+    def get_triples(self, namespace: str):
+        uri = Study.uri(namespace, self.study_id)
         rdf = []
         rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#Study>".format(uri))
         rdf.append("<{}> <http://www.w3.org/2000/01/rdf-schema#label> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.study_title))
@@ -84,7 +88,8 @@ class Study(object):
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#studyType> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self. study_type))
         if self.submit_date:
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#submitted> \"{}\"^^<http://www.w3.org/2001/XMLSchema#dateTime>".format(uri, self.submit_date))
-        if project_uri:
+        if self.project_id:
+            project_uri = Project.uri(namespace, self.project_id)
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#inCollection> <{}>".format(uri, project_uri))
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#collectionFor> <{}>".format(project_uri, uri))
         if self.institute:
@@ -115,6 +120,10 @@ class Study(object):
         for species in self.subject_species:
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#subjectSpecies> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, species))
         return rdf
+
+    @staticmethod
+    def uri(namespace: str, study_id: str) -> str:
+        return f"{namespace}{study_id}"
 
 
 class Dataset(object):
@@ -261,6 +270,7 @@ class Organization(object):
     def get_triples(self, namespace: str):
         uri = Organization.uri(namespace, self.org_id)
         rdf = []
+        rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Organization>".format(uri))
         if self.type == "institute":
             rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://vivoweb.org/ontology/core#Institute>".format(uri))
         if self.type == "department":
