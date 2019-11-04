@@ -96,12 +96,18 @@ def get_supplementals(cur, person_id=None):
     for row in cur:
         pmid = row[0]
         person_id = int(row[1])
-        if person_id in extras.keys():
-            extras[person_id].append(pmid)
-            exceptions[person_id].append(pmid)
+        include = row[2]
+        if include:
+            if person_id in extras.keys():
+                extras[person_id].append(pmid)
+            else:
+                extras[person_id] = [pmid]
         else:
-            extras[person_id] = [pmid]
-            exceptions[person_id] = [pmid]
+            if person_id in exceptions.keys():
+                exceptions[person_id].append(pmid)
+            else:
+                exceptions[person_id] = [pmid]
+
     return extras, exceptions
 
 
