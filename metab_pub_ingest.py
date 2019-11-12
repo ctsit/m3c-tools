@@ -1,5 +1,5 @@
 """
-Metab Importer
+Metab Pub Ingest
 Usage:
     metab_pub_ingest.py (-h | --help)
     metab_pub_ingest.py [-id <id_number>] <path_to_config>
@@ -15,6 +15,7 @@ Example:
 from datetime import datetime
 import os
 import sys
+import typing
 import yaml
 
 import psycopg2
@@ -40,7 +41,7 @@ class Citation(object):
             return ''
 
 
-def get_config(config_path):
+def get_config(config_path: str) -> dict:
     try:
         with open(config_path, 'r') as config_file:
             config = yaml.load(config_file.read(), Loader=yaml.FullLoader)
@@ -50,15 +51,16 @@ def get_config(config_path):
     return config
 
 
-def connect(host, db, user, pg_password, port):
+def connect(host: str, db: str, user: str, pg_password: str, port: str) \
+                    -> psycopg2.extensions.cursor:
     conn = psycopg2.connect(host=host, dbname=db, user=user,
                             password=pg_password, port=port)
     cur = conn.cursor()
     return cur
 
 
-def get_people(cur, person_id=None):
-    people = []
+def get_people(cur: psycopg2.extensions.cursor, person_id: str = None) -> dict:
+    people = {}
     if person_id:
         cur.execute("""\
                 SELECT id, first_name, last_name
@@ -74,18 +76,48 @@ def get_people(cur, person_id=None):
                 ON id=person_id""")
     for row in cur:
         person = Person(person_id=row[0], first_name=row[1], last_name=row[2])
-        people.append(person)
+        people[person.person_id] = person
     return people
 
 
-def query_pubmed(aide, person):
+def get_supplementals(cur: psycopg2.extensions.cursor, person_id: str = None)\
+        -> (dict, dict):
+    extras = {}
+    exceptions = {}
+    if person_id:
+        cur.execute("""\
+            SELECT pmid, person_id, include
+            FROM publications
+            WHERE person_id=%s""", (person_id,))
+    else:
+        cur.execute("""\
+            SELECT pmid, person_id, include
+            FROM publications""")
+    for row in cur:
+        pmid = row[0]
+        person_id = int(row[1])
+        include = row[2]
+        if include:
+            if person_id in extras.keys():
+                extras[person_id].append(pmid)
+            else:
+                extras[person_id] = [pmid]
+        else:
+            if person_id in exceptions.keys():
+                exceptions[person_id].append(pmid)
+            else:
+                exceptions[person_id] = [pmid]
+
+    return extras, exceptions
+
+
+def get_ids(aide: Aide, person: Person) -> list:
     query = person.last_name + ', ' + person.first_name + ' [Full Author Name]'
     id_list = aide.get_id_list(query)
-    results = aide.get_details(id_list)
-    return results
+    return id_list
 
 
-def parse_api(results):
+def parse_api(results) -> dict:
     publications = {}
     for citing in results['PubmedArticle']:
         pub = Publication()
@@ -98,7 +130,7 @@ def parse_api(results):
     return publications
 
 
-def fill_pub(pub, citation):
+def fill_pub(pub: Publication, citation: Citation) -> None:
     pub.title = (citation.check_key(['MedlineCitation', 'Article', 'ArticleTitle'])).replace('"', '\\"')
     pub.publication_year = (citation.check_key(['MedlineCitation', 'Article', 'Journal',
                             'JournalIssue', 'PubDate', 'Year']))
@@ -156,17 +188,18 @@ def fill_pub(pub, citation):
     return
 
 
-def write_triples(aide, person, pubs):
+def write_triples(aide: Aide, person: Person, pubs: dict) -> list:
     rdf = []
     for pub in pubs.values():
         rdf.extend(pub.add_person(aide.namespace, person.person_id))
     return rdf
 
 
-def print_to_file(triples, file):
+def print_to_file(triples: list, file: str) -> None:
     triples = [t + " ." for t in triples]
     with open(file, 'a+') as rdf:
         rdf.write("\n".join(triples))
+    return
 
 
 def main():
@@ -182,6 +215,7 @@ def main():
         person_id = sys.argv[2]
         config_path = sys.argv[3]
     else:
+        person_id = None
         config_path = sys.argv[1]
 
     timestamp = datetime.now()
@@ -210,11 +244,23 @@ def main():
     people = get_people(cur, person_id)
     triples = []
     pub_collective = {}
-    for person in people:
-        results = query_pubmed(aide, person)
-        pubs = parse_api(results)
-        pub_collective.update(pubs)
-        triples.extend(write_triples(aide, person, pubs))
+
+    extras, exceptions = get_supplementals(cur, person_id)
+    for person in people.values():
+        pmids = get_ids(aide, person)
+        if person.person_id in extras.keys():
+            for pub in extras[person.person_id]:
+                if pub not in pmids:
+                    pmids.append(pub)
+        if person.person_id in exceptions.keys():
+            for pub in exceptions[person.person_id]:
+                if pub in pmids:
+                    pmids.remove(pub)
+        if pmids:
+            results = aide.get_details(pmids)
+            pubs = parse_api(results)
+            pub_collective.update(pubs)
+            triples.extend(write_triples(aide, person, pubs))
 
     pub_count = 0
     for pub in pub_collective.values():
