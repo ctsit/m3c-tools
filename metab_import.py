@@ -227,8 +227,8 @@ def get_projects(mwb_cur, sup_cur,
             doi=row[4].replace('\n', ''),
             funding_source=row[5].replace('\n', ''))
 
-        last_name: str = row[6]
-        first_name: str = row[7]
+        last_names: str = row[6]
+        first_names: str = row[7]
         institute = row[8]
         department = row[9]
         lab = row[10]
@@ -284,21 +284,27 @@ def get_projects(mwb_cur, sup_cur,
                 print("Organization name: " + lab)
                 sys.exit()
 
-        sup_cur.execute("""\
-                    SELECT person_id
-                    FROM names
-                    WHERE last_name=%s AND first_name=%s
-                      AND withheld = FALSE""",
-                        (last_name.strip(), first_name.strip()))
-        try:
-            person_id = sup_cur.fetchone()[0]
-            project.pi = people[person_id].person_id
-        except (IndexError, KeyError, TypeError):
-            print("Error: Person does not exist.")
-            print("PI for project " + project.project_id)
-            print("Last name: " + last_name)
-            print("First name: " + first_name)
-            sys.exit()
+        last_name_list = [ln.strip() for ln in last_names.split(';')]
+        first_name_list = [fn.strip() for fn in first_names.split(';')]
+
+        for i in range(0, len(last_name_list)):
+            last_name = last_name_list[i]
+            first_name = first_name_list[i]
+            sup_cur.execute("""\
+                        SELECT person_id
+                        FROM names
+                        WHERE last_name=%s AND first_name=%s
+                        AND withheld = FALSE""",
+                            (last_name, first_name))
+            try:
+                person_id = sup_cur.fetchone()[0]
+                project.pi.append(people[person_id].person_id)
+            except (IndexError, KeyError, TypeError):
+                print("Error: Person does not exist.")
+                print("PI for project " + project.project_id)
+                print("Last name: " + last_name)
+                print("First name: " + first_name)
+                sys.exit()
         projects[project.project_id] = project
     return projects
 
@@ -341,8 +347,8 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
             submit_date=submit_date,
             project_id=row[5].replace('\n', ''))
 
-        last_name: str = row[6]
-        first_name: str = row[7]
+        last_names: str = row[6]
+        first_names: str = row[7]
         institute = row[8]
         department = row[9]
         lab = row[10]
@@ -398,21 +404,27 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
                 print("Organization name: " + lab)
                 sys.exit()
 
-        sup_cur.execute("""\
-                    SELECT person_id
-                    FROM names
-                    WHERE last_name=%s AND first_name=%s
-                      AND withheld = FALSE""",
-                        (last_name.strip(), first_name.strip()))
-        try:
-            person_id = sup_cur.fetchone()[0]
-            study.runner = people[person_id].person_id
-        except (IndexError, KeyError, TypeError):
-            print("Error: Person does not exist.")
-            print("Runner for study " + study.study_id)
-            print("Last name: " + last_name)
-            print("First name: " + first_name)
-            sys.exit()
+        last_name_list = [ln.strip() for ln in last_names.split(';')]
+        first_name_list = [fn.strip() for fn in first_names.split(';')]
+
+        for i in range(0, len(last_name_list)):
+            last_name = last_name_list[i]
+            first_name = first_name_list[i]
+            sup_cur.execute("""\
+                        SELECT person_id
+                        FROM names
+                        WHERE last_name=%s AND first_name=%s
+                        AND withheld = FALSE""",
+                            (last_name.strip(), first_name.strip()))
+            try:
+                person_id = sup_cur.fetchone()[0]
+                study.runner.append(people[person_id].person_id)
+            except (IndexError, KeyError, TypeError):
+                print("Error: Person does not exist.")
+                print("Runner for study " + study.study_id)
+                print("Last name: " + last_name)
+                print("First name: " + first_name)
+                sys.exit()
 
         studies[study.study_id] = study
     return studies
@@ -682,15 +694,15 @@ def main():
     print_to_file(people_triples, people_file)
 
     # Photos
-    photos = get_photos(config.get("picturepath", "."), people)
-    photos_triples = make_photos(aide.namespace, photos)
-    print_to_file(photos_triples, photos_file)
+    # photos = get_photos(config.get("picturepath", "."), people)
+    # photos_triples = make_photos(aide.namespace, photos)
+    # print_to_file(photos_triples, photos_file)
 
-    # Tools
-    yaml_tools = get_yaml_tools(config)
-    csv_tools = get_csv_tools(config, aide)
-    tools_triples = make_tools(aide.namespace, yaml_tools + csv_tools, people)
-    print_to_file(tools_triples, tools_file)
+    # # Tools
+    # yaml_tools = get_yaml_tools(config)
+    # csv_tools = get_csv_tools(config, aide)
+    # tools_triples = make_tools(aide.namespace, yaml_tools + csv_tools, people)
+    # print_to_file(tools_triples, tools_file)
 
     # Projects
     projects = get_projects(mwb_cur, sup_cur, people, orgs)
@@ -701,20 +713,20 @@ def main():
 
     # Studies
     # Study file printed after datasets
-    studies = get_studies(mwb_cur, sup_cur, people, orgs)
-    study_triples, study_summaries = \
-        make_studies(aide.namespace, studies, projects)
+    # studies = get_studies(mwb_cur, sup_cur, people, orgs)
+    # study_triples, study_summaries = \
+    #     make_studies(aide.namespace, studies, projects)
 
-    # Datasets
-    datasets = get_datasets(mwb_cur)
-    dataset_triples, study_sup_triples = \
-        make_datasets(aide.namespace, datasets, studies)
-    print_to_file(dataset_triples, dataset_file)
+    # # Datasets
+    # datasets = get_datasets(mwb_cur)
+    # dataset_triples, study_sup_triples = \
+    #     make_datasets(aide.namespace, datasets, studies)
+    # print_to_file(dataset_triples, dataset_file)
 
-    all_study_triples = study_triples + study_summaries + study_sup_triples
-    print_to_file(all_study_triples, study_file)
+    # all_study_triples = study_triples + study_summaries + study_sup_triples
+    # print_to_file(all_study_triples, study_file)
 
-    summary_triples = project_summaries + study_summaries
+    # summary_triples = project_summaries + study_summaries
 
     if old_path:
         add, sub = diff(old_path, path)
@@ -731,23 +743,23 @@ def main():
         sys.exit()
 
     # If you've made it this far, it's time to delete
-    aide.do_delete()
-    insert(aide, org_triples)
-    print("Organizations uploaded")
-    insert(aide, people_triples)
-    print("People uploaded")
-    insert(aide, project_triples)
-    print("Projects uploaded")
-    insert(aide, study_triples)
-    print("Studies uploaded")
-    insert(aide, dataset_triples)
-    print("Datasets uploaded")
-    insert(aide, tools_triples)
-    print("Tools uploaded")
-    insert(aide, photos_triples)
-    print("Photos uploaded")
-    insert(aide, summary_triples, 1)
-    print("Summaries uploaded")
+    # aide.do_delete()
+    # insert(aide, org_triples)
+    # print("Organizations uploaded")
+    # insert(aide, people_triples)
+    # print("People uploaded")
+    # insert(aide, project_triples)
+    # print("Projects uploaded")
+    # insert(aide, study_triples)
+    # print("Studies uploaded")
+    # insert(aide, dataset_triples)
+    # print("Datasets uploaded")
+    # insert(aide, tools_triples)
+    # print("Tools uploaded")
+    # insert(aide, photos_triples)
+    # print("Photos uploaded")
+    # insert(aide, summary_triples, 1)
+    # print("Summaries uploaded")
 
 
 if __name__ == "__main__":
