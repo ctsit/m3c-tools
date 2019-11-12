@@ -72,43 +72,49 @@ def add_organizations(mwb_conn: psycopg2.extensions.connection,
         mwb_cur.execute(select_orgs)
 
         for row in mwb_cur:
-            institute, department, laboratory = tuple(row)
+            institutes, departments, laboratories = tuple(row)
 
-            if not institute:
-                assert not department
-                assert not laboratory
+            if not institutes:
+                assert not departments
+                assert not laboratories
                 continue
 
-            institute_id = get_organization(sup_cur, INSTITUTE, institute)
-            if not institute_id:
-                institute_id = add_organization(sup_cur, INSTITUTE, institute)
-                print("Added institute #{}: {}."
-                      .format(institute_id, institute))
+            institute_list = [inst.strip() for inst in institutes.split(';')]
+            for institute in institute_list:
+                institute_id = get_organization(sup_cur, INSTITUTE, institute)
+                if not institute_id:
+                    institute_id = add_organization(sup_cur, INSTITUTE, institute)
+                    print("Added institute #{}: {}."
+                        .format(institute_id, institute))
 
-            department_id = get_organization(sup_cur, DEPARTMENT, department,
-                                             institute_id)
+            department_list = [dept.strip() for dept in departments.split(';')]
+            for department in department_list:
+                department_id = get_organization(sup_cur, DEPARTMENT, department,
+                                                institute_id)
 
-            if department and not department_id:
-                department_id = add_organization(sup_cur, DEPARTMENT,
-                                                 department, institute_id)
-                print("Added department #{}: {}."
-                      .format(department_id, department))
+                if department and not department_id:
+                    department_id = add_organization(sup_cur, DEPARTMENT,
+                                                    department, institute_id)
+                    print("Added department #{}: {}."
+                        .format(department_id, department))
 
-            if not laboratory:
+            if not laboratories:
                 continue
 
-            laboratory_id = get_organization(sup_cur, LABORATORY, laboratory,
-                                             department_id)
+            laboratory_list = [lab.strip() for lab in laboratories.split(';')]
+            for laboratory in laboratory_list:
+                laboratory_id = get_organization(sup_cur, LABORATORY, laboratory,
+                                                department_id)
 
-            if not laboratory_id:
-                parent_id = department_id
-                if not parent_id:
-                    # If there is no Department, the Institute is the parent.
-                    parent_id = institute_id
-                laboratory_id = add_organization(sup_cur, LABORATORY,
-                                                 laboratory, parent_id)
-                print("Added laboratory #{}: {}."
-                      .format(laboratory_id, laboratory))
+                if not laboratory_id:
+                    parent_id = department_id
+                    if not parent_id:
+                        # If there is no Department, the Institute is the parent.
+                        parent_id = institute_id
+                    laboratory_id = add_organization(sup_cur, LABORATORY,
+                                                    laboratory, parent_id)
+                    print("Added laboratory #{}: {}."
+                        .format(laboratory_id, laboratory))
 
 
 def add_people(mwb_conn: psycopg2.extensions.connection,
