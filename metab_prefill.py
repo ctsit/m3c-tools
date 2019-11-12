@@ -138,8 +138,8 @@ def add_people(mwb_conn: psycopg2.extensions.connection,
 
         for row in mwb_cur:
             first_names, last_names, institute, department, lab = tuple(row)
-            last_name_list = [ln.strip() for ln in last_names.split(';')]
-            first_name_list = [fn.strip() for fn in first_names.split(';')]
+            last_name_list = [ln for ln in last_names.split(';')]
+            first_name_list = [fn for fn in first_names.split(';')]
 
             for i in range(0, len(last_name_list)):
                 last_name = last_name_list[i]
