@@ -15,6 +15,7 @@ Example:
 from datetime import datetime
 import os
 import sys
+import typing
 import yaml
 
 import psycopg2
@@ -40,7 +41,7 @@ class Citation(object):
             return ''
 
 
-def get_config(config_path):
+def get_config(config_path: str) -> dict:
     try:
         with open(config_path, 'r') as config_file:
             config = yaml.load(config_file.read(), Loader=yaml.FullLoader)
@@ -50,14 +51,15 @@ def get_config(config_path):
     return config
 
 
-def connect(host, db, user, pg_password, port):
+def connect(host: str, db: str, user: str, pg_password: str, port: str) \
+                    -> psycopg2.extensions.cursor:
     conn = psycopg2.connect(host=host, dbname=db, user=user,
                             password=pg_password, port=port)
     cur = conn.cursor()
     return cur
 
 
-def get_people(cur, person_id=None):
+def get_people(cur: psycopg2.extensions.cursor, person_id: str = None) -> dict:
     people = {}
     if person_id:
         cur.execute("""\
@@ -78,7 +80,7 @@ def get_people(cur, person_id=None):
     return people
 
 
-def get_supplementals(cur, person_id=None):
+def get_supplementals(cur: psycopg2.extensions.cursor, person_id: str = None) -> tuple:
     extras = {}
     exceptions = {}
     if person_id:
@@ -93,22 +95,28 @@ def get_supplementals(cur, person_id=None):
     for row in cur:
         pmid = row[0]
         person_id = int(row[1])
-        if person_id in extras.keys():
-            extras[person_id].append(pmid)
-            exceptions[person_id].append(pmid)
+        include = row[2]
+        if include:
+            if person_id in extras.keys():
+                extras[person_id].append(pmid)
+            else:
+                extras[person_id] = [pmid]
         else:
-            extras[person_id] = [pmid]
-            exceptions[person_id] = [pmid]
+            if person_id in exceptions.keys():
+                exceptions[person_id].append(pmid)
+            else:
+                exceptions[person_id] = [pmid]
+
     return extras, exceptions
 
 
-def get_ids(aide, person):
+def get_ids(aide: Aide, person: Person) -> list:
     query = person.last_name + ', ' + person.first_name + ' [Full Author Name]'
     id_list = aide.get_id_list(query)
     return id_list
 
 
-def parse_api(results, namespace):
+def parse_api(results, namespace) -> dict:
     publications = {}
     for citing in results['PubmedArticle']:
         pub = Publication()
@@ -122,7 +130,7 @@ def parse_api(results, namespace):
     return publications
 
 
-def fill_pub(pub, citation):
+def fill_pub(pub: Publication, citation: Citation) -> None:
     pub.title = (citation.check_key(['MedlineCitation', 'Article', 'ArticleTitle'])).replace('"', '\\"')
     pub.publication_year = (citation.check_key(['MedlineCitation', 'Article', 'Journal',
                             'JournalIssue', 'PubDate', 'Year']))
@@ -179,17 +187,18 @@ def fill_pub(pub, citation):
     return
 
 
-def write_triples(aide, person, pubs):
+def write_triples(aide: Aide, person: Person, pubs: dict) -> list:
     rdf = []
     for pub in pubs.values():
         rdf.extend(pub.add_person(aide.namespace, person.person_id))
     return rdf
 
 
-def print_to_file(triples, file):
+def print_to_file(triples: list, file: str) -> None:
     triples = [t + " ." for t in triples]
     with open(file, 'a+') as rdf:
         rdf.write("\n".join(triples))
+    return
 
 
 def main():
