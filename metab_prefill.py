@@ -131,44 +131,51 @@ def add_people(mwb_conn: psycopg2.extensions.connection,
         print("Found {} unique names".format(mwb_cur.rowcount), flush=True)
 
         for row in mwb_cur:
-            first_name, last_name, institute, department, lab = tuple(row)
-            person_ids = get_person(sup_cur, first_name, last_name)
-            if len(person_ids) > 1:
-                print("ERROR: multiple people with same name", file=sys.stderr)
-                print("first={}. last={}. ids={}."
-                      .format(first_name, last_name, ', '.join(person_ids)),
-                      file=sys.stderr)
-                sys.exit(1)
+            first_names, last_names, institute, department, lab = tuple(row)
+            last_name_list = [ln.strip() for ln in last_names.split(';')]
+            first_name_list = [fn.strip() for fn in first_names.split(';')]
 
-            if len(person_ids) == 1:
-                person_id = person_ids[0]
-                print("Skipping person #{}: {} {}."
-                      .format(person_ids[0], first_name, last_name))
-            else:
-                person_id = add_person(sup_cur, first_name, last_name)
-                print("Added person #{}: {} {}."
-                      .format(person_id, first_name, last_name))
+            for i in range(0, len(last_name_list)):
+                last_name = last_name_list[i]
+                first_name = first_name_list[i]
 
-            # Create associations
-            institute_id = get_organization(sup_cur, INSTITUTE, institute)
-            assert institute_id
-            associate(sup_cur, person_id, institute_id)
-            parent_id = institute_id
+                person_ids = get_person(sup_cur, first_name, last_name)
+                if len(person_ids) > 1:
+                    print("ERROR: multiple people with same name", file=sys.stderr)
+                    print("first={}. last={}. ids={}."
+                        .format(first_name, last_name, ', '.join(person_ids)),
+                        file=sys.stderr)
+                    sys.exit(1)
 
-            department_id = get_organization(sup_cur, DEPARTMENT, department,
-                                             parent_id)
-            if department_id:
-                associate(sup_cur, person_id, department_id)
-                parent_id = department_id
+                if len(person_ids) == 1:
+                    person_id = person_ids[0]
+                    print("Skipping person #{}: {} {}."
+                        .format(person_ids[0], first_name, last_name))
+                else:
+                    person_id = add_person(sup_cur, first_name, last_name)
+                    print("Added person #{}: {} {}."
+                        .format(person_id, first_name, last_name))
 
-            laboratory_id = get_organization(sup_cur, LABORATORY, lab,
-                                             parent_id)
-            if laboratory_id:
-                associate(sup_cur, person_id, laboratory_id)
+                # Create associations
+                institute_id = get_organization(sup_cur, INSTITUTE, institute)
+                assert institute_id
+                associate(sup_cur, person_id, institute_id)
+                parent_id = institute_id
 
-            print(('Associated {} {} (person) with '
-                   '{} (institute) {} (department) {} (lab)')
-                  .format(first_name, last_name, institute, department, lab))
+                department_id = get_organization(sup_cur, DEPARTMENT, department,
+                                                parent_id)
+                if department_id:
+                    associate(sup_cur, person_id, department_id)
+                    parent_id = department_id
+
+                laboratory_id = get_organization(sup_cur, LABORATORY, lab,
+                                                parent_id)
+                if laboratory_id:
+                    associate(sup_cur, person_id, laboratory_id)
+
+                print(('Associated {} {} (person) with '
+                    '{} (institute) {} (department) {} (lab)')
+                    .format(first_name, last_name, institute, department, lab))
 
     return
 
