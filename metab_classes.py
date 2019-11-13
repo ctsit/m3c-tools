@@ -16,9 +16,9 @@ class Project(object):
         self.doi = doi
         self.funding_source = funding_source
         self.pi = []
-        self.institute = None
-        self.department = None
-        self.lab = None
+        self.institutes = []
+        self.departments = []
+        self.labs = []
 
     def get_triples(self, namespace: str):
         uri = Project.uri(namespace, self.project_id)
@@ -31,18 +31,21 @@ class Project(object):
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#projectType> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.project_type))
         if self.doi:
             rdf.append("<{}> <http://purl.org/ontology/bibo/doi> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.doi))
-        if self.institute:
-            institute_uri = Organization.uri(namespace, self.institute)
-            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#managedBy> <{}>".format(uri, institute_uri))
-            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#manages> <{}>".format(institute_uri, uri))
-        if self.department:
-            dept_id = Organization.uri(namespace, self.department)
-            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#managedBy> <{}>".format(uri, dept_id))
-            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#manages> <{}>".format(dept_id, uri))
-        if self.lab:
-            lab_uri = Organization.uri(namespace, self.lab)
-            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#managedBy> <{}>".format(uri, lab_uri))
-            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#manages> <{}>".format(lab_uri, uri))
+        if self.institutes:
+            for institute in self.institutes:
+                institute_uri = Organization.uri(namespace, institute)
+                rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#managedBy> <{}>".format(uri, institute_uri))
+                rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#manages> <{}>".format(institute_uri, uri))
+        if self.departments:
+            for department in self.departments:
+                dept_id = Organization.uri(namespace, department)
+                rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#managedBy> <{}>".format(uri, dept_id))
+                rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#manages> <{}>".format(dept_id, uri))
+        if self.labs:
+            for lab in self.labs:
+                lab_uri = Organization.uri(namespace, lab)
+                rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#managedBy> <{}>".format(uri, lab_uri))
+                rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#manages> <{}>".format(lab_uri, uri))
         if self.pi:
             for person in self.pi:
                 pi_uri = Person.uri(namespace, person)
@@ -72,9 +75,9 @@ class Study(object):
         self.project_id = project_id
 
         self.runner = []
-        self.institute = None
-        self.department = None
-        self.lab = None
+        self.institutes = []
+        self.departments = []
+        self.labs = []
 
         self.subject_species = []
 
@@ -93,18 +96,21 @@ class Study(object):
             project_uri = Project.uri(namespace, self.project_id)
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#inCollection> <{}>".format(uri, project_uri))
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#collectionFor> <{}>".format(project_uri, uri))
-        if self.institute:
-            institute_uri = Organization.uri(namespace, self.institute)
-            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#managedBy> <{}>".format(uri, institute_uri))
-            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#manages> <{}>".format(institute_uri, uri))
-        if self.department:
-            dept_uri = Organization.uri(namespace, self.department)
-            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#managedBy> <{}>".format(uri, dept_uri))
-            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#manages> <{}>".format(dept_uri, uri))
-        if self.lab:
-            lab_uri = Organization.uri(namespace, self.lab)
-            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#managedBy> <{}>".format(uri, lab_uri))
-            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#manages> <{}>".format(lab_uri, uri))
+        if self.institutes:
+            for institute in self.institutes:
+                institute_uri = Organization.uri(namespace, institute)
+                rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#managedBy> <{}>".format(uri, institute_uri))
+                rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#manages> <{}>".format(institute_uri, uri))
+        if self.departments:
+            for department in self.departments:
+                dept_uri = Organization.uri(namespace, department)
+                rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#managedBy> <{}>".format(uri, dept_uri))
+                rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#manages> <{}>".format(dept_uri, uri))
+        if self.labs:
+            for lab in self.labs:
+                lab_uri = Organization.uri(namespace, lab)
+                rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#managedBy> <{}>".format(uri, lab_uri))
+                rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#manages> <{}>".format(lab_uri, uri))
         if self.runner:
             for person in self.runner:
                 runner_uri = Person.uri(namespace, person)

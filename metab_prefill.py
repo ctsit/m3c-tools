@@ -191,6 +191,7 @@ def add_people(mwb_conn: psycopg2.extensions.connection,
                         assert institute_id
                         parent_id = institute_id
                     
+                    # If there are not enough departments, default to first
                     if departments:
                         try:
                             department_id = get_organization(sup_cur, DEPARTMENT, department_list[i],
