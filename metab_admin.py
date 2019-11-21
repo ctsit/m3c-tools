@@ -196,10 +196,10 @@ def upload_image():
 
             displayNameInput.addEventListener('change', (e) => {
                 if (displayNames.includes(e.srcElement.value)) {
-                    const splitName = e.srcElement.value.split(' ');
+                    const splitName = e.srcElement.value.substring(0, e.srcElement.value.indexOf("|")-1).split(' ');
                     const splitId = e.srcElement.value.split(' | ');
                     firstName.value = splitName[0];
-                    lastName.value = splitName[1];
+                    lastName.value = splitName.slice(1).join(" ");
                     if (splitId.length > 0) {
                         personId.value = splitId[1];
 
