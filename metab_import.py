@@ -8,6 +8,7 @@ Options:
     -h --help     Show this message and exit
     -d --dry-run  Create N-Triples files without deleting and uploading to VIVO
     -x --diff     See Differential Update.
+    -a --add-devs Add new developers for tools.
 
 Differential Update:
     A differential update compares the triples produced by a run with that of
@@ -155,6 +156,44 @@ def get_people(sup_cur):
                         display_name=row[3], email=row[4], phone=row[5])
         people[person.person_id] = person
     return people
+
+
+def add_person(cursor: psycopg2.extensions.cursor,
+               first_name: str, last_name: str) -> int:
+
+    statement = '''
+        INSERT INTO people (id,      display_name)
+             VALUES        (DEFAULT, %s          )
+          RETURNING id
+    '''
+
+    display_name = '{} {}'.format(first_name.strip(), last_name.strip())
+    cursor.execute(statement, (display_name,))
+
+    person_id = cursor.fetchone()[0]
+
+    statement = '''
+        INSERT INTO names (person_id, first_name, last_name)
+             VALUES       (%s       , %s        , %s       )
+    '''
+
+    cursor.execute(statement, (person_id, first_name.strip(), last_name.strip()))
+
+    return person_id
+
+
+def get_person(sup_cur, person_id):
+    person = {}
+    sup_cur.execute("""\
+            SELECT id, first_name, last_name, display_name, email, phone
+            FROM people p
+            JOIN names n
+            ON id=person_id
+            WHERE p.withheld = FALSE AND n.withheld = FALSE AND id = %s""", (person_id,))
+    for row in sup_cur:
+        person = Person(person_id=row[0], first_name=row[1], last_name=row[2],
+                        display_name=row[3], email=row[4], phone=row[5])
+    return person
 
 
 def make_people(namespace, people):
@@ -669,14 +708,29 @@ def get_csv_tools(config, aide: Aide) -> List[Tool]:
         return []
 
 
-def make_tools(namespace, tools, people):
+def make_tools(namespace, tools: List[Tool], people, mwb_cur, sup_cur, add_devs):
     print("Making Tools")
     triples = []
     tool_count = 0
     for tool in tools:
         # First, find all the authors' URIs
-        if not tool.match_authors(people):
-            continue
+        non_matched_authors = tool.match_authors(people, namespace)
+        if len(non_matched_authors) != 0:
+            if not add_devs:
+                print('Not all authors matched for Tool. Use --add-devs to add these people. Skipping...')
+                continue
+            try:
+                print("Not all authors matched for Tool. Inserting new people.")
+                for author in non_matched_authors:
+                    first_name = author.name.split(' ')[0]
+                    last_name = " ".join(author.name.split(' ')[1:])
+                    person_id = add_person(sup_cur, first_name, last_name)
+                    people[person_id] = get_person(sup_cur, person_id)
+                print("Trying to match authors again.")
+                tool.match_authors(people, namespace)
+            except Exception:
+                print('Error occurred creating new authors for tool. Skipping tool.')
+                continue
         # Now, generate the triples.
         triples.extend(tool.get_triples(namespace))
         tool_count += 1
@@ -720,13 +774,14 @@ def main():
 
     try:
         optlist, args = getopt.getopt(sys.argv[1:],
-                                      "dhx:", ["dry-run", "help", "diff="])
+                                      "dhx:", ["dry-run", "help", "diff=", "add-devs"])
     except getopt.GetoptError:
         print(__doc__)
         sys.exit(2)
 
     dry_run = False
     old_path = ""
+    add_devs = False
 
     for o, a in optlist:
         if o in ["-h", "--help"]:
@@ -738,6 +793,9 @@ def main():
         elif o in ["-x", "--diff"]:
             old_path = a
             print("Differential update with previous run: " + old_path)
+        elif o == "--add-devs":
+            add_devs = True
+            print("Creating new developers for tools.")
 
     if len(args) != 1:
         print(__doc__)
@@ -784,10 +842,8 @@ def main():
     print_to_file(org_triples, org_file)
 
     # People
+    # Don't make the triples yet because tools can create new people.
     people = get_people(sup_cur)
-    people_triples = make_people(aide.namespace, people)
-    people_triples.extend(link_people_to_org(aide.namespace, sup_cur, people, orgs))
-    print_to_file(people_triples, people_file)
 
     # Photos
     photos = get_photos(config.get("picturepath", "."), people)
@@ -797,7 +853,7 @@ def main():
     # Tools
     yaml_tools = get_yaml_tools(config)
     csv_tools = get_csv_tools(config, aide)
-    tools_triples = make_tools(aide.namespace, yaml_tools + csv_tools, people)
+    tools_triples = make_tools(aide.namespace, yaml_tools + csv_tools, people, mwb_cur, sup_cur, add_devs)
     print_to_file(tools_triples, tools_file)
 
     # Projects
@@ -823,6 +879,11 @@ def main():
     print_to_file(all_study_triples, study_file)
 
     summary_triples = project_summaries + study_summaries
+
+    # Make People Triples
+    people_triples = make_people(aide.namespace, people)
+    people_triples.extend(link_people_to_org(aide.namespace, sup_cur, people, orgs))
+    print_to_file(people_triples, people_file)
 
     if old_path:
         add, sub = diff(old_path, path)

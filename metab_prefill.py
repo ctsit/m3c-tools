@@ -21,6 +21,7 @@ import psycopg2
 
 import metab_data
 import metab_import
+from metab_import import add_person
 
 get_person = metab_data.get_person
 
@@ -229,30 +230,6 @@ def add_people(mwb_conn: psycopg2.extensions.connection,
                       .format(first_name, last_name, institutes, departments, labs))
 
     return
-
-
-def add_person(cursor: psycopg2.extensions.cursor,
-               first_name: str, last_name: str) -> int:
-
-    statement = '''
-        INSERT INTO people (id,      display_name)
-             VALUES        (DEFAULT, %s          )
-          RETURNING id
-    '''
-
-    display_name = '{} {}'.format(first_name, last_name)
-    cursor.execute(statement, (display_name,))
-
-    person_id = cursor.fetchone()[0]
-
-    statement = '''
-        INSERT INTO names (person_id, first_name, last_name)
-             VALUES       (%s       , %s        , %s       )
-    '''
-
-    cursor.execute(statement, (person_id, first_name, last_name))
-
-    return person_id
 
 
 def get_organization(cursor: psycopg2.extensions.cursor, type: str, name: str,

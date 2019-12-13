@@ -340,6 +340,8 @@ class Tool(object):
         encoded = encoded.replace('/', '_s')
         encoded = encoded.replace('?', '_p')
         encoded = encoded.replace('=', '_e')
+        encoded = encoded.replace('&', '_aa')
+        encoded = encoded.replace(':', '_c')
 
         contains_unhandled_char = re.search('[^A-Za-z0-9._/]', encoded)
         if contains_unhandled_char:
@@ -387,20 +389,20 @@ class Tool(object):
 
         return rdf
 
-    def match_authors(self, people: typing.Dict[int, Person]):
-        all_matched = True
+    def match_authors(self, people: typing.Dict[int, Person], namespace: str):
+        non_matched = []
         for author in self.authors:
             for person in people.values():
                 if person.display_name == author.name:
-                    author.uri = person.uri
+                    author.uri = Person.uri(namespace, person.person_id)
                     break
             if author.uri:
                 continue
 
-            all_matched = False
+            non_matched.append(author)
             print(f'Unknown author "{author.name}" for tool: {self.tool_id}')
 
-        return all_matched
+        return non_matched
 
 
 class Publication(object):
