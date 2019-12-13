@@ -19,7 +19,10 @@ import typing
 
 import psycopg2
 
+import metab_data
 import metab_import
+
+get_person = metab_data.get_person
 
 
 INSTITUTE = 'institute'
@@ -143,10 +146,11 @@ def add_people(mwb_conn: psycopg2.extensions.connection,
             first_name_list = [fn for fn in first_names.split(';')]
 
             for i in range(0, len(last_name_list)):
-                last_name = last_name_list[i]
-                first_name = first_name_list[i]
+                last_name = last_name_list[i].strip()
+                first_name = first_name_list[i].strip()
 
-                person_ids = get_person(sup_cur, first_name, last_name)
+                person_ids = get_person(sup_cur, first_name, last_name,
+                                        exclude_withheld=False)
                 if len(person_ids) > 1:
                     print("ERROR: multiple people with same name", file=sys.stderr)
                     print("first={}. last={}. ids={}."
@@ -190,7 +194,7 @@ def add_people(mwb_conn: psycopg2.extensions.connection,
                         institute_id = get_organization(sup_cur, INSTITUTE, institute_list[0])
                         assert institute_id
                         parent_id = institute_id
-                    
+
                     # If there are not enough departments, default to first
                     if departments:
                         try:
@@ -272,25 +276,6 @@ def get_organization(cursor: psycopg2.extensions.cursor, type: str, name: str,
         return 0
 
     return row[0]
-
-
-def get_person(cursor: psycopg2.extensions.cursor,
-               first_name: str, last_name: str) -> typing.List[int]:
-
-    query = '''
-        SELECT person_id
-          FROM names
-         WHERE first_name=%s
-           AND last_name=%s
-    '''
-
-    cursor.execute(query, (first_name, last_name))
-
-    ids = []
-    for row in cursor:
-        ids.append(row[0])
-
-    return ids
 
 
 def main():

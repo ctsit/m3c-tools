@@ -45,6 +45,7 @@ from metab_classes import Photo
 from metab_classes import Project
 from metab_classes import Study
 from metab_classes import Tool
+import metab_data
 
 
 def get_config(config_path):
@@ -342,14 +343,9 @@ def get_projects(mwb_cur, sup_cur,
         for i in range(0, len(last_name_list)):
             last_name = last_name_list[i]
             first_name = first_name_list[i]
-            sup_cur.execute("""\
-                        SELECT person_id
-                        FROM names
-                        WHERE last_name=%s AND first_name=%s
-                        AND withheld = FALSE""",
-                            (last_name, first_name))
+            ids = metab_data.get_person(sup_cur, first_name, last_name)
             try:
-                person_id = sup_cur.fetchone()[0]
+                person_id = ids[0]
                 project.pi.append(people[person_id].person_id)
             except (IndexError, KeyError, TypeError):
                 print("Error: Person does not exist.")
@@ -514,14 +510,10 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
         for i in range(0, len(last_name_list)):
             last_name = last_name_list[i]
             first_name = first_name_list[i]
-            sup_cur.execute("""\
-                        SELECT person_id
-                        FROM names
-                        WHERE last_name=%s AND first_name=%s
-                        AND withheld = FALSE""",
-                            (last_name, first_name))
+
+            ids = metab_data.get_person(sup_cur, first_name, last_name)
             try:
-                person_id = sup_cur.fetchone()[0]
+                person_id = ids[0]
                 study.runner.append(people[person_id].person_id)
             except (IndexError, KeyError, TypeError):
                 print("Error: Person does not exist.")
