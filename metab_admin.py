@@ -73,6 +73,9 @@ def main_menu():
                 <div class="row my-3">
                     <button class="btn btn-info w-100" onclick="window.location.href = '{{ url_for('metab_admin.person_alias') }}'">Modify an Person's Aliases</button>
                 </div>
+                <div class="row my-3">
+                    <button class="btn btn-info w-100" onclick="window.location.href = '{{ url_for('metab_admin.add_pmid') }}'">Edit Publications for a Person</button>
+                </div>
             </div>
         </body>
     </html>
@@ -193,10 +196,10 @@ def upload_image():
 
             displayNameInput.addEventListener('change', (e) => {
                 if (displayNames.includes(e.srcElement.value)) {
-                    const splitName = e.srcElement.value.split(' ');
+                    const splitName = e.srcElement.value.substring(0, e.srcElement.value.indexOf("|")-1).split(' ');
                     const splitId = e.srcElement.value.split(' | ');
                     firstName.value = splitName[0];
-                    lastName.value = splitName[1];
+                    lastName.value = splitName.slice(1).join(" ");
                     if (splitId.length > 0) {
                         personId.value = splitId[1];
 
@@ -253,6 +256,7 @@ def associate_and_insert_orgs(cur, institute, department, lab, person_id):
         else:
             lab_id = rows[0][0]
         cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s) ON CONFLICT DO NOTHING', (lab_id, person_id))
+
 
 @app.route('/createperson', methods=['GET', 'POST'])
 def create_person():
@@ -1120,6 +1124,115 @@ def person_alias():
         </script>
     </body>
     ''', dispNameList=display_names, aliasData=alias)
+
+
+@app.route('/addpmid', methods=['GET', 'POST'])
+def add_pmid():
+    display_names = []
+    cur = conn.cursor()
+
+    cur.execute('SELECT display_name, id FROM people')
+    rows = cur.fetchall()
+    for row in rows:
+        display_names.append(str(row[0]) + ' | ' + str(row[1]))
+
+    cur.close()
+
+    if request.method == 'POST':
+        cur = conn.cursor()
+        try:
+            person_id = request.form['id'].strip()
+            pmid_string = request.form['pmid'].strip()
+            pmid_list = pmid_string.replace(' ', '').split(',')
+
+            if person_id is '':
+                flash('Please search and select someone')
+                return redirect(request.url)
+
+            if pmid_string is '':
+                flash('Please enter a PMID')
+                return redirect(request.url)
+
+            for pmid in pmid_list:
+                if 'include' in request.form:
+                    cur.execute("INSERT INTO publications (pmid, person_id, include) VALUES (%s, %s, %s) ON CONFLICT (pmid, person_id) DO UPDATE SET include='t'", (pmid, int(person_id), True))
+                elif 'exclude' in request.form:
+                    cur.execute("INSERT INTO publications (pmid, person_id, include) VALUES (%s, %s, %s) ON CONFLICT (pmid, person_id) DO UPDATE SET include='f'", (pmid, int(person_id), False))
+
+            conn.commit()
+            flash('PMID(s) ' + pmid_string + ' modified for ' + request.form['name'].strip())
+        except Exception as e:
+            print(e)
+            conn.rollback()
+            flash('Error adding PMID')
+        finally:
+            cur.close()
+        return redirect(request.url)
+
+    return render_template_string('''
+    <!doctype html>
+    <head>
+        <title>Edit Publications for a Person</title>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    </head>
+    <body>
+        <div class="container mx-auto" style="width: 50%;">
+            <div class="row">
+                <h1 class="mx-auto">Edit Publications for a Person</h1>
+            </div>
+            <a href="{{ url_for('metab_admin.main_menu') }}">Back to Home</a>
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-warning" role="alert">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="form-group">
+                <label>Search Display Name</label>
+                <input id=searchInput class="form-control" list=displaynames name=displayname>
+                <datalist id=displaynames>
+                    {% for name in dispNameList %}
+                        <option value="{{name}}">
+                    {% endfor %}
+                </datalist>
+            </div>
+
+            <form method=post enctype=multipart/form-data>
+                <div class="form-group">
+                    <label>Name</label>
+                    <input readonly id=name class="form-control" type=text name=name>
+                </div>
+
+                <input hidden readonly id=id type=text name=id>
+
+                <div class="form-group">
+                    <label>PubMed IDs</label>
+                    <input class="form-control" type=text name=pmid placeholder="separate ids with a comma i.e. 11111, 22222">
+                </div>
+
+                <button class="btn btn-primary" type=submit name=include>Add PMID</button>
+                <button class="btn btn-danger" type=submit name=exclude>Exclude PMID</button>
+            </form>
+        </div>
+        <script>
+            const displayNameInput = document.getElementById('searchInput');
+            const displayNames = [...document.getElementById('displaynames').childNodes].filter(name => name.value).map(name => name.value);
+            const name = document.getElementById('name');
+            const id = document.getElementById('id');
+            displayNameInput.addEventListener('change', (e) => {
+                if (displayNames.includes(e.srcElement.value)) {
+                    const splitName = e.srcElement.value.split('|');
+                    name.value = splitName[0];
+                    id.value = splitName[1];
+                }
+            });
+        </script>
+    </body>
+    ''', dispNameList=display_names)
 
 
 def main():
