@@ -1,6 +1,11 @@
 Changelog
 =========
 
+## [0.3.1] - 2019-12-17
+
+ * Exclude withheld entities during association (Taeber Rapczak)
+
+
 ## [0.3.0] - 2019-12-17
 
  * Fix a trailing whitespace bug for People (Taeber Rapczak)
