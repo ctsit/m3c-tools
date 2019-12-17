@@ -209,7 +209,11 @@ def link_people_to_org(namespace: str, sup_cur, people, orgs):
     triples = []
     sup_cur.execute("""\
         SELECT person_id, organization_id
-        FROM associations
+          FROM associations as a,
+               organizations as o,
+               people as p
+         WHERE a.person_id = p.id AND a.organization_id = o.id
+           AND p.withheld IS NOT TRUE AND o.withheld IS NOT TRUE
     """)
     for row in sup_cur:
         triples.extend(orgs[row[1]].add_person(namespace, row[0]))
