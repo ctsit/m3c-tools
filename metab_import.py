@@ -8,6 +8,7 @@ Options:
     -h --help     Show this message and exit
     -d --dry-run  Create N-Triples files without deleting and uploading to VIVO
     -x --diff     See Differential Update.
+    -a --add-devs Add new developers for tools.
 
 Differential Update:
     A differential update compares the triples produced by a run with that of
@@ -45,6 +46,7 @@ from metab_classes import Photo
 from metab_classes import Project
 from metab_classes import Study
 from metab_classes import Tool
+import metab_data
 
 
 def get_config(config_path):
@@ -150,10 +152,48 @@ def get_people(sup_cur):
             ON id=person_id
             WHERE p.withheld = FALSE AND n.withheld = FALSE""")
     for row in sup_cur:
-        person = Person(person_id=row[0], first_name=row[1], last_name=row[2],
+        person = Person(person_id=row[0], first_name=row[1].strip(), last_name=row[2].strip(),
                         display_name=row[3], email=row[4], phone=row[5])
         people[person.person_id] = person
     return people
+
+
+def add_person(cursor: psycopg2.extensions.cursor,
+               first_name: str, last_name: str) -> int:
+
+    statement = '''
+        INSERT INTO people (id,      display_name)
+             VALUES        (DEFAULT, %s          )
+          RETURNING id
+    '''
+
+    display_name = '{} {}'.format(first_name.strip(), last_name.strip())
+    cursor.execute(statement, (display_name,))
+
+    person_id = cursor.fetchone()[0]
+
+    statement = '''
+        INSERT INTO names (person_id, first_name, last_name)
+             VALUES       (%s       , %s        , %s       )
+    '''
+
+    cursor.execute(statement, (person_id, first_name.strip(), last_name.strip()))
+
+    return person_id
+
+
+def get_person(sup_cur, person_id):
+    person = {}
+    sup_cur.execute("""\
+            SELECT id, first_name, last_name, display_name, email, phone
+            FROM people p
+            JOIN names n
+            ON id=person_id
+            WHERE p.withheld = FALSE AND n.withheld = FALSE AND id = %s""", (person_id,))
+    for row in sup_cur:
+        person = Person(person_id=row[0], first_name=row[1], last_name=row[2],
+                        display_name=row[3], email=row[4], phone=row[5])
+    return person
 
 
 def make_people(namespace, people):
@@ -227,78 +267,131 @@ def get_projects(mwb_cur, sup_cur,
             doi=row[4].replace('\n', ''),
             funding_source=row[5].replace('\n', ''))
 
-        last_name: str = row[6]
-        first_name: str = row[7]
-        institute = row[8]
-        department = row[9]
-        lab = row[10]
+        last_names: str = row[6]
+        first_names: str = row[7]
+        institutes = row[8]
+        departments = row[9]
+        labs = row[10]
 
-        if institute:
-            sup_cur.execute("""\
-                        SELECT id, parent_id
-                        FROM organizations
-                        WHERE name=%s AND withheld = FALSE""",
-                            (institute,))
-            try:
-                inst_id = sup_cur.fetchone()[0]
-                project.institute = orgs[inst_id].org_id
-            except TypeError:
-                print("Error: Organization does not exist.")
-                print("Organization for project " + project.project_id)
-                print("Organization name: " + institute)
-                sys.exit()
-        if department:
-            sup_cur.execute("""\
-                        SELECT id, parent_id
-                        FROM organizations
-                        WHERE name=%s AND withheld = FALSE""",
-                            (department,))
-            try:
-                dept_options = {}
-                for row in sup_cur:
-                    dept_options[row[0]] = row[1]
-                for dept_id, parent in dept_options.items():
-                    if inst_id == parent:
-                        project.department = orgs[dept_id].org_id
-            except TypeError:
-                print("Error: Organization does not exist.")
-                print("Organization for project " + project.project_id)
-                print("Organization name: " + department)
-                sys.exit()
-        if lab:
-            sup_cur.execute("""\
-                        SELECT id, parent_id
-                        FROM organizations
-                        WHERE name=%s AND withheld = FALSE""",
-                            (lab,))
-            try:
-                lab_options = {}
-                for row in sup_cur:
-                    lab_options[row[0]] = row[1]
-                for lab_id, parent in lab_options.items():
-                    if dept_id == parent:
-                        project.lab = orgs[lab_id].org_id
-            except TypeError:
-                print("Error: Organization does not exist.")
-                print("Organization for project " + project.project_id)
-                print("Organization name: " + lab)
-                sys.exit()
-
-        sup_cur.execute("""\
-                    SELECT person_id
-                    FROM names
-                    WHERE last_name=%s AND first_name=%s
-                      AND withheld = FALSE""",
-                        (last_name.strip(), first_name.strip()))
+        institute_list = [inst for inst in institutes.split(';')]
         try:
-            person_id = sup_cur.fetchone()[0]
-            project.pi = people[person_id].person_id
-        except (IndexError, KeyError, TypeError):
-            print("Error: Person does not exist.")
-            print("PI for project " + project.project_id)
-            print("Last name: " + last_name)
-            print("First name: " + first_name)
-            sys.exit()
+            department_list = [dept for dept in departments.split(';')]
+        except AttributeError:
+            department_list = []
+        try:
+            lab_list = [lab for lab in labs.split(';')]
+        except AttributeError:
+            lab_list = []
+        max_range = len(institute_list)
+        if len(department_list) > max_range:
+            max_range = len(department_list)
+        if len(lab_list) > max_range:
+            max_range = len(lab_list)
+
+        for i in range(0, max_range):
+            # If there are not enough institutes, default to first
+            try:
+                sup_cur.execute("""\
+                        SELECT id, parent_id
+                        FROM organizations
+                        WHERE name=%s AND type='institute'
+                        AND withheld = FALSE""",
+                            (institute_list[i],))
+                try:
+                    inst_id = sup_cur.fetchone()[0]
+                    project.institutes.append(orgs[inst_id].org_id)
+                except TypeError:
+                    print("Error: Organization does not exist.")
+                    print("Organization for project " + project.project_id)
+                    print("Organization name: " + institute_list[i])
+                    sys.exit()
+            except IndexError:
+                sup_cur.execute("""\
+                            SELECT id, parent_id
+                            FROM organizations
+                            WHERE name=%s AND type='institute'
+                            AND withheld = FALSE""",
+                                (institute_list[0],))
+                inst_id = sup_cur.fetchone()[0]
+
+            # If there are not enough departments, default to first
+            if departments:
+                try:
+                    sup_cur.execute("""\
+                            SELECT id, parent_id
+                            FROM organizations
+                            WHERE name=%s AND type='department'
+                            AND withheld = FALSE""",
+                                (department_list[i],))
+                    try:
+                        dept_options = {}
+                        for row in sup_cur:
+                            dept_options[row[0]] = row[1]
+                        for dept_id, parent in dept_options.items():
+                            if inst_id == parent:
+                                department_id = dept_id
+                                project.departments.append(orgs[dept_id].org_id)
+                    except TypeError:
+                        print("Error: Organization does not exist.")
+                        print("Organization for project " + project.project_id)
+                        print("Organization name: " + department_list[i])
+                        sys.exit()
+                except IndexError:
+                    sup_cur.execute("""\
+                                SELECT id, parent_id
+                                FROM organizations
+                                WHERE name=%s AND type='department'
+                                AND withheld = FALSE""",
+                                    (department_list[0],))
+                    dept_options = {}
+                    for row in sup_cur:
+                        dept_options[row[0]] = row[1]
+                    for dept_id, parent in dept_options.items():
+                        if inst_id == parent:
+                            department_id = dept_id
+            if labs:
+                try:
+                    sup_cur.execute("""\
+                                SELECT id, parent_id
+                                FROM organizations
+                                WHERE name=%s AND type='laboratory'
+                                AND withheld = FALSE""",
+                                    (lab_list[i],))
+                    try:
+                        lab_options = {}
+                        for row in sup_cur:
+                            lab_options[row[0]] = row[1]
+                        for lab_id, parent in lab_options.items():
+                            try:
+                                if department_id == parent:
+                                    project.labs.append(orgs[lab_id].org_id)
+                            except Exception:
+                                import pdb
+                                pdb.set_trace()
+                    except TypeError:
+                        print("Error: Organization does not exist.")
+                        print("Organization for project " + project.project_id)
+                        print("Organization name: " + lab_list[i])
+                        sys.exit()
+                except IndexError:
+                    pass
+
+        last_name_list = [ln for ln in last_names.split(';')]
+        first_name_list = [fn for fn in first_names.split(';')]
+
+        for i in range(0, len(last_name_list)):
+            last_name = last_name_list[i]
+            first_name = first_name_list[i]
+            ids = metab_data.get_person(sup_cur, first_name, last_name)
+            try:
+                person_id = ids[0]
+                project.pi.append(people[person_id].person_id)
+            except (IndexError, KeyError, TypeError):
+                print("Error: Person does not exist.")
+                print("PI for project " + project.project_id)
+                print("Last name: " + last_name)
+                print("First name: " + first_name)
+                sys.exit()
         projects[project.project_id] = project
     return projects
 
@@ -341,78 +434,132 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
             submit_date=submit_date,
             project_id=row[5].replace('\n', ''))
 
-        last_name: str = row[6]
-        first_name: str = row[7]
-        institute = row[8]
-        department = row[9]
-        lab = row[10]
+        last_names: str = row[6]
+        first_names: str = row[7]
+        institutes = row[8]
+        departments = row[9]
+        labs = row[10]
 
-        if institute:
-            sup_cur.execute("""\
-                        SELECT id, parent_id
-                        FROM organizations
-                        WHERE name=%s AND withheld = FALSE""",
-                            (institute,))
-            try:
-                inst_id = sup_cur.fetchone()[0]
-                study.institute = orgs[inst_id].org_id
-            except TypeError:
-                print("Error: Organization does not exist.")
-                print("Organization for study " + study.study_id)
-                print("Organization name: " + institute)
-                sys.exit()
-        if department:
-            sup_cur.execute("""\
-                        SELECT id, parent_id
-                        FROM organizations
-                        WHERE name=%s AND withheld = FALSE""",
-                            (department,))
-            try:
-                dept_options = {}
-                for row in sup_cur:
-                    dept_options[row[0]] = row[1]
-                for dept_id, parent in dept_options.items():
-                    if inst_id == parent:
-                        study.department = orgs[dept_id].org_id
-            except TypeError:
-                print("Error: Organization does not exist.")
-                print("Organization for study " + study.study_id)
-                print("Organization name: " + department)
-                sys.exit()
-        if lab:
-            sup_cur.execute("""\
-                        SELECT id, parent_id
-                        FROM organizations
-                        WHERE name=%s AND withheld = FALSE""",
-                            (lab,))
-            try:
-                lab_options = {}
-                for row in sup_cur:
-                    lab_options[row[0]] = row[1]
-                for lab_id, parent in lab_options.items():
-                    if dept_id == parent:
-                        study.lab = orgs[lab_id].org_id
-            except TypeError:
-                print("Error: Organization does not exist.")
-                print("Organization for study " + study.study_id)
-                print("Organization name: " + lab)
-                sys.exit()
-
-        sup_cur.execute("""\
-                    SELECT person_id
-                    FROM names
-                    WHERE last_name=%s AND first_name=%s
-                      AND withheld = FALSE""",
-                        (last_name.strip(), first_name.strip()))
+        institute_list = [inst for inst in institutes.split(';')]
         try:
-            person_id = sup_cur.fetchone()[0]
-            study.runner = people[person_id].person_id
-        except (IndexError, KeyError, TypeError):
-            print("Error: Person does not exist.")
-            print("Runner for study " + study.study_id)
-            print("Last name: " + last_name)
-            print("First name: " + first_name)
-            sys.exit()
+            department_list = [dept for dept in departments.split(';')]
+        except AttributeError:
+            department_list = []
+        try:
+            lab_list = [lab for lab in labs.split(';')]
+        except AttributeError:
+            lab_list = []
+        max_range = len(institute_list)
+        if len(department_list) > max_range:
+            max_range = len(department_list)
+        if len(lab_list) > max_range:
+            max_range = len(lab_list)
+
+        for i in range(0, max_range):
+            # If there are not enough institutes, default to first
+            try:
+                sup_cur.execute("""\
+                        SELECT id, parent_id
+                        FROM organizations
+                        WHERE name=%s AND type='institute'
+                        AND withheld = FALSE""",
+                            (institute_list[i],))
+                try:
+                    inst_id = sup_cur.fetchone()[0]
+                    study.institutes.append(orgs[inst_id].org_id)
+                except TypeError:
+                    print("Error: Organization does not exist.")
+                    print("Organization for study " + study.study_id)
+                    print("Organization name: " + institute_list[i])
+                    sys.exit()
+            except IndexError:
+                sup_cur.execute("""\
+                            SELECT id, parent_id
+                            FROM organizations
+                            WHERE name=%s AND type='institute'
+                            AND withheld = FALSE""",
+                                (institute_list[0],))
+                inst_id = sup_cur.fetchone()[0]
+
+            # If there are not enough departments, default to first
+            if departments:
+                try:
+                    sup_cur.execute("""\
+                            SELECT id, parent_id
+                            FROM organizations
+                            WHERE name=%s AND type='department'
+                            AND withheld = FALSE""",
+                                (department_list[i],))
+                    try:
+                        dept_options = {}
+                        for row in sup_cur:
+                            dept_options[row[0]] = row[1]
+                        for dept_id, parent in dept_options.items():
+                            if inst_id == parent:
+                                department_id = dept_id
+                                study.departments.append(orgs[dept_id].org_id)
+                    except TypeError:
+                        print("Error: Organization does not exist.")
+                        print("Organization for study " + study.study_id)
+                        print("Organization name: " + department_list[i])
+                        sys.exit()
+                except IndexError:
+                    sup_cur.execute("""\
+                                SELECT id, parent_id
+                                FROM organizations
+                                WHERE name=%s AND type='department'
+                                AND withheld = FALSE""",
+                                    (department_list[0],))
+                    dept_options = {}
+                    for row in sup_cur:
+                        dept_options[row[0]] = row[1]
+                    for dept_id, parent in dept_options.items():
+                        if inst_id == parent:
+                            department_id = dept_id
+            if labs:
+                try:
+                    sup_cur.execute("""\
+                                SELECT id, parent_id
+                                FROM organizations
+                                WHERE name=%s AND type='laboratory'
+                                AND withheld = FALSE""",
+                                    (lab_list[i],))
+                    try:
+                        lab_options = {}
+                        for row in sup_cur:
+                            lab_options[row[0]] = row[1]
+                        for lab_id, parent in lab_options.items():
+                            try:
+                                if department_id == parent:
+                                    study.labs.append(orgs[lab_id].org_id)
+                            except Exception:
+                                import pdb
+                                pdb.set_trace()
+                    except TypeError:
+                        print("Error: Organization does not exist.")
+                        print("Organization for study " + study.study_id)
+                        print("Organization name: " + lab_list[i])
+                        sys.exit()
+                except IndexError:
+                    pass
+
+        last_name_list = [ln for ln in last_names.split(';')]
+        first_name_list = [fn for fn in first_names.split(';')]
+
+        for i in range(0, len(last_name_list)):
+            last_name = last_name_list[i]
+            first_name = first_name_list[i]
+
+            ids = metab_data.get_person(sup_cur, first_name, last_name)
+            try:
+                person_id = ids[0]
+                study.runner.append(people[person_id].person_id)
+            except (IndexError, KeyError, TypeError):
+                print("Error: Person does not exist.")
+                print("Runner for study " + study.study_id)
+                print("Last name: " + last_name + '.')
+                print("First name: " + first_name + '.')
+                sys.exit()
 
         studies[study.study_id] = study
     return studies
@@ -561,14 +708,29 @@ def get_csv_tools(config, aide: Aide) -> List[Tool]:
         return []
 
 
-def make_tools(namespace, tools, people):
+def make_tools(namespace, tools: List[Tool], people, mwb_cur, sup_cur, add_devs):
     print("Making Tools")
     triples = []
     tool_count = 0
     for tool in tools:
         # First, find all the authors' URIs
-        if not tool.match_authors(people):
-            continue
+        non_matched_authors = tool.match_authors(people, namespace)
+        if len(non_matched_authors) != 0:
+            if not add_devs:
+                print('Not all authors matched for Tool. Use --add-devs to add these people. Skipping...')
+                continue
+            try:
+                print("Not all authors matched for Tool. Inserting new people.")
+                for author in non_matched_authors:
+                    first_name = author.name.split(' ')[0]
+                    last_name = " ".join(author.name.split(' ')[1:])
+                    person_id = add_person(sup_cur, first_name, last_name)
+                    people[person_id] = get_person(sup_cur, person_id)
+                print("Trying to match authors again.")
+                tool.match_authors(people, namespace)
+            except Exception:
+                print('Error occurred creating new authors for tool. Skipping tool.')
+                continue
         # Now, generate the triples.
         triples.extend(tool.get_triples(namespace))
         tool_count += 1
@@ -612,13 +774,14 @@ def main():
 
     try:
         optlist, args = getopt.getopt(sys.argv[1:],
-                                      "dhx:", ["dry-run", "help", "diff="])
+                                      "dhx:", ["dry-run", "help", "diff=", "add-devs"])
     except getopt.GetoptError:
         print(__doc__)
         sys.exit(2)
 
     dry_run = False
     old_path = ""
+    add_devs = False
 
     for o, a in optlist:
         if o in ["-h", "--help"]:
@@ -630,6 +793,9 @@ def main():
         elif o in ["-x", "--diff"]:
             old_path = a
             print("Differential update with previous run: " + old_path)
+        elif o == "--add-devs":
+            add_devs = True
+            print("Creating new developers for tools.")
 
     if len(args) != 1:
         print(__doc__)
@@ -676,10 +842,8 @@ def main():
     print_to_file(org_triples, org_file)
 
     # People
+    # Don't make the triples yet because tools can create new people.
     people = get_people(sup_cur)
-    people_triples = make_people(aide.namespace, people)
-    people_triples.extend(link_people_to_org(aide.namespace, sup_cur, people, orgs))
-    print_to_file(people_triples, people_file)
 
     # Photos
     photos = get_photos(config.get("picturepath", "."), people)
@@ -689,7 +853,7 @@ def main():
     # Tools
     yaml_tools = get_yaml_tools(config)
     csv_tools = get_csv_tools(config, aide)
-    tools_triples = make_tools(aide.namespace, yaml_tools + csv_tools, people)
+    tools_triples = make_tools(aide.namespace, yaml_tools + csv_tools, people, mwb_cur, sup_cur, add_devs)
     print_to_file(tools_triples, tools_file)
 
     # Projects
@@ -715,6 +879,11 @@ def main():
     print_to_file(all_study_triples, study_file)
 
     summary_triples = project_summaries + study_summaries
+
+    # Make People Triples
+    people_triples = make_people(aide.namespace, people)
+    people_triples.extend(link_people_to_org(aide.namespace, sup_cur, people, orgs))
+    print_to_file(people_triples, people_file)
 
     if old_path:
         add, sub = diff(old_path, path)
