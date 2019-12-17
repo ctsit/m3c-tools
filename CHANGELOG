@@ -1,6 +1,15 @@
 Changelog
 =========
 
+## [0.3.0] - 2019-12-17
+
+ * Fix a trailing whitespace bug for People (Taeber Rapczak)
+ * Fix photo upload form to show middle and last name. (Hunter Jarrell)
+ * Modify metab import to create missing tool authors. (Hunter Jarrell)
+ * Add comprehension for names with semi-colons (Naomi Braun)
+ * Add form and code for associating PubMed IDs with authors (Naomi Braun)
+
+
 ## [0.2.0] - 2019-11-04
 
 * Add admin forms. (Hunter Jarrell, Taeber Rapczak, Naomi Braun)
