@@ -432,7 +432,7 @@ class Publication(object):
             rdf.append("<{}> <http://vivoweb.org/ontology/core#dateTimeValue> <{}>".format(uri, dtv_uri))
             rdf.append("<{}> <http://vivoweb.org/ontology/core#dateTime> \"{}\"^^<http://www.w3.org/2001/XMLSchema#dateTime>".format(dtv_uri, self.datetime))
         if self.citation:
-            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#citation> \"{}\"^^<http://www.w3.org/2001/XMLSchema#dateTime>".format(uri, self.citation))
+            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#citation> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.citation))
 
         return rdf
 
