@@ -12,7 +12,7 @@ Example:
     $ python metab_pub_ingest.py config.yaml
 """
 
-from datetime import datetime
+import datetime
 import os
 import sys
 import typing
@@ -23,6 +23,7 @@ import psycopg2
 from aide import Aide
 from metab_classes import Person
 from metab_classes import Publication
+from metab_classes import DateTimeValue
 
 
 class Citation(object):
@@ -117,23 +118,55 @@ def get_ids(aide: Aide, person: Person) -> list:
     return id_list
 
 
-def parse_api(results) -> dict:
-    publications = {}
-    for citing in results['PubmedArticle']:
-        pub = Publication()
-        citation = Citation(citing)
+def parse_api(results: dict) -> typing.Dict[str, Publication]:
+    publications: typing.Dict[str, Publication] = {}
 
-        fill_pub(pub, citation)
+    for article in results['PubmedArticle']:
+        citation = Citation(article)
+        pub = make_pub(citation)
+        if not pub.pmid or not pub.published:
+            continue
+        publications[pub.pmid] = pub
 
-        if pub.pmid:
-            publications[pub.pmid] = pub
     return publications
 
 
+def make_pub(citation: Citation) -> Publication:
+    pub = Publication("", "", None, "", "")
+    fill_pub(pub, citation)
+    return pub
+
+
+MONTHS = 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split()
+
+
 def fill_pub(pub: Publication, citation: Citation) -> None:
-    pub.title = (citation.check_key(['MedlineCitation', 'Article', 'ArticleTitle'])).replace('"', '\\"')
-    pub.publication_year = (citation.check_key(['MedlineCitation', 'Article', 'Journal',
-                            'JournalIssue', 'PubDate', 'Year']))
+    pub.title = (citation.check_key(
+        ['MedlineCitation', 'Article', 'ArticleTitle'])).replace('"', '\\"')
+
+    # For more information on parsing publication dates in PubMed, see:
+    #   https://www.nlm.nih.gov/bsd/licensee/elements_descriptions.html#pubdate
+    pubdate = citation.check_key(
+        ['MedlineCitation', 'Article', 'Journal', 'JournalIssue', 'PubDate'])
+    if pubdate:
+        if 'MedlineDate' in pubdate:
+            year = int(pubdate['MedlineDate'][0:4])
+        else:
+            year = int(pubdate['Year'])
+
+        try:
+            month_text = pubdate['Month']
+            month = MONTHS.index(month_text)+1
+        except (KeyError, ValueError):
+            month = None
+
+        try:
+            day = int(pubdate['Day'])
+        except KeyError:
+            day = None
+
+        pub.published = DateTimeValue(year, month, day)
+
     pub.pmid = str(citation.check_key(['MedlineCitation', 'PMID']))
     try:
         count = 0
@@ -164,8 +197,8 @@ def fill_pub(pub: Publication, citation: Citation) -> None:
     journal = citation.check_key(['MedlineCitation', 'Article', 'Journal', 'Title']).title()
 
     cite = ', '.join(names)
-    if pub.publication_year:
-        cite += ' (' + pub.publication_year + '). '
+    if pub.published:
+        cite += f' ({pub.published.year}). '
     cite += pub.title
     if not cite.endswith('.'):
         cite += '. '
@@ -218,7 +251,7 @@ def main():
         person_id = None
         config_path = sys.argv[1]
 
-    timestamp = datetime.now()
+    timestamp = datetime.datetime.now()
     path = 'data_out/' + timestamp.strftime("%Y") + '/' + \
         timestamp.strftime("%m") + '/' + timestamp.strftime("%Y_%m_%d")
     try:

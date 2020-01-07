@@ -3,22 +3,49 @@ import unittest
 
 from Bio import Entrez
 
-from metab_classes import Publication
-from metab_pub_ingest import Citation
-from metab_pub_ingest import fill_pub
+import metab_pub_ingest
 
 
 class TestParse(unittest.TestCase):
     def test_parse(self):
         """ Confirm citations are being written in the correct format """
         results = self.create_citation()
-        citation = Citation(results['PubmedArticle'][0])
-        pub = Publication()
-        fill_pub(pub, citation)
+        citation = metab_pub_ingest.Citation(results['PubmedArticle'][0])
+        pub = metab_pub_ingest.make_pub(citation)
 
         expected_citation = "Smith, J., Doe, J., Hamill, M. (2007). This is an example publication. Journal Of Example Science, 1(5), 100-105. doi:12.3456/7890"
         self.assertEqual(pub.pmid, '999999')
         self.assertEqual(pub.citation, expected_citation)
+
+    def test_make_pub_handles_medlinedate(self):
+        xml = io.StringIO('''
+            <?xml version="1.0"?>
+            <!DOCTYPE PubmedArticleSet PUBLIC "-//NLM//DTD PubMedArticle, 1st January 2019//EN" "https://dtd.nlm.nih.gov/ncbi/pubmed/out/pubmed_190101.dtd">
+            <PubmedArticleSet>
+            <PubmedArticle>
+                <MedlineCitation Status="PubMed-not-MEDLINE" Owner="NLM">
+                    <PMID Version="1">999999</PMID>
+                    <Article PubModel="Print">
+                        <Journal>
+                            <JournalIssue CitedMedium="Internet">
+                                <Volume>1</Volume>
+                                <Issue>5</Issue>
+                                <PubDate>
+                                    <MedlineDate>1984 Dec-1985 Jan</MedlineDate>
+                                </PubDate>
+                            </JournalIssue>
+                        </Journal>
+                    </Article>
+                </MedlineCitation>
+            </PubmedArticle>
+            </PubmedArticleSet>
+        '''.strip())
+        pubmed_articles = Entrez.read(xml)
+        article = pubmed_articles['PubmedArticle'][0]
+        citation = metab_pub_ingest.Citation(article)
+        pub = metab_pub_ingest.make_pub(citation)
+        self.assertEqual(pub.published.year, 1984)
+        self.assertEqual(pub.published.precision, 'year')
 
     def create_citation(self):
         handle = io.StringIO()
