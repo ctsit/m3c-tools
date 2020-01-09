@@ -1,0 +1,81 @@
+<!doctype html>
+    <head>
+        <title>Upload a new picture</title>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    </head>
+    <body>
+        <div class="container mx-auto" style="width: 50%;">
+            <div class="row">
+                <h1 class="mx-auto">Upload new profile picture</h1>
+            </div>
+            <a href="{{ url_for('metab_admin.main_menu') }}">Back to Home</a>
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-warning" role="alert">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="form-group">
+                <label>Search Display Name</label>
+                <input id=searchInput class="form-control" list=displaynames name=displayname>
+                <datalist id=displaynames>
+                    {% for name in dispNameList %}
+                        <option value="{{name}}">
+                    {% endfor %}
+                </datalist>
+            </div>
+
+            <form method=post enctype=multipart/form-data>
+                <div class="form-group">
+                    <label>First Name</label>
+                    <input id=firstName readonly class="form-control" type=text name=first_name>
+                </div>
+
+                <input hidden id=personId readonly type=text name=person_id>
+
+                <div class="form-group">
+                    <label>Last Name</label>
+                    <input id=lastName readonly class="form-control" type=text name=last_name>
+                </div>
+
+                <div class="form-group">
+                    <input type="file" class="form-control-file" id="inputGroupFile01" name=picture>
+                </div>
+
+                <button class="btn btn-primary" type=submit>Upload</button>
+            </form>
+
+            <img id="current" style="width: 200px; height: auto;" alt="Current Photo" />
+        </div>
+        <script>
+            const displayNameInput = document.getElementById('searchInput');
+            const displayNames = [...document.getElementById('displaynames').childNodes].filter(name => name.value).map(name => name.value);
+            const firstName = document.getElementById('firstName');
+            const lastName = document.getElementById('lastName');
+            const personId = document.getElementById('personId');
+
+            var previousPersonId
+
+            displayNameInput.addEventListener('change', (e) => {
+                if (displayNames.includes(e.srcElement.value)) {
+                    const splitName = e.srcElement.value.substring(0, e.srcElement.value.indexOf("|")-1).split(' ');
+                    const splitId = e.srcElement.value.split(' | ');
+                    firstName.value = splitName[0];
+                    lastName.value = splitName.slice(1).join(" ");
+                    if (splitId.length > 0) {
+                        personId.value = splitId[1];
+
+                        if (personId.value !== previousPersonId) {
+                            previousPersonId = personId.value;
+                            document.getElementById('current').src =
+                                "{{ url_for('metab_admin.get_photo') }}?id=" + previousPersonId;
+                        }
+                    }
+                }
+            });
+        </script>
+    </body>
