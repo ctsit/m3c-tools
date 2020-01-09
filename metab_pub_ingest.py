@@ -151,6 +151,7 @@ def fill_pub(pub: Publication, citation: Citation) -> None:
     if pubdate:
         if 'MedlineDate' in pubdate:
             year = int(pubdate['MedlineDate'][0:4])
+            assert 1900 < year and year < 3000
         else:
             year = int(pubdate['Year'])
 
