@@ -440,7 +440,8 @@ class DateTimeValue:
 
 
 class Publication(object):
-    def __init__(self, pmid: str, title: str, published: DateTimeValue, doi: str,
+    def __init__(self, pmid: str, title: str,
+                 published: typing.Optional[DateTimeValue], doi: str,
                  citation: str):
         self.pmid = pmid
         self.title = title

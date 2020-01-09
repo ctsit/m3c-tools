@@ -131,21 +131,16 @@ def parse_api(results: dict) -> typing.Dict[str, Publication]:
     return publications
 
 
-def make_pub(citation: Citation) -> Publication:
-    pub = Publication("", "", None, "", "")
-    fill_pub(pub, citation)
-    return pub
-
-
 MONTHS = 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split()
 
 
-def fill_pub(pub: Publication, citation: Citation) -> None:
-    pub.title = (citation.check_key(
+def make_pub(citation: Citation) -> Publication:
+    title = (citation.check_key(
         ['MedlineCitation', 'Article', 'ArticleTitle'])).replace('"', '\\"')
 
     # For more information on parsing publication dates in PubMed, see:
     #   https://www.nlm.nih.gov/bsd/licensee/elements_descriptions.html#pubdate
+    published = None
     pubdate = citation.check_key(
         ['MedlineCitation', 'Article', 'Journal', 'JournalIssue', 'PubDate'])
     if pubdate:
@@ -166,9 +161,9 @@ def fill_pub(pub: Publication, citation: Citation) -> None:
         except KeyError:
             day = None
 
-        pub.published = DateTimeValue(year, month, day)
+        published = DateTimeValue(year, month, day)
 
-    pub.pmid = str(citation.check_key(['MedlineCitation', 'PMID']))
+    pmid = str(citation.check_key(['MedlineCitation', 'PMID']))
     try:
         count = 0
         proto_doi = citation.check_key(['PubmedData', 'ArticleIdList'])[count]
@@ -176,11 +171,13 @@ def fill_pub(pub: Publication, citation: Citation) -> None:
             count += 1
             proto_doi = citation.check_key(['PubmedData',
                                             'ArticleIdList'])[count]
-        pub.doi = str(proto_doi)
+        doi = str(proto_doi)
     except IndexError:
-        pub.doi = ''
+        doi = ''
+
     # create citation
-    author_list = citation.check_key(['MedlineCitation', 'Article', 'AuthorList'])
+    author_list = citation.check_key(['MedlineCitation', 'Article',
+                                      'AuthorList'])
     names = []
     for author in author_list:
         if 'CollectiveName' in author:
@@ -190,17 +187,19 @@ def fill_pub(pub: Publication, citation: Citation) -> None:
         initial = author['Initials']
         name = last_name + ", " + initial + "."
         names.append(name)
-    volume = citation.check_key(['MedlineCitation', 'Article', 'Journal', 'JournalIssue',
-                                'Volume'])
-    issue = citation.check_key(['MedlineCitation', 'Article', 'Journal', 'JournalIssue',
-                                'Issue'])
-    pages = citation.check_key(['MedlineCitation', 'Article', 'Pagination', 'MedlinePgn'])
-    journal = citation.check_key(['MedlineCitation', 'Article', 'Journal', 'Title']).title()
+    volume = citation.check_key(['MedlineCitation', 'Article', 'Journal',
+                                 'JournalIssue', 'Volume'])
+    issue = citation.check_key(['MedlineCitation', 'Article', 'Journal',
+                                'JournalIssue', 'Issue'])
+    pages = citation.check_key(['MedlineCitation', 'Article', 'Pagination',
+                                'MedlinePgn'])
+    journal = citation.check_key(['MedlineCitation', 'Article', 'Journal',
+                                  'Title']).title()
 
     cite = ', '.join(names)
-    if pub.published:
-        cite += f' ({pub.published.year}). '
-    cite += pub.title
+    if published:
+        cite += f' ({published.year}). '
+    cite += title
     if not cite.endswith('.'):
         cite += '. '
     else:
@@ -216,10 +215,11 @@ def fill_pub(pub: Publication, citation: Citation) -> None:
         if pages:
             cite += ', ' + pages
         cite += '. '
-    if pub.doi:
-        cite += 'doi:' + pub.doi
-    pub.citation = cite
-    return
+    if doi:
+        cite += 'doi:' + doi
+    citation = cite
+
+    return Publication(pmid, title, published, doi, citation)
 
 
 def write_triples(aide: Aide, person: Person, pubs: dict) -> list:
