@@ -1,0 +1,91 @@
+<!doctype html>
+    <head>
+        <title>Change Person Withholding</title>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+        <style>
+            .hide {
+                display: none;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container mx-auto" style="width: 50%;">
+            <h1 class="mx-auto">Change the withholding status of a person</h1>
+            <a href="{{ url_for('metab_admin.main_menu') }}">Back to Home</a>
+            <div id="messages">
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-warning" role="alert">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            </div>
+
+             <div class="form-group">
+                <input type="text" class="form-control" id="search-bar">
+            </div>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th scope="col">Id</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Email</th>
+                        <th scope="col">Withheld</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for person in people %}
+                        <tr id="row-{{person.0}}-{{person.1}}-{{person.2}}">
+                            <th scope="row">{{ person.0 }}</th>
+                            <td>{{person.1}}</td>
+                            <td>{{person.2}}</td>
+                            <td><input type="checkbox" id="check-{{person.0}}" {{ "checked" if person.3 else ""}}></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <script>
+            const withChecks = document.querySelectorAll("[id^='check']");
+            const tableRows = document.querySelectorAll("[id^='row']");
+            const search = document.getElementById('search-bar');
+            const messages = document.getElementById('messages');
+            withChecks.forEach((check) => {
+                check.addEventListener('change', (e) => {
+                    fetch(window.location.href, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                                checked: e.target.checked,
+                                id: e.target.id.slice(6)
+                            })
+                        }).then(async data => {
+                            messages.innerHTML = '';
+                            if (data.status !== 200) {
+                                const alertMsg = document.createElement('div');
+                                alertMsg.textContent = await data.text();
+                                alertMsg.className = 'alert alert-danger';
+                                messages.appendChild(alertMsg);
+                                e.target.checked = !e.target.checked;
+                            }
+                            console.log(data);
+                        });
+                    });
+            });
+            search.addEventListener('input', (e) => {
+                console.log(e.target.value);
+                tableRows.forEach((row) => {
+                    if (!row.id.toLowerCase().includes(e.target.value.toLowerCase())) {
+                        row.className = 'hide';
+                    } else {
+                        row.className = '';
+                    }
+                });
+            });
+        </script>
+    </body>

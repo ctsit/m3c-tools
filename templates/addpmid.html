@@ -1,0 +1,62 @@
+<!doctype html>
+    <head>
+        <title>Edit Publications for a Person</title>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    </head>
+    <body>
+        <div class="container mx-auto" style="width: 50%;">
+            <div class="row">
+                <h1 class="mx-auto">Edit Publications for a Person</h1>
+            </div>
+            <a href="{{ url_for('metab_admin.main_menu') }}">Back to Home</a>
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-warning" role="alert">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="form-group">
+                <label>Search Display Name</label>
+                <input id=searchInput class="form-control" list=displaynames name=displayname>
+                <datalist id=displaynames>
+                    {% for name in dispNameList %}
+                        <option value="{{name}}">
+                    {% endfor %}
+                </datalist>
+            </div>
+
+            <form method=post enctype=multipart/form-data>
+                <div class="form-group">
+                    <label>Name</label>
+                    <input readonly id=name class="form-control" type=text name=name>
+                </div>
+
+                <input hidden readonly id=id type=text name=id>
+
+                <div class="form-group">
+                    <label>PubMed IDs</label>
+                    <input class="form-control" type=text name=pmid placeholder="separate ids with a comma i.e. 11111, 22222">
+                </div>
+
+                <button class="btn btn-primary" type=submit name=include>Add PMID</button>
+                <button class="btn btn-danger" type=submit name=exclude>Exclude PMID</button>
+            </form>
+        </div>
+        <script>
+            const displayNameInput = document.getElementById('searchInput');
+            const displayNames = [...document.getElementById('displaynames').childNodes].filter(name => name.value).map(name => name.value);
+            const name = document.getElementById('name');
+            const id = document.getElementById('id');
+            displayNameInput.addEventListener('change', (e) => {
+                if (displayNames.includes(e.srcElement.value)) {
+                    const splitName = e.srcElement.value.split('|');
+                    name.value = splitName[0];
+                    id.value = splitName[1];
+                }
+            });
+        </script>
+    </body>
