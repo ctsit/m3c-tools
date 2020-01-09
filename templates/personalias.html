@@ -1,0 +1,152 @@
+<!doctype html>
+    <head>
+        <title>Update a Person's Aliases</title>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    </head>
+    <body>
+        <div class="container mx-auto" style="width: 50%;">
+            <h1 class="mx-auto">Update a Person's Aliases</h1>
+            <a href="{{ url_for('metab_admin.main_menu') }}">Back to Home</a>
+            <div id="messages">
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-warning" role="alert">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+                        </div>
+
+            <div class="form-group">
+                <label>Search Display Name</label>
+                <input id=searchInput class="form-control" list=displaynames name=displayname>
+                <datalist id=displaynames>
+                    {% for name in dispNameList %}
+                        <option value="{{name}}">
+                    {% endfor %}
+                </datalist>
+            </div>
+
+            <div class="form-group">
+                <label>Name</label>
+                <input readonly id=name class="form-control" type=text name=name>
+            </div>
+            <input hidden readonly id=id type=text name=id>
+
+            <div class="form-group">
+                <label>New First Name</label>
+                <input class="form-control" id="new-first">
+            </div>
+            <div class="form-group">
+                <label>New Last Name</label>
+                <input class="form-control" id="new-last">
+            </div>
+            <div class="form-group">
+                <button id="new-btn" class="btn btn-outline-primary">Add New Alias</button>
+            </div>
+
+            <div class="form-group">
+                <label>Current Aliases</label>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>First</th>
+                            <th>Last</th>
+                            <th>Remove</th>
+                        </tr>
+                    </thead>
+                    <tbody id="t-body">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <script>
+            const messages = document.getElementById('messages');
+            const aliasData = {{aliasData|tojson|safe}};
+            const displayNameInput = document.getElementById('searchInput');
+            const displayNames = [...document.getElementById('displaynames').childNodes].filter(name => name.value).map(name => name.value);
+            const name = document.getElementById('name');
+            const id = document.getElementById('id');
+            const tbody = document.getElementById('t-body');
+            const addBtn = document.getElementById('new-btn');
+            const newFirst = document.getElementById('new-first');
+            const newLast = document.getElementById('new-last');
+            const updateTable = (alias) => {
+                tbody.innerHTML = '';
+                alias.forEach(a => {
+                    const row = document.createElement('tr');
+                    const firstCell = document.createElement('td');
+                    const lastCell = document.createElement('td');
+                    const removeCell = document.createElement('td');
+                    const removeBtn = document.createElement('button');
+                    firstCell.textContent = a.first;
+                    lastCell.textContent = a.last;
+                    removeBtn.textContent = '❌';
+                    removeBtn.className = 'btn btn-outline-danger';
+                    removeBtn.addEventListener('click', e => {
+                        updateAlias(false, id.value, a.first, a.last);
+                    })
+                    removeCell.appendChild(removeBtn);
+
+                    row.appendChild(firstCell);
+                    row.appendChild(lastCell);
+                    row.appendChild(removeCell);
+
+                    tbody.appendChild(row);
+                })
+            };
+            const updateAlias = (isNew, personId, firstName, lastName) => {
+                fetch(window.location.href, {
+                    method: isNew ? 'POST' : 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        id: personId,
+                        first: firstName,
+                        last: lastName
+                    })
+                }).then(async resp => {
+                    messages.innerHTML = '';
+                    if (resp.status === 200) {
+                        const alertMsg = document.createElement('div');
+                        alertMsg.textContent = await resp.text();
+                        alertMsg.className = 'alert alert-success';
+                        messages.appendChild(alertMsg);
+                        if (isNew) {
+                            aliasData[personId].push({first: firstName, last: lastName});
+                            newFirst.value = '';
+                            newLast.value = '';
+                        } else {
+                            aliasData[personId].splice(aliasData[personId].findIndex(a => a.first === firstName && a.last === lastName), 1);
+                        }
+                        updateTable(aliasData[personId]);
+                    } else {
+                        const alertMsg = document.createElement('div');
+                        alertMsg.textContent = await resp.text();
+                        alertMsg.className = 'alert alert-danger';
+                        messages.appendChild(alertMsg);
+                    }
+                })
+            };
+            addBtn.addEventListener('click', (e) => {
+                if (id.value && newFirst.value && newLast.value) {
+                    updateAlias(true, id.value, newFirst.value, newLast.value);
+                }
+            });
+            displayNameInput.addEventListener('change', (e) => {
+                if (displayNames.includes(e.srcElement.value)) {
+                    const splitName = e.srcElement.value.split('|');
+                    name.value = splitName[1].trim();
+                    id.value = splitName[0].trim();
+                    const alias = aliasData[splitName[0].trim()];
+                    tbody.innerHTML = "";
+                    if (alias) {
+                        updateTable(alias);
+                    }
+                }
+            });
+        </script>
+    </body>
