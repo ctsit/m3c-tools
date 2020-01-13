@@ -2,13 +2,12 @@
 Metab Importer
 Usage:
     python3 metab_import.py (-h | --help)
-    python3 metab_import.py [-d | --dry-run] [-x <prev> | --diff=<prev>] <path_to_config>
+    python3 metab_import.py [-x <prev> | --diff=<prev>] <path_to_config>
 
 Options:
-    -h --help     Show this message and exit
-    -d --dry-run  Create N-Triples files without deleting and uploading to VIVO
-    -x --diff     See Differential Update.
-    -a --add-devs Add new developers for tools.
+    -h --help      Show this message and exit
+    -x --diff      See Differential Update.
+    -a --add-devs  Add a Person record for new tools developers.
 
 Differential Update:
     A differential update compares the triples produced by a run with that of
@@ -33,6 +32,7 @@ import os
 import pathlib
 import sys
 import time
+import traceback
 import typing
 import yaml
 
@@ -86,30 +86,6 @@ def diff(prev_path: str, path: str) -> \
     sub = previous - current
 
     return (add, sub)
-
-
-def diff_upload(aide: Aide, add: typing.List[str], sub: typing.List[str]):
-    lines = []
-    for line in sub:
-        line = line.strip()
-        if line.endswith(" ."):
-            line = line[:-2]
-        lines.append(line)
-
-    if lines:
-        print(f"Differential update: removing {len(lines)} old triples")
-        delete(aide, lines)
-
-    lines = []
-    for line in add:
-        line = line.strip()
-        if line.endswith(" ."):
-            line = line[:-2]
-        lines.append(line)
-
-    if lines:
-        print(f"Differential update: adding {len(lines)} new triples")
-        insert(aide, lines)
 
 
 def get_organizations(sup_cur):
@@ -722,10 +698,12 @@ def make_tools(namespace, tools: List[Tool], people, mwb_cur, sup_cur, add_devs)
                     first_name = author.name.split(' ')[0]
                     last_name = " ".join(author.name.split(' ')[1:])
                     person_id = add_person(sup_cur, first_name, last_name)
+                    print(f"Added {first_name} {last_name}: {person_id}")
                     people[person_id] = get_person(sup_cur, person_id)
                 print("Trying to match authors again.")
                 tool.match_authors(people, namespace)
             except Exception:
+                traceback.print_exc()
                 print('Error occurred creating new authors for tool. Skipping tool.')
                 continue
         # Now, generate the triples.
@@ -741,29 +719,6 @@ def print_to_file(triples, file):
         rdf.write("\n".join(triples))
 
 
-def delete(aide, triples, chunk_size=20):
-    do_upload(aide, triples, chunk_size, "DELETE")
-
-
-def insert(aide, triples, chunk_size=20):
-    do_upload(aide, triples, chunk_size, "INSERT")
-
-
-def do_upload(aide, triples, chunk_size=20, upload_type="INSERT"):
-    assert upload_type in ["INSERT", "DELETE"]
-    chunks = [triples[x:x+chunk_size]
-              for x in range(0, len(triples), chunk_size)]
-    for chunk in chunks:
-        query = upload_type + """
-            DATA {{
-                GRAPH <http://vitro.mannlib.cornell.edu/default/vitro-kb-2> {{
-                    {}
-                }}
-            }}
-        """.format(" . \n".join(chunk))
-        aide.do_update(query)
-
-
 def main():
     if len(sys.argv) < 2:
         print(__doc__)
@@ -771,12 +726,11 @@ def main():
 
     try:
         optlist, args = getopt.getopt(sys.argv[1:],
-                                      "dhx:", ["dry-run", "help", "diff=", "add-devs"])
+                                      "hx:", ["help", "diff=", "add-devs"])
     except getopt.GetoptError:
         print(__doc__)
         sys.exit(2)
 
-    dry_run = False
     old_path = ""
     add_devs = False
 
@@ -784,9 +738,6 @@ def main():
         if o in ["-h", "--help"]:
             print(__doc__)
             sys.exit()
-        elif o in ["-d", "--dry-run"]:
-            dry_run = True
-            print("This is a dry run.")
         elif o in ["-x", "--diff"]:
             old_path = a
             print("Differential update with previous run: " + old_path)
@@ -882,8 +833,6 @@ def main():
                 + study_sup_triples
             print_to_file(all_study_triples, study_file)
 
-            summary_triples = project_summaries + study_summaries
-
             # Make People Triples
             people_triples = make_people(aide.namespace, people)
             people_triples.extend(
@@ -896,32 +845,6 @@ def main():
                     f.writelines(add)
                 with open(sub_file, 'w') as f:
                     f.writelines(sub)
-
-                if not dry_run:
-                    diff_upload(aide, add, sub)
-                    return
-
-            if dry_run:
-                sys.exit()
-
-            # If you've made it this far, it's time to delete
-            aide.do_delete()
-            insert(aide, org_triples)
-            print("Organizations uploaded")
-            insert(aide, people_triples)
-            print("People uploaded")
-            insert(aide, project_triples)
-            print("Projects uploaded")
-            insert(aide, study_triples)
-            print("Studies uploaded")
-            insert(aide, dataset_triples)
-            print("Datasets uploaded")
-            insert(aide, tools_triples)
-            print("Tools uploaded")
-            insert(aide, photos_triples)
-            print("Photos uploaded")
-            insert(aide, summary_triples, 1)
-            print("Summaries uploaded")
 
     sup_conn.close()
     mwb_conn.close()

@@ -1,5 +1,3 @@
-import requests
-
 from Bio import Entrez
 
 
@@ -16,27 +14,6 @@ class Aide(object):
         # Pubmed related
         self.retstart = 0
         self.count_up = 0
-
-    def do_update(self, query):
-        payload = {
-            'email': self.email,
-            'password': self.password,
-            'update': query
-        }
-        response = requests.post(self.endpoint, params=payload, verify=False)
-        if response.status_code != 200:
-            print('Error with following query:')
-            print(query)
-            print(response.status_code)
-            print(response.text)
-            return False
-        else:
-            return True
-
-    def do_delete(self):
-        query = \
-            "CLEAR GRAPH <http://vitro.mannlib.cornell.edu/default/vitro-kb-2>"
-        self.do_update(query)
 
     def get_id_list(self, term):
         Entrez.email = self.email
