@@ -346,8 +346,6 @@ tibco.com/products/tibco-spotfire:
     "Tools for statistical analysis of data."
   url: https://www.tibco.com/products/tibco-spotfire
   authors:
-    - name: Tibco
-      email: analyst.relations@tibco.com
   tags:
     - service
 
