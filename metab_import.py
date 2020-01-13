@@ -1,8 +1,8 @@
 """
 Metab Importer
 Usage:
-    import.py (-h | --help)
-    import.py [-d | --dry-run] [-x <prev> | --diff=<prev>] <path_to_config>
+    python3 metab_import.py (-h | --help)
+    python3 metab_import.py [-d | --dry-run] [-x <prev> | --diff=<prev>] <path_to_config>
 
 Options:
     -h --help     Show this message and exit
