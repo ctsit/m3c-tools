@@ -1,6 +1,18 @@
 Changelog
 =========
 
+## [0.4.0] - 2020-01-13
+
+ * Remove non-human tools developer (Taeber Rapczak)
+ * Remove dry-run flag as it is now the only option (Taeber Rapczak)
+ * Commit changes made by using --add-devs (Taeber Rapczak)
+ * Correct usage text (Taeber Rapczak)
+ * Assert MedlineDate contains a sensible year (Taeber Rapczak)
+ * Move Jinja templates from metab_admin to seperate files. (Hunter Jarrell)
+ * Add month and day to Publication dates (Taeber Rapczak)
+ * Fix APA citation data type (Taeber Rapczak)
+
+
 ## [0.3.1] - 2019-12-17
 
  * Exclude withheld entities during association (Taeber Rapczak)
