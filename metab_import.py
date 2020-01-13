@@ -59,13 +59,6 @@ def get_config(config_path):
     return config
 
 
-def connect(host, db, user, pg_password, port):
-    conn = psycopg2.connect(host=host, dbname=db, user=user,
-                            password=pg_password, port=port)
-    cur = conn.cursor()
-    return cur
-
-
 def diff(prev_path: str, path: str) -> \
         typing.Tuple[typing.List[str], typing.List[str]]:
     prev = pathlib.Path(prev_path)
@@ -830,97 +823,108 @@ def main():
                 config.get('vivo_email'),
                 config.get('vivo_password'),
                 config.get('namespace'))
-    mwb_cur = connect(config.get('mwb_host'), config.get('mwb_database'),
-                      config.get('mwb_username'), config.get('mwb_password'),
-                      config.get('mwb_port'))
-    sup_cur = connect(config.get('sup_host'), config.get('sup_database'),
-                      config.get('sup_username'), config.get('sup_password'),
-                      config.get('sup_port'))
 
     if not aide.namespace.endswith('/'):
         print(f"WARNING! Namespace doesn't end with '/': {aide.namespace}")
 
-    # Organizations
-    orgs = get_organizations(sup_cur)
-    org_triples = make_organizations(aide.namespace, orgs)
-    print_to_file(org_triples, org_file)
+    mwb_conn: psycopg2.extensions.connection = psycopg2.connect(
+        host=config.get('mwb_host'), dbname=config.get('mwb_database'),
+        user=config.get('mwb_username'), password=config.get('mwb_password'),
+        port=config.get('mwb_port'))
 
-    # People
-    # Don't make the triples yet because tools can create new people.
-    people = get_people(sup_cur)
+    sup_conn: psycopg2.extensions.connection = psycopg2.connect(
+        host=config.get('sup_host'), dbname=config.get('sup_database'),
+        user=config.get('sup_username'), password=config.get('sup_password'),
+        port=config.get('sup_port'))
 
-    # Photos
-    photos = get_photos(config.get("picturepath", "."), people)
-    photos_triples = make_photos(aide.namespace, photos)
-    print_to_file(photos_triples, photos_file)
+    with mwb_conn, sup_conn:
+        with mwb_conn.cursor() as mwb_cur, sup_conn.cursor() as sup_cur:
+            # Organizations
+            orgs = get_organizations(sup_cur)
+            org_triples = make_organizations(aide.namespace, orgs)
+            print_to_file(org_triples, org_file)
 
-    # Tools
-    yaml_tools = get_yaml_tools(config)
-    csv_tools = get_csv_tools(config, aide)
-    tools_triples = make_tools(aide.namespace, yaml_tools + csv_tools, people, mwb_cur, sup_cur, add_devs)
-    print_to_file(tools_triples, tools_file)
+            # People
+            # Don't make the triples yet because tools can create new people.
+            people = get_people(sup_cur)
 
-    # Projects
-    projects = get_projects(mwb_cur, sup_cur, people, orgs)
-    project_triples, project_summaries = \
-        make_projects(aide.namespace, projects)
-    all_proj_triples = project_triples + project_summaries
-    print_to_file(all_proj_triples, project_file)
+            # Photos
+            photos = get_photos(config.get("picturepath", "."), people)
+            photos_triples = make_photos(aide.namespace, photos)
+            print_to_file(photos_triples, photos_file)
 
-    # Studies
-    # Study file printed after datasets
-    studies = get_studies(mwb_cur, sup_cur, people, orgs)
-    study_triples, study_summaries = \
-        make_studies(aide.namespace, studies, projects)
+            # Tools
+            yaml_tools = get_yaml_tools(config)
+            csv_tools = get_csv_tools(config, aide)
+            tools_triples = make_tools(aide.namespace, yaml_tools + csv_tools, people, mwb_cur, sup_cur, add_devs)
+            print_to_file(tools_triples, tools_file)
 
-    # Datasets
-    datasets = get_datasets(mwb_cur)
-    dataset_triples, study_sup_triples = \
-        make_datasets(aide.namespace, datasets, studies)
-    print_to_file(dataset_triples, dataset_file)
+            # Projects
+            projects = get_projects(mwb_cur, sup_cur, people, orgs)
+            project_triples, project_summaries = \
+                make_projects(aide.namespace, projects)
+            all_proj_triples = project_triples + project_summaries
+            print_to_file(all_proj_triples, project_file)
 
-    all_study_triples = study_triples + study_summaries + study_sup_triples
-    print_to_file(all_study_triples, study_file)
+            # Studies
+            # Study file printed after datasets
+            studies = get_studies(mwb_cur, sup_cur, people, orgs)
+            study_triples, study_summaries = \
+                make_studies(aide.namespace, studies, projects)
 
-    summary_triples = project_summaries + study_summaries
+            # Datasets
+            datasets = get_datasets(mwb_cur)
+            dataset_triples, study_sup_triples = \
+                make_datasets(aide.namespace, datasets, studies)
+            print_to_file(dataset_triples, dataset_file)
 
-    # Make People Triples
-    people_triples = make_people(aide.namespace, people)
-    people_triples.extend(link_people_to_org(aide.namespace, sup_cur, people, orgs))
-    print_to_file(people_triples, people_file)
+            all_study_triples = study_triples + study_summaries \
+                + study_sup_triples
+            print_to_file(all_study_triples, study_file)
 
-    if old_path:
-        add, sub = diff(old_path, path)
-        with open(add_file, 'w') as f:
-            f.writelines(add)
-        with open(sub_file, 'w') as f:
-            f.writelines(sub)
+            summary_triples = project_summaries + study_summaries
 
-        if not dry_run:
-            diff_upload(aide, add, sub)
-            return
+            # Make People Triples
+            people_triples = make_people(aide.namespace, people)
+            people_triples.extend(
+                link_people_to_org(aide.namespace, sup_cur, people, orgs))
+            print_to_file(people_triples, people_file)
 
-    if dry_run:
-        sys.exit()
+            if old_path:
+                add, sub = diff(old_path, path)
+                with open(add_file, 'w') as f:
+                    f.writelines(add)
+                with open(sub_file, 'w') as f:
+                    f.writelines(sub)
 
-    # If you've made it this far, it's time to delete
-    aide.do_delete()
-    insert(aide, org_triples)
-    print("Organizations uploaded")
-    insert(aide, people_triples)
-    print("People uploaded")
-    insert(aide, project_triples)
-    print("Projects uploaded")
-    insert(aide, study_triples)
-    print("Studies uploaded")
-    insert(aide, dataset_triples)
-    print("Datasets uploaded")
-    insert(aide, tools_triples)
-    print("Tools uploaded")
-    insert(aide, photos_triples)
-    print("Photos uploaded")
-    insert(aide, summary_triples, 1)
-    print("Summaries uploaded")
+                if not dry_run:
+                    diff_upload(aide, add, sub)
+                    return
+
+            if dry_run:
+                sys.exit()
+
+            # If you've made it this far, it's time to delete
+            aide.do_delete()
+            insert(aide, org_triples)
+            print("Organizations uploaded")
+            insert(aide, people_triples)
+            print("People uploaded")
+            insert(aide, project_triples)
+            print("Projects uploaded")
+            insert(aide, study_triples)
+            print("Studies uploaded")
+            insert(aide, dataset_triples)
+            print("Datasets uploaded")
+            insert(aide, tools_triples)
+            print("Tools uploaded")
+            insert(aide, photos_triples)
+            print("Photos uploaded")
+            insert(aide, summary_triples, 1)
+            print("Summaries uploaded")
+
+    sup_conn.close()
+    mwb_conn.close()
 
 
 if __name__ == "__main__":
