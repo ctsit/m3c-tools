@@ -23,6 +23,7 @@ Copyright 2019–2020 University of Florida.
 import datetime
 import os
 import sys
+import traceback
 import typing
 import yaml
 
@@ -290,36 +291,41 @@ def main():
         person_ids = people.keys() - person_ids
 
     for person_id in person_ids:
-        person_id = int(person_id)
-        triples = []
-        pub_collective = {}
+        try:
+            person_id = int(person_id)
+            triples = []
+            pub_collective = {}
 
-        extras, exceptions = get_supplementals(cur, person_id)
-        person = people[person_id]
+            extras, exceptions = get_supplementals(cur, person_id)
+            person = people[person_id]
 
-        pmids = get_ids(aide, person)
-        if person.person_id in extras.keys():
-            for pub in extras[person.person_id]:
-                if pub not in pmids:
-                    pmids.append(pub)
-        if person.person_id in exceptions.keys():
-            for pub in exceptions[person.person_id]:
-                if pub in pmids:
-                    pmids.remove(pub)
-        if pmids:
-            results = aide.get_details(pmids)
-            pubs = parse_api(results)
-            pub_collective.update(pubs)
-            triples.extend(write_triples(aide, person, pubs))
+            pmids = get_ids(aide, person)
+            if person.person_id in extras.keys():
+                for pub in extras[person.person_id]:
+                    if pub not in pmids:
+                        pmids.append(pub)
+            if person.person_id in exceptions.keys():
+                for pub in exceptions[person.person_id]:
+                    if pub in pmids:
+                        pmids.remove(pub)
+            if pmids:
+                results = aide.get_details(pmids)
+                pubs = parse_api(results)
+                pub_collective.update(pubs)
+                triples.extend(write_triples(aide, person, pubs))
 
-        pub_count = 0
-        for pub in pub_collective.values():
-            triples.extend(pub.get_triples(aide.namespace))
-            pub_count += 1
-        print("There are " + str(pub_count) + " publications.")
+            pub_count = 0
+            for pub in pub_collective.values():
+                triples.extend(pub.get_triples(aide.namespace))
+                pub_count += 1
+            print("There are " + str(pub_count) + " publications.")
 
-        pub_file = os.path.join(path, f"{person_id}_pubs.nt")
-        print_to_file(triples, pub_file)
+            pub_file = os.path.join(path, f"{person_id}_pubs.nt")
+            print_to_file(triples, pub_file)
+        except Exception:
+            print(f"Error while processing {person_id}", file=sys.stderr)
+            traceback.print_exc()
+            continue
 
 
 if __name__ == "__main__":
