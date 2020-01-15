@@ -256,7 +256,7 @@ def main():
 
     config_path = sys.argv[1]
     cmd = sys.argv[2]
-    person_ids = sys.argv[3:]
+    person_ids: typing.List[str] = sys.argv[3:]
 
     if cmd not in ["all", "only", "except"]:
         print(f"Unknown command: {cmd}", file=sys.stderr)
@@ -284,20 +284,24 @@ def main():
     people: typing.Dict[str, Person] = get_people(cur, None)
 
     if cmd == "all":
-        person_ids = people.keys()
+        person_ids = list(map(str, people.keys()))
     elif cmd == "only":
         pass  # Use person_ids as is
     elif cmd == "except":
-        person_ids = people.keys() - person_ids
+        remaining: typing.List[str] = []
+        for pid in people.keys():
+            person_id = str(pid)
+            if person_id not in person_ids:
+                remaining.append(person_id)
+        person_ids = remaining
 
     for person_id in person_ids:
         try:
-            person_id = int(person_id)
             triples = []
             pub_collective = {}
 
             extras, exceptions = get_supplementals(cur, person_id)
-            person = people[person_id]
+            person = people[int(person_id)]
 
             pmids = get_ids(aide, person)
             if person.person_id in extras.keys():
