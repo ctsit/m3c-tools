@@ -1,15 +1,23 @@
-"""
-Metab Pub Ingest
+"""M3C PubMed publication importer.
+
 Usage:
-    metab_pub_ingest.py (-h | --help)
-    metab_pub_ingest.py [-id <id_number>] <path_to_config>
+    python3 metab_pub_ingest.py -h | --help
+    python3 metab_pub_ingest.py <config> all
+    python3 metab_pub_ingest.py <config> [only | except] <person_id>...
 
 Options:
-    -h --help       Show this message and exit
-    -id             Run ingest for single person_id
+    -h --help    Show this message and exit.
 
-Example:
-    $ python metab_pub_ingest.py config.yaml
+Example: Import everyone's publications
+    $ python metab_pub_ingest.py config.yaml all
+
+Example: Import James's publications (person_id=007)
+    $ python metab_pub_ingest.py config.yaml only 007
+
+Example: Import everyone except James and Alec's publications
+    $ python metab_pub_ingest.py config.yaml except 006 007
+
+Copyright 2019–2020 University of Florida.
 """
 
 import datetime
@@ -237,32 +245,29 @@ def print_to_file(triples: list, file: str) -> None:
 
 
 def main():
-    if len(sys.argv) < 2:
-        print(__doc__)
-        sys.exit(2)
-
-    if sys.argv[1] in ["-h", "--help"]:
+    if len(sys.argv) >= 2 and sys.argv[1] in ["-h", "--help"]:
         print(__doc__)
         sys.exit()
 
-    if sys.argv[1] == "-id":
-        person_id = sys.argv[2]
-        config_path = sys.argv[3]
-    else:
-        person_id = None
-        config_path = sys.argv[1]
+    if len(sys.argv) < 3:
+        print(__doc__, file=sys.stderr)
+        sys.exit(2)
+
+    config_path = sys.argv[1]
+    cmd = sys.argv[2]
+    person_ids = sys.argv[3:]
+
+    if cmd not in ["all", "only", "except"]:
+        print(f"Unknown command: {cmd}", file=sys.stderr)
+        sys.exit(2)
 
     timestamp = datetime.datetime.now()
-    path = 'data_out/' + timestamp.strftime("%Y") + '/' + \
-        timestamp.strftime("%m") + '/' + timestamp.strftime("%Y_%m_%d")
-    try:
-        os.makedirs(path)
-    except FileExistsError:
-        pass
-    if sys.argv[1] == "-id":
-        pub_file = os.path.join(path, person_id + "_pubs.nt")
-    else:
-        pub_file = os.path.join(path, 'pubs.nt')
+    # Path will look like: data_out/2012/06/2012_06_23
+    path = os.path.join("data_out",
+                        timestamp.strftime("%Y"),
+                        timestamp.strftime("%m"),
+                        timestamp.strftime("%Y_%m_%d"))
+    os.makedirs(path, exist_ok=True)
 
     config = get_config(config_path)
 
@@ -275,12 +280,23 @@ def main():
                   config.get('sup_username'), config.get('sup_password'),
                   config.get('sup_port'))
 
-    people = get_people(cur, person_id)
-    triples = []
-    pub_collective = {}
+    people: typing.Dict[str, Person] = get_people(cur, None)
 
-    extras, exceptions = get_supplementals(cur, person_id)
-    for person in people.values():
+    if cmd == "all":
+        person_ids = people.keys()
+    elif cmd == "only":
+        pass  # Use person_ids as is
+    elif cmd == "except":
+        person_ids = people.keys() - person_ids
+
+    for person_id in person_ids:
+        person_id = int(person_id)
+        triples = []
+        pub_collective = {}
+
+        extras, exceptions = get_supplementals(cur, person_id)
+        person = people[person_id]
+
         pmids = get_ids(aide, person)
         if person.person_id in extras.keys():
             for pub in extras[person.person_id]:
@@ -296,13 +312,14 @@ def main():
             pub_collective.update(pubs)
             triples.extend(write_triples(aide, person, pubs))
 
-    pub_count = 0
-    for pub in pub_collective.values():
-        triples.extend(pub.get_triples(aide.namespace))
-        pub_count += 1
-    print("There are " + str(pub_count) + " publications.")
+        pub_count = 0
+        for pub in pub_collective.values():
+            triples.extend(pub.get_triples(aide.namespace))
+            pub_count += 1
+        print("There are " + str(pub_count) + " publications.")
 
-    print_to_file(triples, pub_file)
+        pub_file = os.path.join(path, f"{person_id}_pubs.nt")
+        print_to_file(triples, pub_file)
 
 
 if __name__ == "__main__":
