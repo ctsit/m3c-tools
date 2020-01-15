@@ -60,10 +60,9 @@ publications are gathered using the full name of the person in a query to
 PubMed. Supplemental PMIDs can be added to a person by using the `publications`
 table in your supplemental database. The admin page can be used to add PMIDs.
 
-This tool can be run on all people in the database, or for a single person by
-making use of the `-id` flag.
+This tool can be run on all people in the database, or for a single person:
 
-    $ python metab_pub_ingest.py [-id <id_number>] $CONFIG_PATH
+    $ python metab_pub_ingest.py $CONFIG_PATH only <PERSON_ID>
 
 
 ## Running the Admin Page
