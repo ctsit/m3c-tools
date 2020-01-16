@@ -415,6 +415,14 @@ def make_projects(namespace, projects: typing.Mapping[str, Project]):
     return triples, summaries
 
 
+def is_valid_study(study: Study):
+    if study.study_id.startswith('ST9'):
+        # Studies that start with ST9 are testing studies
+        print('Test study found like ST9XXXXX. Skipping...')
+        return False
+    return True
+
+
 def get_studies(mwb_cur, sup_cur, people, orgs):
     print("Gathering Workbench Studies")
     studies = {}
@@ -437,6 +445,10 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
             summary=row[3].replace('\n', '').replace('"', '\\"'),
             submit_date=submit_date,
             project_id=row[5].replace('\n', ''))
+
+        # Skip invalid studies
+        if not is_valid_study(study):
+            continue
 
         last_names: str = row[6]
         first_names: str = row[7]
