@@ -1,7 +1,7 @@
 Changelog
 =========
 
-## [0.4.0] - 2020-01-13
+## [0.4.0] - 2020-01-21
 
  * Remove non-human tools developer (Taeber Rapczak)
  * Remove dry-run flag as it is now the only option (Taeber Rapczak)
