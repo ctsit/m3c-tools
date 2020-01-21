@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 import re
@@ -405,18 +406,48 @@ class Tool(object):
         return non_matched
 
 
-class Publication(object):
-    def __init__(self):
-        self.pmid = None
-        self.title = None
-        self.publication_year = None
-        self.datetime = None
-        self.doi = None
-        self.citation = None
+class DateTimeValue:
+    '''
+    Represents a VIVO DateTimeValue.
 
-    def make_datetime(self):
-        datetime = self.publication_year + "-01-01T00:00:00"
-        self.datetime = datetime
+    If `month` and `day` are specified, the precision is `yearMonthDay`.
+    If `month` is specified, the precision is `yearMonth`.
+    In all other cases, the precision is `year`.
+
+    See http://vivoweb.org/ontology/core#DateTimeValue
+    '''
+    def __init__(self, year: int, month: int = None, day: int = None):
+        self.precision = 'year'
+        self.year = year
+        self.month = 1
+        self.day = 1
+
+        if month:
+            self.month = month
+            self.precision = 'yearMonth'
+
+            if day:
+                self.day = day
+                self.precision = 'yearMonthDay'
+
+    def get_triples(self, datetime_value_uri: str) -> typing.List[str]:
+        uri = datetime_value_uri
+
+        triples: typing.List[str] = []
+        triples.append(f'<{uri}> <http://vivoweb.org/ontology/core#dateTime> "{self.year}{self.month:02}{self.day:02}"^^<http://www.w3.org/2001/XMLSchema#dateTime>')
+        triples.append(f'<{uri}> <http://vivoweb.org/ontology/core#dateTimePrecision> <http://vivoweb.org/ontology/core#{self.precision}Precision>')
+        return triples
+
+
+class Publication(object):
+    def __init__(self, pmid: str, title: str,
+                 published: typing.Optional[DateTimeValue], doi: str,
+                 citation: str):
+        self.pmid = pmid
+        self.title = title
+        self.published = published
+        self.doi = doi
+        self.citation = citation
 
     def get_triples(self, namespace):
         uri = Publication.uri(namespace, self.pmid)
@@ -427,12 +458,10 @@ class Publication(object):
         rdf.append("<{}> <http://purl.org/ontology/bibo/pmid> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.pmid))
         if self.doi:
             rdf.append("<{}> <http://purl.org/ontology/bibo/doi> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.doi))
-        if self.publication_year:
-            self.make_datetime()
-            rdf.append("<{}> <http://vivoweb.org/ontology/core#dateTimeValue> <{}>".format(uri, dtv_uri))
-            rdf.append("<{}> <http://vivoweb.org/ontology/core#dateTime> \"{}\"^^<http://www.w3.org/2001/XMLSchema#dateTime>".format(dtv_uri, self.datetime))
+        if self.published:
+            rdf.extend(self.published.get_triples(dtv_uri))
         if self.citation:
-            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#citation> \"{}\"^^<http://www.w3.org/2001/XMLSchema#dateTime>".format(uri, self.citation))
+            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#citation> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.citation))
 
         return rdf
 

@@ -1,0 +1,91 @@
+<!doctype html>
+    <head>
+        <title>Create a new Person</title>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    </head>
+    <body>
+        <div class="container mx-auto" style="width: 50%;">
+            <h1 class="mx-auto">Associate a Person with a Inst/Dept/Lab</h1>
+            <a href="{{ url_for('metab_admin.main_menu') }}">Back to Home</a>
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-warning" role="alert">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="form-group">
+                <label>Search Display Name</label>
+                <input id=searchInput class="form-control" list=displaynames name=displayname>
+                <datalist id=displaynames>
+                    {% for name in dispNameList %}
+                        <option value="{{name}}">
+                    {% endfor %}
+                </datalist>
+            </div>
+
+            <form method=post enctype=multipart/form-data>
+                <div class="form-group">
+                    <label>Name</label>
+                    <input readonly id=name class="form-control" type=text name=name>
+                </div>
+
+                <div class="form-group">
+                    <label>Email</label>
+                    <input readonly id=email class="form-control" type=text name=email>
+                </div>
+
+                <input hidden readonly id=id type=text name=id>
+
+                <div class="form-group">
+                    <label>Institute</label>
+                    <input class="form-control" list=institutes name=institute>
+                    <datalist id=institutes>
+                        {% for inst in instituteList %}
+                            <option value="{{inst}}">
+                        {% endfor %}
+                    </datalist>
+                </div>
+
+                <div class="form-group">
+                    <label>Department</label>
+                    <input class="form-control" list=departments name=department>
+                    <datalist id=departments>
+                        {% for dept in departmentList %}
+                            <option value="{{dept}}">
+                        {% endfor %}
+                    </datalist>
+                </div>
+
+                <div class="form-group">
+                    <label>Labs</label>
+                    <input class="form-control" list=labs name=lab>
+                    <datalist id=labs>
+                        {% for labItem in labList %}
+                            <option value="{{labItem}}">
+                        {% endfor %}
+                    </datalist>
+                </div>
+
+                <button class="btn btn-primary" type="submit">Associate Person</button>
+            </form>
+        </div>
+        <script>
+            const displayNameInput = document.getElementById('searchInput');
+            const displayNames = [...document.getElementById('displaynames').childNodes].filter(name => name.value).map(name => name.value);
+            const name = document.getElementById('name');
+            const email = document.getElementById('email');
+            const id = document.getElementById('id');
+            displayNameInput.addEventListener('change', (e) => {
+                if (displayNames.includes(e.srcElement.value)) {
+                    const splitName = e.srcElement.value.split('|');
+                    name.value = splitName[0];
+                    email.value = splitName[1];
+                    id.value = splitName[2];
+                }
+            });
+        </script>
+    </body>
