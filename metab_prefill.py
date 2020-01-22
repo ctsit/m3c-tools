@@ -62,13 +62,14 @@ def add_organization(cursor: psycopg2.extensions.cursor, type: str, name: str,
 
 
 def add_organizations(mwb_conn: psycopg2.extensions.connection,
-                      sup_conn: psycopg2.extensions.connection):
+                      sup_conn: psycopg2.extensions.connection,
+                      embargoed: typing.List[str]):
 
     select_orgs = '''
-        SELECT institute, department, laboratory
+        SELECT institute, department, laboratory, project_id
           FROM project
          UNION
-        SELECT study.institute, department, laboratory
+        SELECT study.institute, department, laboratory, study.study_id
           FROM study, study_status
          WHERE study.study_id = study_status.study_id
            AND study_status.status = 1
@@ -78,7 +79,11 @@ def add_organizations(mwb_conn: psycopg2.extensions.connection,
         mwb_cur.execute(select_orgs)
 
         for row in mwb_cur:
-            institutes, departments, laboratories = tuple(row)
+            institutes, departments, laboratories, uid = tuple(row)
+
+            # Exclude embargoed studies.
+            if uid in embargoed:
+                continue
 
             if not institutes:
                 assert not departments
@@ -126,17 +131,20 @@ def add_organizations(mwb_conn: psycopg2.extensions.connection,
 
 
 def add_people(mwb_conn: psycopg2.extensions.connection,
-               sup_conn: psycopg2.extensions.connection):
+               sup_conn: psycopg2.extensions.connection,
+               embargoed: typing.List[str]):
 
     # For each (first_name, last_name) across both project and study:
     #   if (first_name, last_name) in names => skip
     #   add person to people table and name to names table.
 
     select_names = '''
-        SELECT first_name, last_name, institute, department, laboratory
+        SELECT first_name, last_name, institute, department, laboratory,
+               project_id
           FROM project
          UNION
-        SELECT first_name, last_name, study.institute, department, laboratory
+        SELECT first_name, last_name, study.institute, department, laboratory,
+               study.study_id
           FROM study, study_status
          WHERE study.study_id = study_status.study_id
            AND study_status.status = 1
@@ -147,7 +155,13 @@ def add_people(mwb_conn: psycopg2.extensions.connection,
         print("Found {} unique names".format(mwb_cur.rowcount), flush=True)
 
         for row in mwb_cur:
-            first_names, last_names, institutes, departments, labs = tuple(row)
+            first_names, last_names, institutes, departments, labs, uid = \
+                tuple(row)
+
+            # Exclude embargoed studies.
+            if uid in embargoed:
+                continue
+
             last_name_list = [ln for ln in last_names.split(';')]
             first_name_list = [fn for fn in first_names.split(';')]
 
@@ -285,9 +299,15 @@ def main():
         user=config.get('sup_username'), password=config.get('sup_password'),
         port=config.get('sup_port'))
 
+    embargoed_path = config.get('embargoed', '')
+    embargoed: typing.List[str] = []
+    if embargoed_path:
+        with open(embargoed_path) as f:
+            embargoed = [line.strip() for line in f if line]
+
     with mwb_conn, sup_conn:
-        add_organizations(mwb_conn, sup_conn)
-        add_people(mwb_conn, sup_conn)
+        add_organizations(mwb_conn, sup_conn, embargoed)
+        add_people(mwb_conn, sup_conn, embargoed)
 
     sup_conn.close()
     mwb_conn.close()
