@@ -18,6 +18,9 @@ vivo_password: "vivo_password"
 update_endpoint: "http://vivo.domain.info/api/sparqlUpdate"
 namespace: "https://vivo.domain.info/individual/"
 
+# Path to a list of embargoed studies
+embargoed: embargoed.txt
+
 # Path to the Tools information
 tools: "tools.yaml"
 csv_tools: "tools.csv"

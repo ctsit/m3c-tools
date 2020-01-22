@@ -392,7 +392,7 @@ def is_valid_study(study: Study) -> bool:
     return True
 
 
-def get_studies(mwb_cur, sup_cur, people, orgs):
+def get_studies(mwb_cur, sup_cur, people, orgs, embargoed: typing.List[str]):
     print("Gathering Workbench Studies")
     studies = {}
     mwb_cur.execute("""\
@@ -417,6 +417,11 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
             summary=row[3].replace('\n', '').replace('"', '\\"'),
             submit_date=submit_date,
             project_id=row[5].replace('\n', ''))
+
+        # Exclude embargoed studies.
+        if study.study_id in embargoed:
+            print(f"Skipping embargoed study: {study.study_id}")
+            continue
 
         # Skip invalid studies
         if not is_valid_study(study):
@@ -834,7 +839,13 @@ def main():
 
             # Studies
             # Study file printed after datasets
-            studies = get_studies(mwb_cur, sup_cur, people, orgs)
+            embargoed_path = config.get('embargoed', '')
+            embargoed: typing.List[str] = []
+            if embargoed_path:
+                with open(embargoed_path) as f:
+                    embargoed = [line.strip() for line in f if line]
+
+            studies = get_studies(mwb_cur, sup_cur, people, orgs, embargoed)
             study_triples, study_summaries = \
                 make_studies(aide.namespace, studies, projects)
 
