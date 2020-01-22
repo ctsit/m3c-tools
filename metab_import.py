@@ -384,17 +384,28 @@ def make_projects(namespace, projects: typing.Mapping[str, Project]):
     return triples, summaries
 
 
+def is_valid_study(study: Study) -> bool:
+    if study.study_id.startswith('ST9'):
+        # Studies that start with ST9 are testing studies
+        print('Test study found like ST9XXXXX. Skipping...')
+        return False
+    return True
+
+
 def get_studies(mwb_cur, sup_cur, people, orgs):
     print("Gathering Workbench Studies")
     studies = {}
     mwb_cur.execute("""\
-        SELECT study_id, study_title, COALESCE(study_type, ''),
-            COALESCE(study_summary, ''), submit_date,
-            project_id, last_name, first_name, institute, department,
-            laboratory
-        FROM study""")
-    for row in mwb_cur:
+        SELECT study.study_id, study.study_title,
+               COALESCE(study.study_type, ''),
+               COALESCE(study.study_summary, ''), study.submit_date,
+               study.project_id, study.last_name, study.first_name,
+               study.institute, study.department, study.laboratory
+        FROM study, study_status
+        WHERE study.study_id = study_status.study_id
+          AND study_status.status = 1""")
 
+    for row in mwb_cur:
         submit_date = ""
         if row[4]:
             submit_date = f"{row[4]}T00:00:00"
@@ -406,6 +417,10 @@ def get_studies(mwb_cur, sup_cur, people, orgs):
             summary=row[3].replace('\n', '').replace('"', '\\"'),
             submit_date=submit_date,
             project_id=row[5].replace('\n', ''))
+
+        # Skip invalid studies
+        if not is_valid_study(study):
+            continue
 
         last_names: str = row[6]
         first_names: str = row[7]
