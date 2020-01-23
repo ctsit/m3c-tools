@@ -90,6 +90,19 @@ def get_people(cur: psycopg2.extensions.cursor, person_id: str = None) -> dict:
     return people
 
 
+def get_affiliations(cur: psycopg2.extensions.cursor, person_id: str) -> typing.List[str]:
+    cur.execute("""\
+        SELECT o.name
+        FROM organizations o, people p, associations a
+        WHERE
+        o.id = a.organization_id AND
+        a.person_id = p.id AND
+        p.id = %s AND
+        o.withheld = FALSE AND
+        o.type = 'institute'""", (int(person_id),))
+    return [row[0] for row in cur]
+
+
 def get_supplementals(cur: psycopg2.extensions.cursor, person_id: str = None)\
         -> (dict, dict):
     extras = {}
@@ -121,8 +134,15 @@ def get_supplementals(cur: psycopg2.extensions.cursor, person_id: str = None)\
     return extras, exceptions
 
 
-def get_ids(aide: Aide, person: Person) -> list:
+def get_ids(aide: Aide, person: Person, affiliations: typing.List[str]) -> list:
     query = person.last_name + ', ' + person.first_name + ' [Full Author Name]'
+    if len(affiliations) > 0:
+        query += ' AND ('
+        for affiliation in affiliations:
+            query += f'{affiliation}[Affiliation] OR '
+        # Trim off the trailing OR
+        query = query[:-4]
+        query += ')'
     id_list = aide.get_id_list(query)
     return id_list
 
@@ -303,7 +323,7 @@ def main():
             extras, exceptions = get_supplementals(cur, person_id)
             person = people[int(person_id)]
 
-            pmids = get_ids(aide, person)
+            pmids = get_ids(aide, person, get_affiliations(cur, person_id))
             if person.person_id in extras.keys():
                 for pub in extras[person.person_id]:
                     if pub not in pmids:
