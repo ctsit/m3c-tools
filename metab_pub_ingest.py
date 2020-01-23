@@ -131,11 +131,17 @@ def parse_api(results: dict) -> typing.Dict[str, Publication]:
     publications: typing.Dict[str, Publication] = {}
 
     for article in results['PubmedArticle']:
-        citation = Citation(article)
-        pub = make_pub(citation)
-        if not pub.pmid or not pub.published:
+        try:
+            citation = Citation(article)
+            pub = make_pub(citation)
+            if not pub.pmid or not pub.published:
+                continue
+            publications[pub.pmid] = pub
+        except Exception:
+            citation = Citation(article)
+            pmid = str(citation.check_key(['MedlineCitation', 'PMID']))
+            print(f'Skipping publication {pmid}')
             continue
-        publications[pub.pmid] = pub
 
     return publications
 
@@ -242,6 +248,7 @@ def print_to_file(triples: list, file: str) -> None:
     triples = [t + " ." for t in triples]
     with open(file, 'a+') as rdf:
         rdf.write("\n".join(triples))
+        rdf.write("\n")
     return
 
 
@@ -275,7 +282,9 @@ def main():
     aide = Aide(config.get('update_endpoint'),
                 config.get('vivo_email'),
                 config.get('vivo_password'),
-                config.get('namespace'))
+                config.get('namespace'),
+                config.get('pubmed_email'),
+                config.get('pubmed_api_token'))
 
     cur = connect(config.get('sup_host'), config.get('sup_database'),
                   config.get('sup_username'), config.get('sup_password'),
@@ -295,11 +304,9 @@ def main():
                 remaining.append(person_id)
         person_ids = remaining
 
+    pmid_to_person = {}
     for person_id in person_ids:
         try:
-            triples = []
-            pub_collective = {}
-
             extras, exceptions = get_supplementals(cur, person_id)
             person = people[int(person_id)]
 
@@ -313,21 +320,45 @@ def main():
                     if pub in pmids:
                         pmids.remove(pub)
             if pmids:
-                results = aide.get_details(pmids)
-                pubs = parse_api(results)
-                pub_collective.update(pubs)
-                triples.extend(write_triples(aide, person, pubs))
-
-            pub_count = 0
-            for pub in pub_collective.values():
-                triples.extend(pub.get_triples(aide.namespace))
-                pub_count += 1
-            print("There are " + str(pub_count) + " publications.")
-
-            pub_file = os.path.join(path, f"{person_id}_pubs.nt")
-            print_to_file(triples, pub_file)
+                for pmid in pmids:
+                    if pmid_to_person.get(pmid):
+                        pmid_to_person[pmid].append(person_id)
+                    else:
+                        pmid_to_person[pmid] = [person_id]
         except Exception:
             print(f"Error while processing {person_id}", file=sys.stderr)
+            traceback.print_exc()
+            continue
+
+    BATCH_SIZE = 5000
+    # Make the dict into a list so that it is ordered and we can batch process it
+    # Turns into a list of 2-tuples (pmids, person)
+    pmid_to_person_list = list(pmid_to_person.items())
+    curr_items = []
+    batch = 0
+    while len(pmid_to_person_list) != 0:
+        batch += 1
+        curr_items = pmid_to_person_list[:BATCH_SIZE]
+        pmid_to_person_list = pmid_to_person_list[BATCH_SIZE:]
+        try:
+            triples = []
+            pub_collective = {}
+
+            results = aide.get_details([item[0] for item in curr_items])
+            pubs = parse_api(results)
+            pub_collective.update(pubs)
+            for pub in pubs.values():
+                for person_id in pmid_to_person[pub.pmid]:
+                    person = people[int(person_id)]
+                    print_to_file(write_triples(aide, person, {pub.pmid: pub}), os.path.join(path, f'{person.person_id}_pubs.nt'))
+                triples.extend(pub.get_triples(aide.namespace))
+
+            pub_file = os.path.join(path, f"pub_info.nt")
+            print_to_file(triples, pub_file)
+
+            print(f'Batch {batch} with {len(pmid_to_person_list)} pubs to go')
+        except Exception:
+            print(f"Error while processing PMIDs", file=sys.stderr)
             traceback.print_exc()
             continue
 

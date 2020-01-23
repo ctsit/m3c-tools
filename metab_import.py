@@ -773,7 +773,9 @@ def main():
     aide = Aide(config.get('update_endpoint'),
                 config.get('vivo_email'),
                 config.get('vivo_password'),
-                config.get('namespace'))
+                config.get('namespace'),
+                config.get('pubmed_email'),
+                config.get('pubmed_api_token'))
 
     if not aide.namespace.endswith('/'):
         print(f"WARNING! Namespace doesn't end with '/': {aide.namespace}")
