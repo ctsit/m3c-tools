@@ -135,7 +135,18 @@ def get_supplementals(cur: psycopg2.extensions.cursor, person_id: str = None)\
 
 
 def get_ids(aide: Aide, person: Person, affiliations: typing.List[str]) -> list:
-    query = person.last_name + ', ' + person.first_name + ' [Full Author Name]'
+    ''' Get the PMIDs associated with a person with the passed affilitions.
+        Returns an empty array if no affiliations are passed.
+
+        Here is an example of a full query with a person with first name Arthur, last name Edison, and two affiliations
+
+        Edison Arthur[Author - Full] AND (University of Florida[Affiliation] OR University of Georgia[Affiliation])
+
+        Which PubMed turns into:
+
+        Edison, Arthur[Full Author Name] AND (University of Florida[Affiliation] OR University of Georgia[Affiliation])
+    '''
+    query = person.first_name + ' ' + person.last_name + '[Author - Full]'
     if len(affiliations) > 0:
         query += ' AND ('
         for affiliation in affiliations:
@@ -143,6 +154,9 @@ def get_ids(aide: Aide, person: Person, affiliations: typing.List[str]) -> list:
         # Trim off the trailing OR
         query = query[:-4]
         query += ')'
+    else:
+        print(f'Missing Affiliation for person_id: {person.person_id}. Skipping...')
+        return []
     id_list = aide.get_id_list(query)
     return id_list
 
