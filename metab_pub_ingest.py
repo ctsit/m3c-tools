@@ -90,6 +90,19 @@ def get_people(cur: psycopg2.extensions.cursor, person_id: str = None) -> dict:
     return people
 
 
+def get_affiliations(cur: psycopg2.extensions.cursor, person_id: str) -> typing.List[str]:
+    cur.execute("""\
+        SELECT o.name
+        FROM organizations o, people p, associations a
+        WHERE
+        o.id = a.organization_id AND
+        a.person_id = p.id AND
+        p.id = %s AND
+        o.withheld = FALSE AND
+        o.type = 'institute'""", (int(person_id),))
+    return [row[0] for row in cur]
+
+
 def get_supplementals(cur: psycopg2.extensions.cursor, person_id: str = None)\
         -> (dict, dict):
     extras = {}
@@ -121,8 +134,29 @@ def get_supplementals(cur: psycopg2.extensions.cursor, person_id: str = None)\
     return extras, exceptions
 
 
-def get_ids(aide: Aide, person: Person) -> list:
-    query = person.last_name + ', ' + person.first_name + ' [Full Author Name]'
+def get_ids(aide: Aide, person: Person, affiliations: typing.List[str]) -> list:
+    ''' Get the PMIDs associated with a person with the passed affilitions.
+        Returns an empty array if no affiliations are passed.
+
+        Here is an example of a full query with a person with first name Arthur, last name Edison, and two affiliations
+
+        Edison Arthur[Author - Full] AND (University of Florida[Affiliation] OR University of Georgia[Affiliation])
+
+        Which PubMed turns into:
+
+        Edison, Arthur[Full Author Name] AND (University of Florida[Affiliation] OR University of Georgia[Affiliation])
+    '''
+    query = person.first_name + ' ' + person.last_name + '[Author - Full]'
+    if len(affiliations) > 0:
+        query += ' AND ('
+        for affiliation in affiliations:
+            query += f'{affiliation}[Affiliation] OR '
+        # Trim off the trailing OR
+        query = query[:-4]
+        query += ')'
+    else:
+        print(f'Missing Affiliation for person_id: {person.person_id}. Skipping...')
+        return []
     id_list = aide.get_id_list(query)
     return id_list
 
@@ -310,7 +344,7 @@ def main():
             extras, exceptions = get_supplementals(cur, person_id)
             person = people[int(person_id)]
 
-            pmids = get_ids(aide, person)
+            pmids = get_ids(aide, person, get_affiliations(cur, person_id))
             if person.person_id in extras.keys():
                 for pub in extras[person.person_id]:
                     if pub not in pmids:
