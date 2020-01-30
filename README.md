@@ -9,6 +9,7 @@ Setup a Python Virtual Environment, then install the required dependencies.
     $ source venv/bin/activate
     $ pip install -r requirements.txt
 
+Also obtain a PubMed API token for increased API limits. See [this site](https://ncbiinsights.ncbi.nlm.nih.gov/2017/11/02/new-api-keys-for-the-e-utilities/) for more information.
 
 ## Preparing your config file
 
