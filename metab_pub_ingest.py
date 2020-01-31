@@ -22,6 +22,7 @@ Copyright 2019–2020 University of Florida.
 
 import datetime
 import os
+import re
 import sys
 import traceback
 import typing
@@ -278,8 +279,12 @@ def write_triples(aide: Aide, person: Person, pubs: dict) -> list:
     return rdf
 
 
-def print_to_file(triples: list, file: str) -> None:
+def print_to_file(triples: typing.List[str], file: str) -> None:
     triples = [t + " ." for t in triples]
+    # Replace all newlines (along with any leading space on the next line) with
+    # a single space. This is mainly for titles and citations from PubMed, but
+    # because we're writing as N-Triples, we cannot have any newlines.
+    triples = [re.sub(r'\n\s*', ' ', t) for t in triples]
     with open(file, 'a+') as rdf:
         rdf.write("\n".join(triples))
         rdf.write("\n")
