@@ -400,9 +400,9 @@ def get_studies(mwb_cur, sup_cur, people, orgs, embargoed: typing.List[str]):
                COALESCE(study.study_summary, ''), study.submit_date,
                study.project_id, study.last_name, study.first_name,
                study.institute, study.department, study.laboratory
-        FROM study, study_status
-        WHERE study.study_id = study_status.study_id
-          AND study_status.status = 1""")
+        FROM study, study_status_prod
+        WHERE study.study_id = study_status_prod.study_id
+          AND study_status_prod.status = 1""")
 
     for row in mwb_cur:
         submit_date = ""
