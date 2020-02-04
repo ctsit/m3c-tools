@@ -70,9 +70,9 @@ def add_organizations(mwb_conn: psycopg2.extensions.connection,
           FROM project
          UNION
         SELECT study.institute, department, laboratory, study.study_id
-          FROM study, study_status
-         WHERE study.study_id = study_status.study_id
-           AND study_status.status = 1
+          FROM study, study_status_prod
+         WHERE study.study_id = study_status_prod.study_id
+           AND study_status_prod.status = 1
     '''
 
     with mwb_conn.cursor() as mwb_cur, sup_conn.cursor() as sup_cur:
@@ -145,9 +145,9 @@ def add_people(mwb_conn: psycopg2.extensions.connection,
          UNION
         SELECT first_name, last_name, study.institute, department, laboratory,
                study.study_id
-          FROM study, study_status
-         WHERE study.study_id = study_status.study_id
-           AND study_status.status = 1
+          FROM study, study_status_prod
+         WHERE study.study_id = study_status_prod.study_id
+           AND study_status_prod.status = 1
     '''
 
     with mwb_conn.cursor() as mwb_cur, sup_conn.cursor() as sup_cur:
