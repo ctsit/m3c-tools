@@ -115,14 +115,13 @@ def get_people(sup_cur):
     print("Gathering People")
     people = {}
     sup_cur.execute("""\
-            SELECT id, first_name, last_name, display_name, email, phone
+            SELECT id, first_name, last_name, display_name, email, phone, (p.withheld OR n.withheld)
             FROM people p
             JOIN names n
-            ON id=person_id
-            WHERE p.withheld = FALSE AND n.withheld = FALSE""")
+            ON id=person_id""")
     for row in sup_cur:
         person = Person(person_id=row[0], first_name=row[1].strip(), last_name=row[2].strip(),
-                        display_name=row[3], email=row[4], phone=row[5])
+                        display_name=row[3], email=row[4], phone=row[5], withheld=row[6])
         people[person.person_id] = person
     return people
 
@@ -701,13 +700,13 @@ def get_csv_tools(config, aide: Aide) -> List[Tool]:
         return []
 
 
-def make_tools(namespace, tools: List[Tool], people, mwb_cur, sup_cur, add_devs):
+def make_tools(namespace, tools: List[Tool], people, withheld_people, mwb_cur, sup_cur, add_devs):
     print("Making Tools")
     triples = []
     tool_count = 0
     for tool in tools:
         # First, find all the authors' URIs
-        non_matched_authors = tool.match_authors(people, namespace)
+        non_matched_authors = tool.match_authors({**people, **withheld_people}, namespace)
         if len(non_matched_authors) != 0:
             if not add_devs:
                 print('Not all authors matched for Tool. Use --add-devs to add these people. Skipping...')
@@ -819,7 +818,9 @@ def main():
 
             # People
             # Don't make the triples yet because tools can create new people.
-            people = get_people(sup_cur)
+            all_people = get_people(sup_cur)
+            people = {k: v for k, v in all_people.items() if not v.withheld}
+            withheld_people = {k: v for k, v in all_people.items() if v.withheld}
 
             # Photos
             photos = get_photos(config.get("picturepath", "."), people)
@@ -829,7 +830,7 @@ def main():
             # Tools
             yaml_tools = get_yaml_tools(config)
             csv_tools = get_csv_tools(config, aide)
-            tools_triples = make_tools(aide.namespace, yaml_tools + csv_tools, people, mwb_cur, sup_cur, add_devs)
+            tools_triples = make_tools(aide.namespace, yaml_tools + csv_tools, people, withheld_people, mwb_cur, sup_cur, add_devs)
             print_to_file(tools_triples, tools_file)
 
             # Projects
