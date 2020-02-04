@@ -156,7 +156,8 @@ class Dataset(object):
 
 class Person(object):
     def __init__(self, person_id: str, first_name: str, last_name: str,
-                 display_name: str = "", email: str = "", phone: str = ""):
+                 display_name: str = "", email: str = "", phone: str = "",
+                 withheld: bool = False):
         assert person_id and first_name and last_name
 
         self.person_id = person_id
@@ -165,11 +166,14 @@ class Person(object):
         self.email = email
         self.phone = phone
         self.display_name = display_name
+        self.withheld = withheld
 
         if not self.display_name:
             self.display_name = f"{self.first_name} {self.last_name}"
 
     def get_triples(self, namespace: str):
+        if self.withheld:
+            return []
         uri = Person.uri(namespace, self.person_id)
         rdf = []
         vcard_uri = uri + "vcard"
@@ -434,7 +438,7 @@ class DateTimeValue:
         uri = datetime_value_uri
 
         triples: typing.List[str] = []
-        triples.append(f'<{uri}> <http://vivoweb.org/ontology/core#dateTime> "{self.year}{self.month:02}{self.day:02}"^^<http://www.w3.org/2001/XMLSchema#dateTime>')
+        triples.append(f'<{uri}> <http://vivoweb.org/ontology/core#dateTime> "{self.year:04}-{self.month:02}-{self.day:02}T00:00:00"^^<http://www.w3.org/2001/XMLSchema#dateTime>')
         triples.append(f'<{uri}> <http://vivoweb.org/ontology/core#dateTimePrecision> <http://vivoweb.org/ontology/core#{self.precision}Precision>')
         return triples
 

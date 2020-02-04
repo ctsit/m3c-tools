@@ -1,0 +1,15 @@
+# Please do not pollute this .gitignore file with your personal preferences.
+# Use:
+#  - .git/info/exclude
+#  - $XDG_CONFIG_HOME/git/ignore
+# See "git help ignore" or https://git-scm.com/docs/gitignore.
+
+# Ignore build output and compiled files.
+*.pyc
+__pycache__/
+dist/
+build/
+*.egg-info/
+
+# Anything else is probably a preference. Think twice and then ask three people
+# before adding something else.
