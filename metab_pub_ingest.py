@@ -23,9 +23,11 @@ Copyright 2019–2020 University of Florida.
 import datetime
 import os
 import re
+import requests
 import sys
 import traceback
 import typing
+import xml.etree.ElementTree as ET
 import yaml
 
 import psycopg2
@@ -34,6 +36,10 @@ from aide import Aide
 from metab_classes import Person
 from metab_classes import Publication
 from metab_classes import DateTimeValue
+
+
+MATCH_THRESHOLD = '0.98'
+CATALYST_URL = 'http://profiles.catalyst.harvard.edu/services/GetPMIDs/default.asp'
 
 
 class Citation(object):
@@ -135,7 +141,142 @@ def get_supplementals(cur: psycopg2.extensions.cursor, person_id: str = None)\
     return extras, exceptions
 
 
-def get_ids(aide: Aide, person: Person, affiliations: typing.List[str]) -> list:
+def get_include_exclude_pmids(cur: psycopg2.extensions.cursor, person: Person) -> typing.Tuple[typing.List[str], typing.List[str]]:
+    cur.execute("""\
+        SELECT pmid, include
+        FROM publications
+        WHERE
+        person_id = %s
+        """, (int(person.person_id),))
+    include = []
+    exclude = []
+    for row in cur:
+        if row[1] is True:
+            include.append(row[0])
+        elif row[1] is False:
+            exclude.append(row[0])
+        else:
+            # Ignore if the include is None or anything other than True or False
+            pass
+
+    return (include, exclude)
+
+
+def get_ids(aide: Aide, person: Person, affiliations: typing.List[str], cur: psycopg2.extensions.cursor) -> list:
+    '''
+    Get the PubMed PMIDs for a person with the given affiliations.
+
+    If there are publications in the supplemental database's Publications table for the person, this function uses
+    the catalyst disambiguation tool.
+
+    Otherwise it searches PubMed directly.
+    '''
+    include, exclude = get_include_exclude_pmids(cur, person)
+    if len(include) > 0:
+        return get_ids_catalyst(person, affiliations, include, exclude)
+    else:
+        return get_ids_pubmed_affl(aide, person, affiliations)
+
+
+def build_catalyst_xml(person: Person, affiliations: typing.List[str], include_pmids: typing.List[str], exclude_pmids: typing.List[str]) -> str:
+    '''
+    Build the request payload for talking to the Harvard PubMed Disambiguation Tool as part of their Profiles Catalyst service.
+
+    Affiliations and include_pmids must contain at least 1 entry each.
+
+    See http://profiles.catalyst.harvard.edu/docs/ProfilesRNS_DisambiguationEngine.pdf
+    '''
+    assert affiliations and len(affiliations) > 0 and include_pmids and len(include_pmids) > 0
+
+    root = ET.Element("FindPMIDs")
+    name = ET.SubElement(root, 'Name')
+    first_name = ET.SubElement(name, 'First')
+    first_name.text = person.first_name
+
+    last_name = ET.SubElement(name, 'Last')
+    last_name.text = person.last_name
+
+    email_list = ET.SubElement(root, 'EmailList')
+    if person.email is not None or person.email != '':
+        email = ET.SubElement(email_list, 'email')
+        email.text = person.email
+
+    affiliation_list = ET.SubElement(root, 'AffiliationList')
+    for affiliation in affiliations:
+        affil = ET.SubElement(affiliation_list, 'Affiliation')
+        affil.text = f'%{affiliation}%'
+
+    local_dup_names = ET.SubElement(root, 'LocalDuplicateNames')
+    local_dup_names.text = '1'
+
+    require_first_name = ET.SubElement(root, 'RequireFirstName')
+    require_first_name.text = 'false'
+
+    match_threshold = ET.SubElement(root, 'MatchThreshold')
+    match_threshold.text = '0.98'
+
+    add_list = ET.SubElement(root, 'PMIDAddList')
+    for pmid in include_pmids:
+        pmid_elm = ET.SubElement(add_list, 'PMID')
+        pmid_elm.text = pmid
+
+    rem_list = ET.SubElement(root, 'PMIDExcludeList')
+    if exclude_pmids:
+        for pmid in exclude_pmids:
+            pmid_elm = ET.SubElement(rem_list, 'PMID')
+            pmid_elm.text = pmid
+
+    return ET.tostring(root)
+
+
+def parse_catalyst_pmids(catalyst_xml: str) -> typing.List[str]:
+    '''
+    Parse out the PMIDS from the catalyst results XML.
+
+    This XML looks like:
+
+    <PMIDList>
+        <PMID>11707567</PMID>
+        <PMID>11788827</PMID>
+        <PMID>11815958</PMID>
+        <PMID>12209713</PMID>
+        <PMID>12463949</PMID>
+        <PMID>12659816</PMID>
+        <PMID>15219292</PMID>
+        <PMID>15226823</PMID>
+        <PMID>16359929</PMID>
+        <PMID>18541841</PMID>
+        <PMID>19567788</PMID>
+        <PMID>20190053</PMID>
+    </PMIDList>
+    '''
+    try:
+        root = ET.fromstring(catalyst_xml)
+        return [pmid.text for pmid in root]
+    except Exception:
+        return []
+
+
+def get_ids_catalyst(person: Person, affiliations: typing.List[str], include_pmids: typing.List[str], exclude_pmids: typing.List[str]) -> list:
+    '''
+    Gets the disambiguated PubMed pubs from the Harvard PubMed Disambiguation Tool as part of their Profiles Catalyst service.
+
+    Must pass affiliations and include_pmids.
+    '''
+    assert len(affiliations) > 0 and len(include_pmids) > 0
+
+    payload_xml = build_catalyst_xml(person, affiliations, include_pmids, exclude_pmids)
+    headers = {
+        'Content-Type': 'text/xml'
+    }
+    resp = requests.post(CATALYST_URL, data=payload_xml, headers=headers)
+    if resp.status_code != 200:
+        return []
+
+    return parse_catalyst_pmids(resp.text)
+
+
+def get_ids_pubmed_affl(aide: Aide, person: Person, affiliations: typing.List[str]) -> list:
     ''' Get the PMIDs associated with a person with the passed affilitions.
         Returns an empty array if no affiliations are passed.
 
@@ -349,7 +490,7 @@ def main():
             extras, exceptions = get_supplementals(cur, person_id)
             person = people[int(person_id)]
 
-            pmids = get_ids(aide, person, get_affiliations(cur, person_id))
+            pmids = get_ids(aide, person, get_affiliations(cur, person_id), cur)
             if person.person_id in extras.keys():
                 for pub in extras[person.person_id]:
                     if pub not in pmids:
