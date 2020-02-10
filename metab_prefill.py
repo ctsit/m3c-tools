@@ -51,7 +51,8 @@ def add_organizations(mwb_conn: psycopg2.extensions.connection,
         orgs = db.find_organizations(mwb_cur, embargoed)
 
         for org in orgs:
-            institutes, departments, laboratories, uid = org
+            institutes, departments, laboratories, uid = [t.strip()
+                                                          for t in org]
 
             # Exclude embargoed studies.
             if uid in embargoed:
@@ -62,7 +63,7 @@ def add_organizations(mwb_conn: psycopg2.extensions.connection,
                 assert not laboratories
                 continue
 
-            institute_list = [inst for inst in institutes.split(';')]
+            institute_list = [inst.strip() for inst in institutes.split(';')]
             for institute in institute_list:
                 institute_id = db.get_organization(sup_cur, INSTITUTE,
                                                    institute)
