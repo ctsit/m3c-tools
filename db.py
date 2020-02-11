@@ -32,16 +32,42 @@ def find_organizations(cursor: psycopg2.extensions.cursor,
         -> typing.Iterable[typing.Tuple[str, str, str, str]]:
 
     select_orgs = '''
-        SELECT institute, department, laboratory, project_id
+        SELECT COALESCE(institute, ''), COALESCE(department, ''),
+               COALESCE(laboratory, ''), project_id
           FROM project
          UNION
-        SELECT study.institute, department, laboratory, study.study_id
+        SELECT COALESCE(study.institute, ''), COALESCE(study.department, ''),
+               COALESCE(study.laboratory, ''), study.study_id
           FROM study, study_status_prod
          WHERE study.study_id = study_status_prod.study_id
            AND study_status_prod.status = 1
     '''
 
     cursor.execute(select_orgs)
+
+    for row in cursor:
+        yield tuple(row)
+
+
+def find_names(cursor: psycopg2.extensions.cursor,
+               embargoed: typing.List[str]) \
+        -> typing.Iterable[typing.Tuple[str, str, str, str, str, str]]:
+
+    select_names = '''
+        SELECT COALESCE(first_name, ''), COALESCE(last_name, ''),
+               COALESCE(institute, ''), COALESCE(department, ''),
+               COALESCE(laboratory, ''), project_id
+          FROM project
+         UNION
+        SELECT COALESCE(study.first_name, ''), COALESCE(study.last_name, ''),
+               COALESCE(study.institute, ''), COALESCE(study.department, ''),
+               COALESCE(study.laboratory, ''), study.study_id
+          FROM study, study_status_prod
+         WHERE study.study_id = study_status_prod.study_id
+           AND study_status_prod.status = 1
+    '''
+
+    cursor.execute(select_names)
 
     for row in cursor:
         yield tuple(row)

@@ -73,8 +73,10 @@ def add_organizations(mwb_conn: psycopg2.extensions.connection,
                     print("Added institute #{}: {}."
                           .format(institute_id, institute))
 
+            department_id: typing.Optional[int] = None
             if departments:
-                department_list = [dept for dept in departments.split(';')]
+                department_list = [dept.strip()
+                                   for dept in departments.split(';')]
                 for department in department_list:
                     department_id = db.get_organization(sup_cur, DEPARTMENT,
                                                         department,
@@ -91,7 +93,8 @@ def add_organizations(mwb_conn: psycopg2.extensions.connection,
             if not laboratories:
                 continue
 
-            laboratory_list = [lab for lab in laboratories.split(';')]
+            laboratory_list = [lab.strip()
+                               for lab in laboratories.split(';')]
             for laboratory in laboratory_list:
                 laboratory_id = db.get_organization(sup_cur, LABORATORY,
                                                     laboratory, department_id)
@@ -115,23 +118,10 @@ def add_people(mwb_conn: psycopg2.extensions.connection,
     #   if (first_name, last_name) in names => skip
     #   add person to people table and name to names table.
 
-    select_names = '''
-        SELECT first_name, last_name, institute, department, laboratory,
-               project_id
-          FROM project
-         UNION
-        SELECT first_name, last_name, study.institute, department, laboratory,
-               study.study_id
-          FROM study, study_status_prod
-         WHERE study.study_id = study_status_prod.study_id
-           AND study_status_prod.status = 1
-    '''
-
     with mwb_conn.cursor() as mwb_cur, sup_conn.cursor() as sup_cur:
-        mwb_cur.execute(select_names)
-        print("Found {} unique names".format(mwb_cur.rowcount), flush=True)
+        names = db.find_names(mwb_cur, embargoed)
 
-        for row in mwb_cur:
+        for row in names:
             first_names, last_names, institutes, departments, labs, uid = \
                 tuple(row)
 
@@ -139,19 +129,21 @@ def add_people(mwb_conn: psycopg2.extensions.connection,
             if uid in embargoed:
                 continue
 
-            last_name_list = [ln for ln in last_names.split(';')]
-            first_name_list = [fn for fn in first_names.split(';')]
+            last_name_list = [ln.strip() for ln in last_names.split(';')]
+            first_name_list = [fn.strip() for fn in first_names.split(';')]
 
             for i in range(0, len(last_name_list)):
-                last_name = last_name_list[i].strip()
-                first_name = first_name_list[i].strip()
+                last_name = last_name_list[i]
+                first_name = first_name_list[i]
 
                 person_ids = get_person(sup_cur, first_name, last_name,
                                         exclude_withheld=False)
                 if len(person_ids) > 1:
-                    print("ERROR: multiple people with same name", file=sys.stderr)
+                    print("ERROR: multiple people with same name",
+                          file=sys.stderr)
                     print("first={}. last={}. ids={}."
-                          .format(first_name, last_name, ', '.join(person_ids)),
+                          .format(first_name, last_name,
+                                  ', '.join(person_ids)),
                           file=sys.stderr)
                     sys.exit(1)
 
@@ -165,13 +157,15 @@ def add_people(mwb_conn: psycopg2.extensions.connection,
                           .format(person_id, first_name, last_name))
 
                 # Create associations
-                institute_list = [inst for inst in institutes.split(';')]
+                institute_list = [inst.strip()
+                                  for inst in institutes.split(';')]
                 try:
-                    department_list = [dept for dept in departments.split(';')]
+                    department_list = [dept.strip()
+                                       for dept in departments.split(';')]
                 except AttributeError:
                     department_list = []
                 try:
-                    lab_list = [lab for lab in labs.split(';')]
+                    lab_list = [lab.strip() for lab in labs.split(';')]
                 except AttributeError:
                     lab_list = []
                 max_range = len(institute_list)
@@ -197,32 +191,37 @@ def add_people(mwb_conn: psycopg2.extensions.connection,
                     # If there are not enough departments, default to first
                     if departments:
                         try:
-                            department_id = db.get_organization(sup_cur, DEPARTMENT, department_list[i],
-                                                                parent_id)
+                            department_id = db.get_organization(
+                                sup_cur, DEPARTMENT, department_list[i],
+                                parent_id)
+
                             if department_id:
                                 associate(sup_cur, person_id, department_id)
                                 parent_id = department_id
                         except IndexError:
-                            department_id = db.get_organization(sup_cur, DEPARTMENT, department_list[0],
-                                                                parent_id)
+                            department_id = db.get_organization(
+                                sup_cur, DEPARTMENT, department_list[0],
+                                parent_id)
                             if department_id:
                                 parent_id = department_id
 
                     if labs:
                         try:
-                            laboratory_id = db.get_organization(sup_cur, LABORATORY, lab_list[i],
-                                                                parent_id)
+                            laboratory_id = db.get_organization(
+                                sup_cur, LABORATORY, lab_list[i], parent_id)
                             if laboratory_id:
                                 associate(sup_cur, person_id, laboratory_id)
                         except IndexError:
-                            print('WARNING: There are more institutes/departments than labs\n'
+                            print('WARNING: There are more institutes/'
+                                  'departments than labs\n'
                                   'Institute list: ' + institutes + '\n'
                                   'Department list: ' + departments + '\n'
                                   'Lab list: ' + labs)
 
                 print(('Associated {} {} (person) with '
                        '{} (institute) {} (department) {} (lab)')
-                      .format(first_name, last_name, institutes, departments, labs))
+                      .format(first_name, last_name, institutes, departments,
+                              labs))
 
     return
 
@@ -259,7 +258,6 @@ def main():
     with mwb_conn, sup_conn:
         add_organizations(mwb_conn, sup_conn, embargoed)
         add_people(mwb_conn, sup_conn, embargoed)
-        raise NotImplementedError("")
 
     sup_conn.close()
     mwb_conn.close()

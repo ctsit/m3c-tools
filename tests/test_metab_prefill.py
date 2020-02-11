@@ -1,4 +1,3 @@
-import typing
 import unittest
 
 import metab_prefill
