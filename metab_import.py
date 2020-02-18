@@ -245,13 +245,13 @@ def get_projects(mwb_cur, sup_cur,
         departments = row[9]
         labs = row[10]
 
-        institute_list = [inst for inst in institutes.split(';')]
+        institute_list = [inst.strip() for inst in institutes.split(';')]
         try:
-            department_list = [dept for dept in departments.split(';')]
+            department_list = [dept.strip() for dept in departments.split(';')]
         except AttributeError:
             department_list = []
         try:
-            lab_list = [lab for lab in labs.split(';')]
+            lab_list = [lab.strip() for lab in labs.split(';')]
         except AttributeError:
             lab_list = []
         max_range = len(institute_list)
@@ -348,8 +348,8 @@ def get_projects(mwb_cur, sup_cur,
                 except IndexError:
                     pass
 
-        last_name_list = [ln for ln in last_names.split(';')]
-        first_name_list = [fn for fn in first_names.split(';')]
+        last_name_list = [ln.strip() for ln in last_names.split(';')]
+        first_name_list = [fn.strip() for fn in first_names.split(';')]
 
         for i in range(0, len(last_name_list)):
             last_name = last_name_list[i]
@@ -432,13 +432,13 @@ def get_studies(mwb_cur, sup_cur, people, orgs, embargoed: typing.List[str]):
         departments = row[9]
         labs = row[10]
 
-        institute_list = [inst for inst in institutes.split(';')]
+        institute_list = [inst.strip() for inst in institutes.split(';')]
         try:
-            department_list = [dept for dept in departments.split(';')]
+            department_list = [dept.strip() for dept in departments.split(';')]
         except AttributeError:
             department_list = []
         try:
-            lab_list = [lab for lab in labs.split(';')]
+            lab_list = [lab.strip() for lab in labs.split(';')]
         except AttributeError:
             lab_list = []
         max_range = len(institute_list)
@@ -535,8 +535,8 @@ def get_studies(mwb_cur, sup_cur, people, orgs, embargoed: typing.List[str]):
                 except IndexError:
                     pass
 
-        last_name_list = [ln for ln in last_names.split(';')]
-        first_name_list = [fn for fn in first_names.split(';')]
+        last_name_list = [ln.strip() for ln in last_names.split(';')]
+        first_name_list = [fn.strip() for fn in first_names.split(';')]
 
         for i in range(0, len(last_name_list)):
             last_name = last_name_list[i]
