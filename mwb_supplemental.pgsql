@@ -49,3 +49,21 @@ CREATE TABLE IF NOT EXISTS public.publications
 
     PRIMARY KEY(pmid, person_id)
 );
+
+
+CREATE TABLE IF NOT EXISTS public.pubmed_publications
+(
+    pmid       TEXT                      NOT NULL,
+    xml        TEXT                      NOT NULL,
+    downloaded TIMESTAMP WITH TIME ZONE  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE(pmid)
+);
+
+CREATE TABLE IF NOT EXISTS public.pubmed_authorships
+(
+    pmid      TEXT      NOT NULL,
+    person_id INTEGER   REFERENCES public.people(id),
+
+    UNIQUE(pmid, person_id)
+);

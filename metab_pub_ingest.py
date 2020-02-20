@@ -31,11 +31,15 @@ import xml.etree.ElementTree as ET
 import yaml
 
 import psycopg2
+import psycopg2.extensions
 
 from aide import Aide
 from metab_classes import Person
 from metab_classes import Publication
 from metab_classes import DateTimeValue
+
+
+psql_cursor = psycopg2.extensions.cursor
 
 
 MATCH_THRESHOLD = '0.98'
@@ -92,12 +96,14 @@ def get_people(cur: psycopg2.extensions.cursor, person_id: str = None) -> dict:
                 JOIN names
                 ON id=person_id""")
     for row in cur:
-        person = Person(person_id=row[0], first_name=row[1], last_name=row[2])
+        person = Person(person_id=str(row[0]),
+                        first_name=row[1], last_name=row[2])
         people[person.person_id] = person
     return people
 
 
-def get_affiliations(cur: psycopg2.extensions.cursor, person_id: str) -> typing.List[str]:
+def get_affiliations(cur: psycopg2.extensions.cursor, person_id: str) \
+        -> typing.List[str]:
     cur.execute("""\
         SELECT o.name
         FROM organizations o, people p, associations a
@@ -106,60 +112,51 @@ def get_affiliations(cur: psycopg2.extensions.cursor, person_id: str) -> typing.
         a.person_id = p.id AND
         p.id = %s AND
         o.withheld = FALSE AND
-        o.type = 'institute'""", (int(person_id),))
+        o.type = 'institute'""", (person_id,))
     return [row[0] for row in cur]
 
 
-def get_supplementals(cur: psycopg2.extensions.cursor, person_id: str = None)\
-        -> (dict, dict):
-    extras = {}
-    exceptions = {}
+def get_confirmed_publications(cur: psycopg2.extensions.cursor,
+                               person_id: typing.Optional[str] = "") \
+        -> typing.Tuple[typing.Mapping[int, typing.List[str]],
+                        typing.Mapping[int, typing.List[str]]]:
+
+    included: typing.Mapping[str, typing.List[str]] = {}
+    excluded: typing.Mapping[str, typing.List[str]] = {}
+
     if person_id:
-        cur.execute("""\
+        cur.execute("""
             SELECT pmid, person_id, include
             FROM publications
-            WHERE person_id=%s""", (person_id,))
+            WHERE person_id=%s""", (int(person_id),))
     else:
         cur.execute("""\
             SELECT pmid, person_id, include
             FROM publications""")
+
     for row in cur:
-        pmid = row[0]
-        person_id = int(row[1])
-        include = row[2]
+        pmid = str(row[0])
+        person_id = str(row[1])
+        include = bool(row[2])
+
+        if person_id not in included:
+            included[person_id]: typing.List[str] = []
+            excluded[person_id]: typing.List[str] = []
+
         if include:
-            if person_id in extras.keys():
-                extras[person_id].append(pmid)
-            else:
-                extras[person_id] = [pmid]
+            included[person_id].append(pmid)
         else:
-            if person_id in exceptions.keys():
-                exceptions[person_id].append(pmid)
-            else:
-                exceptions[person_id] = [pmid]
+            excluded[person_id].append(pmid)
 
-    return extras, exceptions
+    return (included, excluded)
 
 
-def get_include_exclude_pmids(cur: psycopg2.extensions.cursor, person: Person) -> typing.Tuple[typing.List[str], typing.List[str]]:
-    cur.execute("""\
-        SELECT pmid, include
-        FROM publications
-        WHERE
-        person_id = %s
-        """, (int(person.person_id),))
-    include = []
-    exclude = []
-    for row in cur:
-        if row[1] is True:
-            include.append(row[0])
-        elif row[1] is False:
-            exclude.append(row[0])
-        else:
-            # Ignore if the include is None or anything other than True or False
-            pass
-
-    return (include, exclude)
+def get_include_exclude_pmids(cur: psycopg2.extensions.cursor, person: Person)\
+        -> typing.Tuple[typing.List[str], typing.List[str]]:
+    included, excluded = get_confirmed_publications(cur, person.person_id)
+    if person.person_id not in included:
+        return ([], [])
+    return (included[person.person_id], excluded[person.person_id])
 
 
 def get_ids(aide: Aide, person: Person, affiliations: typing.List[str], cur: psycopg2.extensions.cursor) -> list:
@@ -470,51 +467,62 @@ def main():
                   config.get('sup_username'), config.get('sup_password'),
                   config.get('sup_port'))
 
-    people: typing.Dict[str, Person] = get_people(cur, None)
+    people: typing.Dict[str, Person] = get_people(cur)
 
     if cmd == "all":
-        person_ids = list(map(str, people.keys()))
+        person_ids = list(people.keys())
     elif cmd == "only":
         pass  # Use person_ids as is
     elif cmd == "except":
         remaining: typing.List[str] = []
-        for pid in people.keys():
-            person_id = str(pid)
+        for person_id in people.keys():
             if person_id not in person_ids:
                 remaining.append(person_id)
         person_ids = remaining
 
     pmid_to_person = {}
-    for person_id in person_ids:
+    included, excluded = get_confirmed_publications(cur)
+    for i, person_id in enumerate(person_ids, start=1):
         try:
-            extras, exceptions = get_supplementals(cur, person_id)
-            person = people[int(person_id)]
+            person = people[person_id]
 
-            pmids = get_ids(aide, person, get_affiliations(cur, person_id), cur)
-            if person.person_id in extras.keys():
-                for pub in extras[person.person_id]:
+            affiliations = get_affiliations(cur, person_id)
+            pmids = get_ids(aide, person, affiliations, cur)
+            print(f"PubMed has {len(pmids)} publications for "
+                  f"{person.display_name} (id:{person_id}) "
+                  f"({i}/{len(person_ids)}).")
+
+            if person.person_id in included:
+                for pub in included[person.person_id]:
                     if pub not in pmids:
                         pmids.append(pub)
-            if person.person_id in exceptions.keys():
-                for pub in exceptions[person.person_id]:
+
+            if person.person_id in excluded:
+                for pub in excluded[person.person_id]:
                     if pub in pmids:
                         pmids.remove(pub)
-            if pmids:
-                for pmid in pmids:
-                    if pmid_to_person.get(pmid):
-                        pmid_to_person[pmid].append(person_id)
-                    else:
-                        pmid_to_person[pmid] = [person_id]
+
+            if not pmids:
+                continue
+
+            for pmid in pmids:
+                if pmid not in pmid_to_person:
+                    pmid_to_person[pmid] = []
+                pmid_to_person[pmid].append(person_id)
+
         except Exception:
             print(f"Error while processing {person_id}", file=sys.stderr)
             traceback.print_exc()
             continue
 
     BATCH_SIZE = 5000
-    # Make the dict into a list so that it is ordered and we can batch process it
-    # Turns into a list of 2-tuples (pmids, person)
-    pmid_to_person_list = list(pmid_to_person.items())
-    curr_items = []
+    # Turn the dict into a list so that it is ordered for batch processing.
+    # Turns into a list of 2-tuples (pmid, person)
+    pmid_to_person_list: typing.List[typing.Tuple[str, str]] \
+        = list(pmid_to_person.items())
+
+    pub_info_file = os.path.join(path, "pub_info.nt")
+    curr_items: typing.List[typing.Tuple[str, str]] = []
     batch = 0
     while len(pmid_to_person_list) != 0:
         batch += 1
@@ -524,22 +532,23 @@ def main():
             triples = []
             pub_collective = {}
 
-            results = aide.get_details([item[0] for item in curr_items])
+            results = aide.get_details([pmid for (pmid, _auth) in curr_items])
             pubs = parse_api(results)
             pub_collective.update(pubs)
             for pub in pubs.values():
                 for person_id in pmid_to_person[pub.pmid]:
-                    person = people[int(person_id)]
-                    print_to_file(write_triples(aide, person, {pub.pmid: pub}), os.path.join(path, f'{person.person_id}_pubs.nt'))
+                    person = people[person_id]
+                    ntfile = os.path.join(path, f"{person.person_id}_pubs.nt")
+                    print_to_file(write_triples(aide, person, {pub.pmid: pub}),
+                                  ntfile)
                 triples.extend(pub.get_triples(aide.namespace))
 
-            pub_file = os.path.join(path, f"pub_info.nt")
-            print_to_file(triples, pub_file)
-
-            print(f'Batch {batch} with {len(pmid_to_person_list)} pubs to go')
+            print_to_file(triples, pub_info_file)
+            print(f"Batch {batch} with {len(pmid_to_person_list)} pubs to go")
         except Exception:
-            print(f"Error while processing PMIDs", file=sys.stderr)
             traceback.print_exc()
+            print(f"Error while processing PMIDs: {curr_items.keys()}",
+                  file=sys.stderr)
             continue
 
 
