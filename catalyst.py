@@ -14,7 +14,7 @@ import requests
 from metab_classes import Person
 
 
-CATALYST_URL = "http://profiles.catalyst.harvard.edu/services/GetPMIDs/default.asp"
+ENDPOINT = "http://profiles.catalyst.harvard.edu/services/GetPMIDs/default.asp"
 
 
 def build_catalyst_xml(person: Person, affiliations: List[str],
@@ -91,6 +91,8 @@ def parse_catalyst_pmids(catalyst_xml: str) -> List[str]:
     </PMIDList>
     ```
     """
+    if not catalyst_xml:
+        return []
     try:
         root = ET.fromstring(catalyst_xml)
         return [pmid.text for pmid in root]
@@ -114,7 +116,7 @@ def fetch_ids(person: Person, affiliations: List[str],
     headers = {
         "Content-Type": "text/xml"
     }
-    resp = requests.post(CATALYST_URL, data=payload_xml, headers=headers)
+    resp = requests.post(ENDPOINT, data=payload_xml, headers=headers)
     if resp.status_code != 200:
         print("Unexpected response from Catalyst", resp.status_code,
               file=sys.stderr)

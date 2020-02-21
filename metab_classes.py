@@ -1,9 +1,30 @@
-import datetime
 import json
+import io
 import os
 import re
 import textwrap
 import typing
+
+from Bio import Entrez
+
+
+MONTHS = 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split()
+
+
+class Citation(object):
+    def __init__(self, data):
+        self.data = data
+
+    def check_key(self, paths, data=None):
+        if not data:
+            data = self.data
+        if paths[0] in data:
+            trail = data[paths[0]]
+            if len(paths) > 1:
+                trail = self.check_key(paths[1:], trail)
+            return trail
+        else:
+            return ''
 
 
 class Project(object):
@@ -452,6 +473,7 @@ class Publication(object):
         self.published = published
         self.doi = doi
         self.citation = citation
+        self.authors = set()
 
     def get_triples(self, namespace):
         uri = Publication.uri(namespace, self.pmid)
@@ -466,21 +488,32 @@ class Publication(object):
             rdf.extend(self.published.get_triples(dtv_uri))
         if self.citation:
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#citation> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.citation))
-
+        for person_id in self.authors:
+            pub_uri = Publication.uri(namespace, self.pmid)
+            person_uri = Person.uri(namespace, person_id)
+            relation_uri = f"{person_uri}r{self.pmid}"
+            rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://vivoweb.org/ontology/core#Authorship>".format(relation_uri))
+            rdf.append("<{}> <http://vivoweb.org/ontology/core#relatedBy> <{}>".format(pub_uri, relation_uri))
+            rdf.append("<{}> <http://vivoweb.org/ontology/core#relates> <{}>".format(relation_uri, pub_uri))
+            rdf.append("<{}> <http://vivoweb.org/ontology/core#relatedBy> <{}>".format(person_uri, relation_uri))
+            rdf.append("<{}> <http://vivoweb.org/ontology/core#relates> <{}>".format(relation_uri, person_uri))
         return rdf
 
-    def add_person(self, namespace, person_id):
-        uri = Publication.uri(namespace, self.pmid)
-        person_uri = Person.uri(namespace, person_id)
-        relation_uri = f"{person_uri}r{self.pmid}"
-        rdf = []
-        rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://vivoweb.org/ontology/core#Authorship>".format(relation_uri))
-        rdf.append("<{}> <http://vivoweb.org/ontology/core#relatedBy> <{}>".format(uri, relation_uri))
-        rdf.append("<{}> <http://vivoweb.org/ontology/core#relates> <{}>".format(relation_uri, uri))
-        rdf.append("<{}> <http://vivoweb.org/ontology/core#relatedBy> <{}>".format(person_uri, relation_uri))
-        rdf.append("<{}> <http://vivoweb.org/ontology/core#relates> <{}>".format(relation_uri, person_uri))
+    def add_author(self, person_id):
+        self.authors.add(person_id)
 
-        return rdf
+    @staticmethod
+    def from_pubmed(xml: str):
+        handle = io.StringIO(f"""<?xml version="1.0"?>
+            <!DOCTYPE PubmedArticle PUBLIC "-//NLM//DTD PubMedArticle, 1st January 2019//EN" "https://dtd.nlm.nih.gov/ncbi/pubmed/out/pubmed_190101.dtd">
+            {xml}
+        """)
+        article = Entrez.read(handle)
+        citation = Citation(article)
+        pub = make_pub(citation)
+        if not pub.pmid or not pub.published:
+            return None
+        return pub
 
     @staticmethod
     def uri(namespace: str, pmid: str) -> str:
@@ -489,3 +522,108 @@ class Publication(object):
 
 def escape(text):
     return json.dumps(text)
+
+
+def make_pub(citation: Citation) -> Publication:
+    title = (citation.check_key(
+        ['MedlineCitation', 'Article', 'ArticleTitle'])).replace('"', '\\"')
+
+    # For more information on parsing publication dates in PubMed, see:
+    #   https://www.nlm.nih.gov/bsd/licensee/elements_descriptions.html#pubdate
+    published = None
+    pubdate = citation.check_key(
+        ['MedlineCitation', 'Article', 'Journal', 'JournalIssue', 'PubDate'])
+    if pubdate:
+        if 'MedlineDate' in pubdate:
+            year = int(pubdate['MedlineDate'][0:4])
+            assert 1900 < year and year < 3000
+        else:
+            year = int(pubdate['Year'])
+
+        try:
+            month_text = pubdate['Month']
+            month = MONTHS.index(month_text)+1
+        except (KeyError, ValueError):
+            month = None
+
+        try:
+            day = int(pubdate['Day'])
+        except KeyError:
+            day = None
+
+        published = DateTimeValue(year, month, day)
+
+    pmid = str(citation.check_key(['MedlineCitation', 'PMID']))
+    try:
+        count = 0
+        proto_doi = citation.check_key(['PubmedData', 'ArticleIdList'])[count]
+        while proto_doi.attributes['IdType'] != 'doi':
+            count += 1
+            proto_doi = citation.check_key(['PubmedData',
+                                            'ArticleIdList'])[count]
+        doi = str(proto_doi)
+    except IndexError:
+        doi = ''
+
+    # create citation
+    author_list = citation.check_key(['MedlineCitation', 'Article',
+                                      'AuthorList'])
+    names = []
+    for author in author_list:
+        if 'CollectiveName' in author:
+            names.append(author['CollectiveName'])
+            continue
+        last_name = author['LastName']
+        initial = author['Initials']
+        name = last_name + ", " + initial + "."
+        names.append(name)
+    volume = citation.check_key(['MedlineCitation', 'Article', 'Journal',
+                                 'JournalIssue', 'Volume'])
+    issue = citation.check_key(['MedlineCitation', 'Article', 'Journal',
+                                'JournalIssue', 'Issue'])
+    pages = citation.check_key(['MedlineCitation', 'Article', 'Pagination',
+                                'MedlinePgn'])
+    journal = citation.check_key(['MedlineCitation', 'Article', 'Journal',
+                                  'Title']).title()
+
+    cite = ', '.join(names)
+    if published:
+        cite += f' ({published.year}). '
+    cite += title
+    if not cite.endswith('.'):
+        cite += '. '
+    else:
+        cite += ' '
+    if journal:
+        cite += journal
+        if volume or issue:
+            cite += ', '
+            if volume:
+                cite += volume
+            if issue:
+                cite += '(' + issue + ')'
+        if pages:
+            cite += ', ' + pages
+        cite += '. '
+    if doi:
+        cite += 'doi:' + doi
+    citation = cite
+
+    return Publication(pmid, title, published, doi, citation)
+def parse_api(results: dict) -> typing.Dict[str, Publication]:
+    publications: typing.Dict[str, Publication] = {}
+
+    for article in results['PubmedArticle']:
+        try:
+            citation = Citation(article)
+            pub = make_pub(citation)
+            if not pub.pmid or not pub.published:
+                continue
+            publications[pub.pmid] = pub
+        except Exception:
+            citation = Citation(article)
+            pmid = str(citation.check_key(['MedlineCitation', 'PMID']))
+            print(f'Skipping publication {pmid}')
+            continue
+
+    return publications

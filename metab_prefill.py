@@ -20,11 +20,10 @@ import typing
 import psycopg2
 
 import db
-import metab_data
 import metab_import
 from metab_import import add_person
 
-get_person = metab_data.get_person
+get_person = db.get_person  # Facilitate testing using monkeypatching.
 
 
 INSTITUTE = 'institute'

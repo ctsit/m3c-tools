@@ -1,11 +1,13 @@
 import datetime
 import io
+from typing import Iterable, Mapping, Optional, Tuple
 
 import psycopg2
 import psycopg2.extensions
 
-from typing import Iterable, Mapping, Optional, Tuple
-psql_cursor = psycopg2.extensions.cursor
+
+Cursor = psycopg2.extensions.cursor
+Connection = psycopg2.extensions.connection
 
 
 INSTITUTE = 'institute'
@@ -15,7 +17,7 @@ LABORATORY = 'laboratory'
 PUBMED_AUTHORSHIPS = "pubmed_authorships"
 
 
-def add_organization(cursor: psql_cursor, type: str, name: str,
+def add_organization(cursor: Cursor, type: str, name: str,
                      parent_id: Optional[int] = None) -> int:
     assert type in [INSTITUTE, DEPARTMENT, LABORATORY]
 
@@ -34,7 +36,7 @@ def add_organization(cursor: psql_cursor, type: str, name: str,
     return row[0]
 
 
-def find_organizations(cursor: psql_cursor) \
+def find_organizations(cursor: Cursor) \
         -> Iterable[Tuple[str, str, str, str]]:
 
     select_orgs = '''
@@ -55,7 +57,7 @@ def find_organizations(cursor: psql_cursor) \
         yield tuple(row)
 
 
-def find_names(cursor: psql_cursor) \
+def find_names(cursor: Cursor) \
         -> Iterable[Tuple[str, str, str, str, str, str]]:
 
     select_names = '''
@@ -78,7 +80,7 @@ def find_names(cursor: psql_cursor) \
         yield tuple(row)
 
 
-def get_affiliations(cursor: psql_cursor) -> Mapping[int, str]:
+def get_affiliations(cursor: Cursor) -> Mapping[int, str]:
     query = """
         SELECT p.id, o.name
           FROM organizations o,
@@ -103,7 +105,7 @@ def get_affiliations(cursor: psql_cursor) -> Mapping[int, str]:
     return affiliations
 
 
-def get_confirmed_publications(cursor: psql_cursor) \
+def get_confirmed_publications(cursor: Cursor) \
         -> Mapping[int, Tuple[Iterable[str], Iterable[str]]]:
 
     publications: Mapping[int, Tuple[Iterable[str], Iterable[str]]] = {}
@@ -130,7 +132,7 @@ def get_confirmed_publications(cursor: psql_cursor) \
     return publications
 
 
-def get_organization(cursor: psql_cursor, type: str, name: str,
+def get_organization(cursor: Cursor, type: str, name: str,
                      parent_id: Optional[int] = None) -> int:
     assert type in [INSTITUTE, DEPARTMENT, LABORATORY]
 
@@ -156,7 +158,35 @@ def get_organization(cursor: psql_cursor, type: str, name: str,
     return row[0]
 
 
-def get_people(cursor: psql_cursor) \
+def get_person(cursor: Cursor, first_name: str, last_name: str,
+               exclude_withheld: bool = True) \
+        -> Iterable[int]:
+
+    first_name = first_name.strip()
+    last_name = last_name.strip()
+
+    assert first_name and last_name
+
+    query = '''
+        SELECT person_id
+          FROM names
+         WHERE first_name=%s
+           AND last_name=%s
+    '''
+
+    if exclude_withheld:
+        query = f'{query} AND withheld=FALSE'
+
+    cursor.execute(query, (first_name, last_name))
+
+    ids = []
+    for row in cursor:
+        ids.append(row[0])
+
+    return ids
+
+
+def get_people(cursor: Cursor) \
         -> Mapping[int, Tuple[str, str, str, str, str, bool]]:
     select_names = """
         SELECT id, first_name, last_name, COALESCE(display_name, ''),
@@ -175,7 +205,25 @@ def get_people(cursor: psql_cursor) \
     return people
 
 
-def get_pubmed_download_timestamps(cursor: psql_cursor) \
+def get_pubmed_authorships(cursor: Cursor) -> Mapping[str, Iterable[int]]:
+    select_pubs = """
+        SELECT pmid, person_id
+          FROM pubmed_authorships
+    """
+
+    cursor.execute(select_pubs)
+
+    authorships = {}
+    for row in cursor:
+        pmid, person_id = row[0:2]
+        if pmid not in authorships:
+            authorships[pmid] = []
+        authorships[pmid].append(person_id)
+
+    return authorships
+
+
+def get_pubmed_download_timestamps(cursor: Cursor) \
         -> Mapping[str, datetime.datetime]:
     select_pubs = """
         SELECT pmid, downloaded
@@ -184,16 +232,21 @@ def get_pubmed_download_timestamps(cursor: psql_cursor) \
 
     cursor.execute(select_pubs)
 
-    timestamps: Mapping[int, datetime.datetime] = {}
-    for row in cursor:
-        pmid = row[0]
-        downloaded = row[1]
-        timestamps[pmid] = downloaded
-
-    return timestamps
+    return {row[0]: row[1] for row in cursor}
 
 
-def update_authorships(cursor: psql_cursor,
+def get_pubmed_publications(cursor: Cursor) -> Mapping[str, str]:
+    select_pubs = """
+        SELECT pmid, xml
+          FROM pubmed_publications
+    """
+
+    cursor.execute(select_pubs)
+
+    return {row[0]: row[1] for row in cursor}
+
+
+def update_authorships(cursor: Cursor,
                        authorships: Mapping[int, Iterable[str]]) -> int:
     tsv = io.StringIO()
     for person_id, pmids in authorships.items():
@@ -208,7 +261,7 @@ def update_authorships(cursor: psql_cursor,
     return cursor.rowcount
 
 
-def upsert_publication(cursor: psql_cursor, pmid: str, xml: str) -> None:
+def upsert_publication(cursor: Cursor, pmid: str, xml: str) -> None:
     insert = """
         INSERT INTO pubmed_publications (pmid, xml, downloaded)
              VALUES                     (  %s,  %s, DEFAULT)
