@@ -1,11 +1,10 @@
 import datetime
 import io
-import typing
 
 import psycopg2
 import psycopg2.extensions
 
-
+from typing import Iterable, Mapping, Optional, Tuple
 psql_cursor = psycopg2.extensions.cursor
 
 
@@ -16,8 +15,8 @@ LABORATORY = 'laboratory'
 PUBMED_AUTHORSHIPS = "pubmed_authorships"
 
 
-def add_organization(cursor: psycopg2.extensions.cursor, type: str, name: str,
-                     parent_id: typing.Optional[int] = None) -> int:
+def add_organization(cursor: psql_cursor, type: str, name: str,
+                     parent_id: Optional[int] = None) -> int:
     assert type in [INSTITUTE, DEPARTMENT, LABORATORY]
 
     insert_org = '''
@@ -35,9 +34,8 @@ def add_organization(cursor: psycopg2.extensions.cursor, type: str, name: str,
     return row[0]
 
 
-def find_organizations(cursor: psycopg2.extensions.cursor,
-                       embargoed: typing.List[str]) \
-        -> typing.Iterable[typing.Tuple[str, str, str, str]]:
+def find_organizations(cursor: psql_cursor) \
+        -> Iterable[Tuple[str, str, str, str]]:
 
     select_orgs = '''
         SELECT COALESCE(institute, ''), COALESCE(department, ''),
@@ -57,9 +55,8 @@ def find_organizations(cursor: psycopg2.extensions.cursor,
         yield tuple(row)
 
 
-def find_names(cursor: psycopg2.extensions.cursor,
-               embargoed: typing.List[str]) \
-        -> typing.Iterable[typing.Tuple[str, str, str, str, str, str]]:
+def find_names(cursor: psql_cursor) \
+        -> Iterable[Tuple[str, str, str, str, str, str]]:
 
     select_names = '''
         SELECT COALESCE(first_name, ''), COALESCE(last_name, ''),
@@ -81,7 +78,7 @@ def find_names(cursor: psycopg2.extensions.cursor,
         yield tuple(row)
 
 
-def get_affiliations(cursor: psql_cursor) -> typing.Mapping[int, str]:
+def get_affiliations(cursor: psql_cursor) -> Mapping[int, str]:
     query = """
         SELECT p.id, o.name
           FROM organizations o,
@@ -106,21 +103,48 @@ def get_affiliations(cursor: psql_cursor) -> typing.Mapping[int, str]:
     return affiliations
 
 
-def get_organization(cursor: psycopg2.extensions.cursor, type: str, name: str,
-                     parent_id: typing.Optional[int] = None) -> int:
+def get_confirmed_publications(cursor: psql_cursor) \
+        -> Mapping[int, Tuple[Iterable[str], Iterable[str]]]:
+
+    publications: Mapping[int, Tuple[Iterable[str], Iterable[str]]] = {}
+
+    select = """
+        SELECT person_id, pmid, include
+        FROM publications
+    """
+    cursor.execute(select)
+
+    for row in cursor:
+        person_id = int(row[0])
+        pmid = str(row[1])
+        include = bool(row[2])
+
+        if person_id not in publications:
+            publications[person_id] = ([], [])
+
+        if include:
+            publications[person_id][0].append(pmid)
+        else:
+            publications[person_id][1].append(pmid)
+
+    return publications
+
+
+def get_organization(cursor: psql_cursor, type: str, name: str,
+                     parent_id: Optional[int] = None) -> int:
     assert type in [INSTITUTE, DEPARTMENT, LABORATORY]
 
     if not parent_id:
-        select_org = '''
+        select_org = """
             SELECT id FROM organizations
              WHERE name=%s AND type=%s AND parent_id IS NULL
-        '''
+        """
         cursor.execute(select_org, (name, type))
     else:
-        select_org = '''
+        select_org = """
             SELECT id FROM organizations
              WHERE name=%s AND type=%s AND parent_id=%s
-        '''
+        """
         cursor.execute(select_org, (name, type, parent_id))
 
     assert cursor.rowcount <= 1
@@ -133,33 +157,34 @@ def get_organization(cursor: psycopg2.extensions.cursor, type: str, name: str,
 
 
 def get_people(cursor: psql_cursor) \
-        -> typing.Mapping[int, typing.Tuple[str, str]]:
-
-    cursor.execute("""
-        SELECT id, first_name, last_name
+        -> Mapping[int, Tuple[str, str, str, str, str, bool]]:
+    select_names = """
+        SELECT id, first_name, last_name, COALESCE(display_name, ''),
+               COALESCE(email, ''), COALESCE(phone, ''), p.withheld
           FROM people p, names n
          WHERE p.id=n.person_id
-    """)
+    """
 
-    people: typing.Mapping[int, typing.Tuple[str, str]] = {}
+    cursor.execute(select_names)
+
+    people: Mapping[int, Tuple[str, str, str, str, str, bool]] = {}
     for row in cursor:
         person_id = int(row[0])
-        first_name = str(row[1])
-        last_name = str(row[2])
-        people[person_id] = (first_name, last_name)
+        people[person_id] = tuple(row[1:7])
 
     return people
 
 
 def get_pubmed_download_timestamps(cursor: psql_cursor) \
-        -> typing.Mapping[str, datetime.datetime]:
-
-    cursor.execute("""
+        -> Mapping[str, datetime.datetime]:
+    select_pubs = """
         SELECT pmid, downloaded
           FROM pubmed_publications
-    """)
+    """
 
-    timestamps: typing.Mapping[int, datetime.datetime] = {}
+    cursor.execute(select_pubs)
+
+    timestamps: Mapping[int, datetime.datetime] = {}
     for row in cursor:
         pmid = row[0]
         downloaded = row[1]
@@ -169,7 +194,7 @@ def get_pubmed_download_timestamps(cursor: psql_cursor) \
 
 
 def update_authorships(cursor: psql_cursor,
-                       authorships: typing.Dict[int, typing.List[str]]) -> int:
+                       authorships: Mapping[int, Iterable[str]]) -> int:
     tsv = io.StringIO()
     for person_id, pmids in authorships.items():
         for pmid in pmids:
@@ -183,8 +208,8 @@ def update_authorships(cursor: psql_cursor,
     return cursor.rowcount
 
 
-def upsert_publication(cursor: psql_cursor, pmid: str, xml: str):
-    ddl = """
+def upsert_publication(cursor: psql_cursor, pmid: str, xml: str) -> None:
+    insert = """
         INSERT INTO pubmed_publications (pmid, xml, downloaded)
              VALUES                     (  %s,  %s, DEFAULT)
         ON CONFLICT (pmid)
@@ -192,5 +217,5 @@ def upsert_publication(cursor: psql_cursor, pmid: str, xml: str):
           RETURNING pmid
     """
 
-    cursor.execute(ddl, (pmid, xml))
+    cursor.execute(insert, (pmid, xml))
     assert cursor.rowcount == 1

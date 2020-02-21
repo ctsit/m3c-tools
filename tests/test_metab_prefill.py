@@ -53,7 +53,7 @@ def add_organization(cursor, type, name, parent_id=None):
     return len(organizations)
 
 
-def find_organizations(cursor, embargoed):
+def find_organizations(cursor):
     for institute in projects:
         yield [institute, "", "", "PROJECT_ID"]
 
