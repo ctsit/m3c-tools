@@ -67,3 +67,11 @@ CREATE TABLE IF NOT EXISTS public.pubmed_authorships
 
     UNIQUE(pmid, person_id)
 );
+
+CREATE TABLE IF NOT EXISTS public.pubmed_authorships_updates
+(
+    person_id  INTEGER   REFERENCES public.people(id),
+    updated    TIMESTAMP WITH TIME ZONE  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE(person_id)
+);

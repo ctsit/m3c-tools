@@ -14,8 +14,6 @@ INSTITUTE = 'institute'
 DEPARTMENT = 'department'
 LABORATORY = 'laboratory'
 
-PUBMED_AUTHORSHIPS = "pubmed_authorships"
-
 
 def add_organization(cursor: Cursor, type: str, name: str,
                      parent_id: Optional[int] = None) -> int:
@@ -223,6 +221,18 @@ def get_pubmed_authorships(cursor: Cursor) -> Mapping[str, Iterable[int]]:
     return authorships
 
 
+def get_pubmed_authorships_updates(cursor: Cursor) \
+        -> Mapping[str, datetime.datetime]:
+    select_pubs = """
+        SELECT person_id, updated
+          FROM pubmed_authorships_updates
+    """
+
+    cursor.execute(select_pubs)
+
+    return {row[0]: row[1] for row in cursor}
+
+
 def get_pubmed_download_timestamps(cursor: Cursor) \
         -> Mapping[str, datetime.datetime]:
     select_pubs = """
@@ -248,16 +258,31 @@ def get_pubmed_publications(cursor: Cursor) -> Mapping[str, str]:
 
 def update_authorships(cursor: Cursor,
                        authorships: Mapping[int, Iterable[str]]) -> int:
+    """Overwrite authorships and timestamp the updates."""
+
+    delete = """
+        DELETE FROM pubmed_authorships_updates
+              WHERE person_id = ANY(%s);
+        DELETE FROM pubmed_authorships
+              WHERE person_id = ANY(%s);
+    """
+    person_ids = list(authorships.keys())
+    cursor.execute(delete, (person_ids, person_ids))
+
+    # Update timestamps for those authors who have been updated.
+    ids = io.StringIO()
+    for person_id in authorships.keys():
+        print(person_id, file=ids)
+    ids.seek(0)
+    cursor.copy_from(ids, "pubmed_authorships_updates", columns=("person_id",))
+
+    # Update publication lists for those authors who have been updated.
     tsv = io.StringIO()
     for person_id, pmids in authorships.items():
         for pmid in pmids:
             print(person_id, pmid, sep="\t", end="\n", file=tsv)
-
     tsv.seek(0)
-
-    cursor.execute(f'TRUNCATE "{PUBMED_AUTHORSHIPS}"')
-    cursor.copy_from(tsv, PUBMED_AUTHORSHIPS, columns=("person_id", "pmid"))
-
+    cursor.copy_from(tsv, "pubmed_authorships", columns=("person_id", "pmid"))
     return cursor.rowcount
 
 
