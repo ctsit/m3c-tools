@@ -610,6 +610,8 @@ def make_pub(citation: Citation) -> Publication:
     citation = cite
 
     return Publication(pmid, title, published, doi, citation)
+
+
 def parse_api(results: dict) -> typing.Dict[str, Publication]:
     publications: typing.Dict[str, Publication] = {}
 
