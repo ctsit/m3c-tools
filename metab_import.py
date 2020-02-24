@@ -767,16 +767,20 @@ def make_tools(namespace, tools: List[Tool], people, withheld_people, mwb_cur, s
     return triples
 
 
-def print_to_file(triples: typing.List[str], file: str):
-    with open(file, 'a+') as rdf:
-        for spo in triples:
-            # Replace LFs and CRs with escaped equivalent. Since N-Triples uses
-            # " .\n" as a record-separator, these absolutely must be escaped.
-            # This is mainly for PubMed titles and citations sanitization.
-            # See https://www.w3.org/TR/n-triples/
-            spo = re.sub(r'\n', '\\n', spo)
-            spo = re.sub(r'\r', '\\r', spo)
-            rdf.write(f'{spo} .\n')
+def print_to_file(triples: typing.List[str], filename: str) -> None:
+    with open(filename, 'a+') as file:
+        print_to_open_file(triples, file)
+
+
+def print_to_open_file(triples: typing.List[str], file: typing.IO) -> None:
+    for spo in triples:
+        # Replace LFs and CRs with escaped equivalent. Since N-Triples uses
+        # " .\n" as a record-separator, these absolutely must be escaped.
+        # This is mainly for PubMed titles and citations sanitization.
+        # See https://www.w3.org/TR/n-triples/
+        spo = re.sub(r'\n', r"\\n", spo)
+        spo = re.sub(r'\r', r"\\r", spo)
+        file.write(f"{spo} .\n")
 
 
 def main():
