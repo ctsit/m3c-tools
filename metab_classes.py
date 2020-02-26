@@ -464,6 +464,7 @@ class Publication(object):
             rdf.append("<{}> <http://purl.org/ontology/bibo/doi> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.doi))
         if self.published:
             rdf.extend(self.published.get_triples(dtv_uri))
+            rdf.append("<{}> <http://vivoweb.org/ontology/core#dateTimeValue> <{}>".format(uri, dtv_uri))
         if self.citation:
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#citation> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.citation))
 
