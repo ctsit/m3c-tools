@@ -1,5 +1,5 @@
-"""
-Metab Importer
+"""Metab Importer
+
 Usage:
     python3 metab_import.py (-h | --help)
     python3 metab_import.py [-x <prev> | --diff=<prev>] <path_to_config>
@@ -30,6 +30,7 @@ import csv
 import getopt
 import os
 import pathlib
+import re
 import sys
 import time
 import traceback
@@ -39,14 +40,15 @@ import yaml
 import psycopg2
 
 from aide import Aide
+import db
 from metab_classes import Dataset
 from metab_classes import Organization
 from metab_classes import Person
 from metab_classes import Photo
 from metab_classes import Project
+from metab_classes import Publication
 from metab_classes import Study
 from metab_classes import Tool
-import metab_data
 
 
 def get_config(config_path):
@@ -219,6 +221,39 @@ def get_photos(file_storage_root: str, people):
     return photos
 
 
+def get_publications(sup_cur: db.Cursor) -> typing.Mapping[str, Publication]:
+    print("Gathering publications")
+
+    authorships = db.get_pubmed_authorships(sup_cur)
+    pubs = db.get_pubmed_publications(sup_cur)
+
+    publications = {}
+    for pmid, xml in pubs.items():
+        if pmid not in authorships:
+            continue
+
+        try:
+            pub = Publication.from_pubmed(xml)
+            assert pub and pub.pmid == pmid
+            for author in authorships[pmid]:
+                pub.add_author(author)
+            publications[pmid] = pub
+        except Exception:
+            traceback.print_exc()
+            print(f"Skipping publication {pmid}")
+
+    return publications
+
+
+def make_publications(namespace: str, pubs: List[Publication]) -> List[str]:
+    print("Making Publication triples")
+    triples = []
+    for pub in pubs.values():
+        triples.extend(pub.get_triples(namespace))
+    print(f"There are {len(pubs)} publications.")
+    return triples
+
+
 def get_projects(mwb_cur, sup_cur,
                  people: List[Person], orgs: List[Organization]):
     print("Gathering Workbench Projects")
@@ -354,7 +389,7 @@ def get_projects(mwb_cur, sup_cur,
         for i in range(0, len(last_name_list)):
             last_name = last_name_list[i]
             first_name = first_name_list[i]
-            ids = metab_data.get_person(sup_cur, first_name, last_name)
+            ids = db.get_person(sup_cur, first_name, last_name)
             try:
                 person_id = ids[0]
                 project.pi.append(people[person_id].person_id)
@@ -542,7 +577,7 @@ def get_studies(mwb_cur, sup_cur, people, orgs, embargoed: typing.List[str]):
             last_name = last_name_list[i]
             first_name = first_name_list[i]
 
-            ids = metab_data.get_person(sup_cur, first_name, last_name)
+            ids = db.get_person(sup_cur, first_name, last_name)
             try:
                 person_id = ids[0]
                 study.runner.append(people[person_id].person_id)
@@ -732,10 +767,20 @@ def make_tools(namespace, tools: List[Tool], people, withheld_people, mwb_cur, s
     return triples
 
 
-def print_to_file(triples, file):
-    triples = [t + " ." for t in triples]
-    with open(file, 'a+') as rdf:
-        rdf.write("\n".join(triples))
+def print_to_file(triples: typing.List[str], filename: str) -> None:
+    with open(filename, 'a+') as file:
+        print_to_open_file(triples, file)
+
+
+def print_to_open_file(triples: typing.List[str], file: typing.IO) -> None:
+    for spo in triples:
+        # Replace LFs and CRs with escaped equivalent. Since N-Triples uses
+        # " .\n" as a record-separator, these absolutely must be escaped.
+        # This is mainly for PubMed titles and citations sanitization.
+        # See https://www.w3.org/TR/n-triples/
+        spo = re.sub(r'\n', r"\\n", spo)
+        spo = re.sub(r'\r', r"\\r", spo)
+        file.write(f"{spo} .\n")
 
 
 def main():
@@ -784,6 +829,7 @@ def main():
     dataset_file = os.path.join(path, 'datasets.nt')
     tools_file = os.path.join(path, 'tools.nt')
     photos_file = os.path.join(path, 'photos.nt')
+    pubs_file = os.path.join(path, 'pubs.nt')
     add_file = os.path.join(path, 'add.nt')
     sub_file = os.path.join(path, 'sub.nt')
 
@@ -792,9 +838,7 @@ def main():
     aide = Aide(config.get('update_endpoint'),
                 config.get('vivo_email'),
                 config.get('vivo_password'),
-                config.get('namespace'),
-                config.get('pubmed_email'),
-                config.get('pubmed_api_token'))
+                config.get('namespace'))
 
     if not aide.namespace.endswith('/'):
         print(f"WARNING! Namespace doesn't end with '/': {aide.namespace}")
@@ -826,6 +870,11 @@ def main():
             photos = get_photos(config.get("picturepath", "."), people)
             photos_triples = make_photos(aide.namespace, photos)
             print_to_file(photos_triples, photos_file)
+
+            # Publications
+            pubs = get_publications(sup_cur)
+            pubs_triples = make_publications(aide.namespace, pubs)
+            print_to_file(pubs_triples, pubs_file)
 
             # Tools
             yaml_tools = get_yaml_tools(config)

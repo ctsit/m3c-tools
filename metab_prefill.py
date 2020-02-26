@@ -20,11 +20,10 @@ import typing
 import psycopg2
 
 import db
-import metab_data
 import metab_import
 from metab_import import add_person
 
-get_person = metab_data.get_person
+get_person = db.get_person  # Facilitate testing using monkeypatching.
 
 
 INSTITUTE = 'institute'
@@ -48,7 +47,7 @@ def add_organizations(mwb_conn: psycopg2.extensions.connection,
                       embargoed: typing.List[str]):
 
     with mwb_conn.cursor() as mwb_cur, sup_conn.cursor() as sup_cur:
-        orgs = db.find_organizations(mwb_cur, embargoed)
+        orgs = db.find_organizations(mwb_cur)
 
         for org in orgs:
             institutes, departments, laboratories, uid = [t.strip()
@@ -119,7 +118,7 @@ def add_people(mwb_conn: psycopg2.extensions.connection,
     #   add person to people table and name to names table.
 
     with mwb_conn.cursor() as mwb_cur, sup_conn.cursor() as sup_cur:
-        names = db.find_names(mwb_cur, embargoed)
+        names = db.find_names(mwb_cur)
 
         for row in names:
             first_names, last_names, institutes, departments, labs, uid = \

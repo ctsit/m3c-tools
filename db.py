@@ -1,6 +1,13 @@
-import typing
+import datetime
+import io
+from typing import Iterable, Mapping, Optional, Tuple
 
 import psycopg2
+import psycopg2.extensions
+
+
+Cursor = psycopg2.extensions.cursor
+Connection = psycopg2.extensions.connection
 
 
 INSTITUTE = 'institute'
@@ -8,8 +15,8 @@ DEPARTMENT = 'department'
 LABORATORY = 'laboratory'
 
 
-def add_organization(cursor: psycopg2.extensions.cursor, type: str, name: str,
-                     parent_id: typing.Optional[int] = None) -> int:
+def add_organization(cursor: Cursor, type: str, name: str,
+                     parent_id: Optional[int] = None) -> int:
     assert type in [INSTITUTE, DEPARTMENT, LABORATORY]
 
     insert_org = '''
@@ -27,9 +34,8 @@ def add_organization(cursor: psycopg2.extensions.cursor, type: str, name: str,
     return row[0]
 
 
-def find_organizations(cursor: psycopg2.extensions.cursor,
-                       embargoed: typing.List[str]) \
-        -> typing.Iterable[typing.Tuple[str, str, str, str]]:
+def find_organizations(cursor: Cursor) \
+        -> Iterable[Tuple[str, str, str, str]]:
 
     select_orgs = '''
         SELECT COALESCE(institute, ''), COALESCE(department, ''),
@@ -49,9 +55,8 @@ def find_organizations(cursor: psycopg2.extensions.cursor,
         yield tuple(row)
 
 
-def find_names(cursor: psycopg2.extensions.cursor,
-               embargoed: typing.List[str]) \
-        -> typing.Iterable[typing.Tuple[str, str, str, str, str, str]]:
+def find_names(cursor: Cursor) \
+        -> Iterable[Tuple[str, str, str, str, str, str]]:
 
     select_names = '''
         SELECT COALESCE(first_name, ''), COALESCE(last_name, ''),
@@ -73,21 +78,73 @@ def find_names(cursor: psycopg2.extensions.cursor,
         yield tuple(row)
 
 
-def get_organization(cursor: psycopg2.extensions.cursor, type: str, name: str,
-                     parent_id: typing.Optional[int] = None) -> int:
+def get_affiliations(cursor: Cursor) -> Mapping[int, str]:
+    query = """
+        SELECT p.id, o.name
+          FROM organizations o,
+               people p,
+               associations a
+         WHERE o.id = a.organization_id
+           AND a.person_id = p.id
+           AND o.withheld = FALSE
+           AND o.type = 'institute'
+    """
+
+    cursor.execute(query)
+
+    affiliations = {}
+    for row in cursor:
+        person_id = int(row[0])
+        organization = row[1]
+        if person_id not in affiliations:
+            affiliations[person_id] = []
+        affiliations[person_id].append(organization)
+
+    return affiliations
+
+
+def get_confirmed_publications(cursor: Cursor) \
+        -> Mapping[int, Tuple[Iterable[str], Iterable[str]]]:
+
+    publications: Mapping[int, Tuple[Iterable[str], Iterable[str]]] = {}
+
+    select = """
+        SELECT person_id, pmid, include
+        FROM publications
+    """
+    cursor.execute(select)
+
+    for row in cursor:
+        person_id = int(row[0])
+        pmid = str(row[1])
+        include = bool(row[2])
+
+        if person_id not in publications:
+            publications[person_id] = ([], [])
+
+        if include:
+            publications[person_id][0].append(pmid)
+        else:
+            publications[person_id][1].append(pmid)
+
+    return publications
+
+
+def get_organization(cursor: Cursor, type: str, name: str,
+                     parent_id: Optional[int] = None) -> int:
     assert type in [INSTITUTE, DEPARTMENT, LABORATORY]
 
     if not parent_id:
-        select_org = '''
+        select_org = """
             SELECT id FROM organizations
              WHERE name=%s AND type=%s AND parent_id IS NULL
-        '''
+        """
         cursor.execute(select_org, (name, type))
     else:
-        select_org = '''
+        select_org = """
             SELECT id FROM organizations
              WHERE name=%s AND type=%s AND parent_id=%s
-        '''
+        """
         cursor.execute(select_org, (name, type, parent_id))
 
     assert cursor.rowcount <= 1
@@ -97,3 +154,146 @@ def get_organization(cursor: psycopg2.extensions.cursor, type: str, name: str,
         return 0
 
     return row[0]
+
+
+def get_person(cursor: Cursor, first_name: str, last_name: str,
+               exclude_withheld: bool = True) \
+        -> Iterable[int]:
+
+    first_name = first_name.strip()
+    last_name = last_name.strip()
+
+    assert first_name and last_name
+
+    query = '''
+        SELECT person_id
+          FROM names
+         WHERE first_name=%s
+           AND last_name=%s
+    '''
+
+    if exclude_withheld:
+        query = f'{query} AND withheld=FALSE'
+
+    cursor.execute(query, (first_name, last_name))
+
+    ids = []
+    for row in cursor:
+        ids.append(row[0])
+
+    return ids
+
+
+def get_people(cursor: Cursor) \
+        -> Mapping[int, Tuple[str, str, str, str, str, bool]]:
+    select_names = """
+        SELECT id, first_name, last_name, COALESCE(display_name, ''),
+               COALESCE(email, ''), COALESCE(phone, ''), p.withheld
+          FROM people p, names n
+         WHERE p.id=n.person_id
+    """
+
+    cursor.execute(select_names)
+
+    people: Mapping[int, Tuple[str, str, str, str, str, bool]] = {}
+    for row in cursor:
+        person_id = int(row[0])
+        people[person_id] = tuple(row[1:7])
+
+    return people
+
+
+def get_pubmed_authorships(cursor: Cursor) -> Mapping[str, Iterable[int]]:
+    select_pubs = """
+        SELECT pmid, person_id
+          FROM pubmed_authorships
+    """
+
+    cursor.execute(select_pubs)
+
+    authorships = {}
+    for row in cursor:
+        pmid, person_id = row[0:2]
+        if pmid not in authorships:
+            authorships[pmid] = []
+        authorships[pmid].append(person_id)
+
+    return authorships
+
+
+def get_pubmed_authorships_updates(cursor: Cursor) \
+        -> Mapping[str, datetime.datetime]:
+    select_pubs = """
+        SELECT person_id, updated
+          FROM pubmed_authorships_updates
+    """
+
+    cursor.execute(select_pubs)
+
+    return {row[0]: row[1] for row in cursor}
+
+
+def get_pubmed_download_timestamps(cursor: Cursor) \
+        -> Mapping[str, datetime.datetime]:
+    select_pubs = """
+        SELECT pmid, downloaded
+          FROM pubmed_publications
+    """
+
+    cursor.execute(select_pubs)
+
+    return {row[0]: row[1] for row in cursor}
+
+
+def get_pubmed_publications(cursor: Cursor) -> Mapping[str, str]:
+    select_pubs = """
+        SELECT pmid, xml
+          FROM pubmed_publications
+    """
+
+    cursor.execute(select_pubs)
+
+    return {row[0]: row[1] for row in cursor}
+
+
+def update_authorships(cursor: Cursor,
+                       authorships: Mapping[int, Iterable[str]]) -> int:
+    """Overwrite authorships and timestamp the updates."""
+
+    delete = """
+        DELETE FROM pubmed_authorships_updates
+              WHERE person_id = ANY(%s);
+        DELETE FROM pubmed_authorships
+              WHERE person_id = ANY(%s);
+    """
+    person_ids = list(authorships.keys())
+    cursor.execute(delete, (person_ids, person_ids))
+
+    # Update timestamps for those authors who have been updated.
+    ids = io.StringIO()
+    for person_id in authorships.keys():
+        print(person_id, file=ids)
+    ids.seek(0)
+    cursor.copy_from(ids, "pubmed_authorships_updates", columns=("person_id",))
+
+    # Update publication lists for those authors who have been updated.
+    tsv = io.StringIO()
+    for person_id, pmids in authorships.items():
+        for pmid in pmids:
+            print(person_id, pmid, sep="\t", end="\n", file=tsv)
+    tsv.seek(0)
+    cursor.copy_from(tsv, "pubmed_authorships", columns=("person_id", "pmid"))
+    return cursor.rowcount
+
+
+def upsert_publication(cursor: Cursor, pmid: str, xml: str) -> None:
+    insert = """
+        INSERT INTO pubmed_publications (pmid, xml, downloaded)
+             VALUES                     (  %s,  %s, DEFAULT)
+        ON CONFLICT (pmid)
+        DO UPDATE SET xml=EXCLUDED.xml, downloaded=EXCLUDED.downloaded
+          RETURNING pmid
+    """
+
+    cursor.execute(insert, (pmid, xml))
+    assert cursor.rowcount == 1

@@ -1,16 +1,16 @@
 import unittest
 import xml.etree.ElementTree as ET
 
+import catalyst
 from metab_classes import Person
-import metab_pub_ingest
 
 
-class TestPubIngest(unittest.TestCase):
+class TestCatalyst(unittest.TestCase):
     def test_parse_pmids_no_pmids(self):
         empty_pmidlist = """
                         <PMIDList>
                         </PMIDList>"""
-        pmids = metab_pub_ingest.parse_catalyst_pmids(empty_pmidlist)
+        pmids = catalyst.parse_catalyst_pmids(empty_pmidlist)
         self.assertListEqual(pmids, [])
 
     def test_parse_pmids_list_pmids(self):
@@ -20,39 +20,45 @@ class TestPubIngest(unittest.TestCase):
                         <PMID>2</PMID>
                         <PMID>3</PMID>
                         </PMIDList>"""
-        pmids = metab_pub_ingest.parse_catalyst_pmids(pmidlist)
+        pmids = catalyst.parse_catalyst_pmids(pmidlist)
         self.assertListEqual(pmids, ['1', '2', '3'])
 
     def test_parse_pmids_none_pmids(self):
         pmidlist = None
-        pmids = metab_pub_ingest.parse_catalyst_pmids(pmidlist)
+        pmids = catalyst.parse_catalyst_pmids(pmidlist)
         self.assertListEqual(pmids, [])
 
     def test_build_catalyst_xml_none_affiliations(self):
         with self.assertRaises(AssertionError):
-            metab_pub_ingest.build_catalyst_xml(Person('1', 'f', 'l', 'd', 'e', 'p'), None, ['1'], ['2'])
+            catalyst.build_catalyst_xml(
+                Person('1', 'f', 'l', 'd', 'e', 'p'), None, ['1'], ['2'])
 
     def test_build_catalyst_xml_empty_affiliations(self):
         with self.assertRaises(AssertionError):
-            metab_pub_ingest.build_catalyst_xml(Person('1', 'f', 'l', 'd', 'e', 'p'), [], ['1'], ['2'])
+            catalyst.build_catalyst_xml(
+                Person('1', 'f', 'l', 'd', 'e', 'p'), [], ['1'], ['2'])
 
     def test_build_catalyst_xml_none_include(self):
         with self.assertRaises(AssertionError):
-            metab_pub_ingest.build_catalyst_xml(Person('1', 'f', 'l', 'd', 'e', 'p'), ['a'], None, ['2'])
+            catalyst.build_catalyst_xml(
+                Person('1', 'f', 'l', 'd', 'e', 'p'), ['a'], None, ['2'])
 
     def test_build_catalyst_xml_empty_include(self):
         with self.assertRaises(AssertionError):
-            metab_pub_ingest.build_catalyst_xml(Person('1', 'f', 'l', 'd', 'e', 'p'), ['a'], [], ['2'])
+            catalyst.build_catalyst_xml(
+                Person('1', 'f', 'l', 'd', 'e', 'p'), ['a'], [], ['2'])
 
     def test_build_catalyst_xml_none_exclude(self):
         try:
-            metab_pub_ingest.build_catalyst_xml(Person('1', 'f', 'l', 'd', 'e', 'p'), ['a'], ['1'], None)
+            catalyst.build_catalyst_xml(
+                Person('1', 'f', 'l', 'd', 'e', 'p'), ['a'], ['1'], None)
         except Exception:
             self.fail('None exclude list caused exception')
 
     def test_build_catalyst_xml_empty_exclude(self):
         try:
-            metab_pub_ingest.build_catalyst_xml(Person('1', 'f', 'l', 'd', 'e', 'p'), ['a'], ['1'], [])
+            catalyst.build_catalyst_xml(
+                Person('1', 'f', 'l', 'd', 'e', 'p'), ['a'], ['1'], [])
         except Exception:
             self.fail('Empty exclude list caused exception')
 
@@ -83,8 +89,10 @@ class TestPubIngest(unittest.TestCase):
         """.strip().replace('\n', '').replace('\t', '').replace(' ', '')
         xml = ET.fromstring(xml)
         xml = ET.tostring(xml)
-        actual_xml = metab_pub_ingest.build_catalyst_xml(Person('1', 'Griffin', 'Weber', 'Griffin Webber', 'weber@hms.harvard.edu', '1234567'),
-                                                         ['Brigham%Women', '@hms.harvard.edu'],
-                                                         ['11707567'],
-                                                         ['19648504'])
+        actual_xml = catalyst.build_catalyst_xml(
+            Person('1', 'Griffin', 'Weber', 'Griffin Webber',
+                   'weber@hms.harvard.edu', '1234567'),
+            ['Brigham%Women', '@hms.harvard.edu'],
+            ['11707567'],
+            ['19648504'])
         self.assertEqual(xml, actual_xml)
