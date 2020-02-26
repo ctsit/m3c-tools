@@ -1,6 +1,24 @@
 Changelog
 =========
 
+## [0.7.0] - 2020-02-26
+
+ * Add missing publication-dateTimeValue-DateTimeValue connections (Samantha Emerson)
+ * Improve publication fetching as a separate module (Taeber Rapczak)
+ * Strip whitespace from organizations' names (Taeber Rapczak)
+ * Fix typos and add parent ID to withheld orgs (Hunter Jarrell)
+ * Use new ontology properties: directs, directedBy (Taeber Rapczak)
+ * Change pub ingest to use harvard catalyst profiles disambiguation. (Hunter Jarrell)
+ * Use study_status_prod instead of study_status (Taeber Rapczak)
+ * Remove newlines in titles (Taeber Rapczak)
+ * Return valid xsd:dateTime strings for published (Taeber Rapczak)
+ * Replace .gitignore folder (Taeber Rapczak)
+ * Remove duplicate MetaboAnalyst (Taeber Rapczak)
+ * Fix add devs crashing when withheld people exist. (Hunter Jarrell)
+ * Fix full author name search in pub ingest (Hunter Jarrell)
+ * Update pub ingest to use author's top level affiliations. (Hunter Jarrell)
+
+
 ## [0.6.0] - 2020-01-22
 
  * Add support for a list of embargoed studies to exclude. (Taeber Rapczak)
