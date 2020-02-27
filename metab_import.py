@@ -49,6 +49,7 @@ from metab_classes import Project
 from metab_classes import Publication
 from metab_classes import Study
 from metab_classes import Tool
+import pubfetch
 
 
 def get_config(config_path):
@@ -657,25 +658,30 @@ def make_datasets(namespace, datasets, studies):
     return dataset_triples, study_triples
 
 
-def get_authors_pmid(aide: Aide, pmid: typing.Text) -> typing.List[typing.Dict]:
-    count = 0
+def get_authors_pmid(pmid: typing.Text) -> typing.List[typing.Dict]:
     authors = []
-    redo = True
-    while redo and count < 2:
-        count += 1
-        redo = False
+    retries = 3
+    while retries > 0:
         try:
-            data = aide.get_details([pmid])
-            for author in data['PubmedArticle'][0]['MedlineCitation']['Article']['AuthorList']:
-                authors.append({
-                    'name': f"{author['ForeName'].split(' ')[0].strip()} {author['LastName']}"
-                })
+            data = pubfetch.pubmed_efetch([pmid])
+            author_list = data.findall('./PubmedArticle[1]/MedlineCitation/'
+                                       'Article/AuthorList/Author')
+            for author in author_list:
+                forename = author.findtext('ForeName', '').strip()
+                surname = author.findtext('LastName', '').strip()
+                auth = {
+                    'name': f'{forename} {surname}'.strip()
+                }
+                authors.append(auth)
+            break
         except IOError:
-            print('Error getting PubMed Data for tool with PMID %s. Trying again in 3 seconds' % pmid)
-            redo = True
-            time.sleep(3)
+            print(f'Error getting PubMed Data for tool with PMID {pmid}. '
+                  'Trying again in 2 seconds')
+            time.sleep(2)
         except Exception:
-            print('Error parsing PubMed Data for tool with PMID %s' % pmid)
+            traceback.print_exc()
+            print(f'Error parsing PubMed Data for tool with PMID {pmid}')
+        retries -= 1
     return authors
 
 
@@ -703,9 +709,8 @@ def strip_http(url: typing.Text) -> typing.Text:
     return url.replace('http://', '').replace('https://', '')
 
 
-def get_csv_tools(config, aide: Aide) -> List[Tool]:
+def get_csv_tools(csv_tools_path: str) -> List[Tool]:
     try:
-        csv_tools_path = config.get('tools_csv', 'tools.csv')
         with open(csv_tools_path, 'r') as tools_file:
             t = csv.reader(tools_file)
             # Skip the header row
@@ -716,7 +721,7 @@ def get_csv_tools(config, aide: Aide) -> List[Tool]:
                 pmid = tool_data[19].strip()
                 authors = None
                 if pmid.isnumeric():
-                    authors = get_authors_pmid(aide, pmid)
+                    authors = get_authors_pmid(pmid)
                 if not tool_data[24].replace('-', '').strip():
                     continue
                 tool = Tool(strip_http(tool_data[24]), {
@@ -725,12 +730,12 @@ def get_csv_tools(config, aide: Aide) -> List[Tool]:
                     'url': tool_data[24],
                     'authors': authors,
                     'pmid': pmid,
-                    'tags': tool_data[6].split(',')
+                    'tags': tool_data[6].split(',')  # TODO: +split('\n') strip
                 })
                 tools.append(tool)
             return tools
-    except Exception as e:
-        print(e)
+    except Exception:
+        traceback.print_exc()
         print('Error parsing tools config file: %s' % csv_tools_path)
         return []
 
@@ -835,6 +840,9 @@ def main():
 
     config = get_config(config_path)
 
+    pubfetch.pubmed_init(email=config.get('pubmed_email'),
+                         api_key=config.get('pubmed_api_token'))
+
     aide = Aide(config.get('update_endpoint'),
                 config.get('vivo_email'),
                 config.get('vivo_password'),
@@ -878,7 +886,7 @@ def main():
 
             # Tools
             yaml_tools = get_yaml_tools(config)
-            csv_tools = get_csv_tools(config, aide)
+            csv_tools = get_csv_tools(config.get("tools_csv", "tools.csv"))
             tools_triples = make_tools(aide.namespace, yaml_tools + csv_tools, people, withheld_people, mwb_cur, sup_cur, add_devs)
             print_to_file(tools_triples, tools_file)
 

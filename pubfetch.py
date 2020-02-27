@@ -152,8 +152,8 @@ def main():
 
     config = metab_import.get_config(config_path)
 
-    Entrez.email = config.get("pubmed_email")
-    Entrez.api_key = config.get("pubmed_api_token")
+    pubmed_init(email=config.get("pubmed_email"),
+                api_key=config.get("pubmed_api_token"))
 
     sup_conn: psql_connection = psycopg2.connect(
         host=config.get("sup_host"),
@@ -250,6 +250,11 @@ def pubmed_esearch(term: str, retstart: int = 0, count_up: int = 0) \
         id_list += pubmed_esearch(term, retstart, count_up)
 
     return id_list
+
+
+def pubmed_init(email: typing.Optional[str], api_key: typing.Optional[str]):
+    Entrez.email = email
+    Entrez.api_key = api_key
 
 
 def too_recent(event: datetime.datetime,
