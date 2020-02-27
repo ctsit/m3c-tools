@@ -9,6 +9,7 @@ Setup a Python Virtual Environment, then install the required dependencies.
     $ source venv/bin/activate
     $ pip install -r requirements.txt
 
+Also obtain a PubMed API token for increased API limits. See [this site](https://ncbiinsights.ncbi.nlm.nih.gov/2017/11/02/new-api-keys-for-the-e-utilities/) for more information.
 
 ## Preparing your config file
 
@@ -53,16 +54,15 @@ This will produce up to four files: projects.rdf, studies.rdf, datasets.rdf,
 and people.rdf. These files contain the triples for each respective class.
 
 
-## Running the Publication Ingest
+## Running the Publication Fetcher
 
-This will produce a file containing triples for adding publications. The
-publications are gathered using the full name of the person in a query to
-PubMed. Supplemental PMIDs can be added to a person by using the `publications`
-table in your supplemental database. The admin page can be used to add PMIDs.
+The Publication Fetcher tries to find all authors' publications by using
+Harvard's Catalyst service or PubMed. Then downloads the XML summaries from
+PubMed and adds them to the supplemental database. Use the admin page to
+mark publications for inclusion and exclusion. (At least one PMID and an
+affiliation is required to use Catalyst).
 
-This tool can be run on all people in the database, or for a single person:
-
-    $ python metab_pub_ingest.py $CONFIG_PATH only <PERSON_ID>
+    $ python pubfetch.py $CONFIG_PATH
 
 
 ## Running the Admin Page

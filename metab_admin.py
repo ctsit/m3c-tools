@@ -330,10 +330,10 @@ def withheld_organizations():
     orgs = []
 
     with conn.cursor() as cur:
-        cur.execute('SELECT id, name, type, withheld from organizations ORDER BY id;')
+        cur.execute('SELECT id, name, type, withheld, parent_id from organizations ORDER BY id;')
         rows = cur.fetchall()
         for row in rows:
-            orgs.append((row[0], row[1], row[2], row[3]))
+            orgs.append((row[0], row[1], row[2], row[3], row[4]))
 
     if request.method == 'POST':
         try:

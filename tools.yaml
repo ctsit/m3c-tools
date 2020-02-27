@@ -226,20 +226,6 @@ csbg.cnb.csic.es/mbrole2/:
   tags:
     - database
 
-metaboanalyst.ca:
-  name: MetaboAnalyst
-  description: |
-    "Tool suite for metabolomics analysis"
-  url: https://www.metaboanalyst.ca
-  authors:
-    - name: Xia Lab
-      email: jeff.xia@mcgill.ca
-  license:
-    kind: GNU General Public License
-    url: http://www.gnu.org/licenses/
-  tags:
-    - service
-
 github.com/dgrapov/MetaMapR:
   name: MetaMapR
   description: >
