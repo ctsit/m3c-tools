@@ -130,16 +130,16 @@ def get_people(sup_cur):
 
 
 def add_person(cursor: psycopg2.extensions.cursor,
-               first_name: str, last_name: str) -> int:
+               first_name: str, last_name: str, email: str, phone: str) -> int:
 
     statement = '''
-        INSERT INTO people (id,      display_name)
-             VALUES        (DEFAULT, %s          )
+        INSERT INTO people (id,      display_name, email, phone)
+             VALUES        (DEFAULT, %s          , %s   , %s)
           RETURNING id
     '''
 
     display_name = '{} {}'.format(first_name.strip(), last_name.strip())
-    cursor.execute(statement, (display_name,))
+    cursor.execute(statement, (display_name, email, phone))
 
     person_id = cursor.fetchone()[0]
 
@@ -756,7 +756,8 @@ def make_tools(namespace, tools: List[Tool], people, withheld_people, mwb_cur, s
                 for author in non_matched_authors:
                     first_name = author.name.split(' ')[0]
                     last_name = " ".join(author.name.split(' ')[1:])
-                    person_id = add_person(sup_cur, first_name, last_name)
+                    person_id = add_person(sup_cur, first_name, last_name,
+                                           "", "")
                     print(f"Added {first_name} {last_name}: {person_id}")
                     people[person_id] = get_person(sup_cur, person_id)
                 print("Trying to match authors again.")

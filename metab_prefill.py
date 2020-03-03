@@ -31,17 +31,6 @@ DEPARTMENT = 'department'
 LABORATORY = 'laboratory'
 
 
-def associate(cursor: psycopg2.extensions.cursor,
-              person_id: int, organization_id: int):
-    insert_association = '''
-        INSERT INTO associations (person_id, organization_id)
-             VALUES              (%s       , %s             )
-        ON CONFLICT DO NOTHING
-    '''
-
-    cursor.execute(insert_association, (person_id, organization_id))
-
-
 def add_organizations(mwb_conn: psycopg2.extensions.connection,
                       sup_conn: psycopg2.extensions.connection,
                       embargoed: typing.List[str]):
@@ -118,11 +107,14 @@ def add_people(mwb_conn: psycopg2.extensions.connection,
     #   add person to people table and name to names table.
 
     with mwb_conn.cursor() as mwb_cur, sup_conn.cursor() as sup_cur:
-        names = db.find_names(mwb_cur)
+        people = db.find_people(mwb_cur)
 
-        for row in names:
-            first_names, last_names, institutes, departments, labs, uid = \
-                tuple(row)
+        for row in people:
+            (first_names, last_names,
+             institutes, departments, labs,
+             uid,
+             emails, phones
+             ) = tuple(row)
 
             # Exclude embargoed studies.
             if uid in embargoed:
@@ -130,10 +122,20 @@ def add_people(mwb_conn: psycopg2.extensions.connection,
 
             last_name_list = [ln.strip() for ln in last_names.split(';')]
             first_name_list = [fn.strip() for fn in first_names.split(';')]
+            emails = [e.strip() for e in emails.split(';')]
+            phones = [p.strip() for p in phones.split(';')]
 
             for i in range(0, len(last_name_list)):
                 last_name = last_name_list[i]
                 first_name = first_name_list[i]
+                try:
+                    email = emails[i]
+                except IndexError:
+                    email = ""  # Allow fewer emails than names.
+                try:
+                    phone = phones[i]
+                except IndexError:
+                    phone = ""  # Allow fewer phone numbers than names
 
                 person_ids = get_person(sup_cur, first_name, last_name,
                                         exclude_withheld=False)
@@ -148,12 +150,26 @@ def add_people(mwb_conn: psycopg2.extensions.connection,
 
                 if len(person_ids) == 1:
                     person_id = person_ids[0]
-                    print("Skipping person #{}: {} {}."
-                          .format(person_ids[0], first_name, last_name))
+                    details = db.get_contact_details(sup_cur, person_id)
+                    curr_email, curr_phone = details
+
+                    if email == curr_email and phone == curr_phone:
+                        print(f"Skipping person #{person_id}: "
+                              f"{first_name} {last_name}.")
+                    else:
+                        updated = db.update_contact_details(sup_cur, person_id,
+                                                            email, phone)
+                        if updated:
+                            print("Updated contact details for person "
+                                  f"#{person_id}: {first_name} {last_name}.")
+                        else:
+                            print("Failed to update contact details for person"
+                                  f" #{person_id}: {first_name} {last_name}.")
                 else:
-                    person_id = add_person(sup_cur, first_name, last_name)
-                    print("Added person #{}: {} {}."
-                          .format(person_id, first_name, last_name))
+                    person_id = add_person(sup_cur, first_name, last_name,
+                                           email, phone)
+                    print(f"Added person #{person_id}: {first_name} "
+                          f"{last_name} (email={email}; phone={phone}).")
 
                 # Create associations
                 institute_list = [inst.strip()
@@ -179,7 +195,7 @@ def add_people(mwb_conn: psycopg2.extensions.connection,
                         institute_id = db.get_organization(
                             sup_cur, INSTITUTE, institute_list[i])
                         assert institute_id
-                        associate(sup_cur, person_id, institute_id)
+                        db.associate(sup_cur, person_id, institute_id)
                         parent_id = institute_id
                     except IndexError:
                         institute_id = db.get_organization(
@@ -195,7 +211,7 @@ def add_people(mwb_conn: psycopg2.extensions.connection,
                                 parent_id)
 
                             if department_id:
-                                associate(sup_cur, person_id, department_id)
+                                db.associate(sup_cur, person_id, department_id)
                                 parent_id = department_id
                         except IndexError:
                             department_id = db.get_organization(
@@ -209,7 +225,7 @@ def add_people(mwb_conn: psycopg2.extensions.connection,
                             laboratory_id = db.get_organization(
                                 sup_cur, LABORATORY, lab_list[i], parent_id)
                             if laboratory_id:
-                                associate(sup_cur, person_id, laboratory_id)
+                                db.associate(sup_cur, person_id, laboratory_id)
                         except IndexError:
                             print('WARNING: There are more institutes/'
                                   'departments than labs\n'

@@ -34,6 +34,15 @@ def add_organization(cursor: Cursor, type: str, name: str,
     return row[0]
 
 
+def associate(cursor: Cursor, person_id: int, organization_id: int):
+    insert_association = '''
+        INSERT INTO associations (person_id, organization_id)
+             VALUES              (%s       , %s             )
+        ON CONFLICT DO NOTHING
+    '''
+    cursor.execute(insert_association, (person_id, organization_id))
+
+
 def find_organizations(cursor: Cursor) \
         -> Iterable[Tuple[str, str, str, str]]:
 
@@ -55,18 +64,20 @@ def find_organizations(cursor: Cursor) \
         yield tuple(row)
 
 
-def find_names(cursor: Cursor) \
-        -> Iterable[Tuple[str, str, str, str, str, str]]:
+def find_people(cursor: Cursor) \
+        -> Iterable[Tuple[str, str, str, str, str, str, str, str]]:
 
     select_names = '''
         SELECT COALESCE(first_name, ''), COALESCE(last_name, ''),
                COALESCE(institute, ''), COALESCE(department, ''),
-               COALESCE(laboratory, ''), project_id
+               COALESCE(laboratory, ''), project_id,
+               COALESCE(email, ''), COALESCE(phone, '')
           FROM project
          UNION
         SELECT COALESCE(study.first_name, ''), COALESCE(study.last_name, ''),
                COALESCE(study.institute, ''), COALESCE(study.department, ''),
-               COALESCE(study.laboratory, ''), study.study_id
+               COALESCE(study.laboratory, ''), study.study_id,
+               COALESCE(email, ''), COALESCE(phone, '')
           FROM study, study_status_prod
          WHERE study.study_id = study_status_prod.study_id
            AND study_status_prod.status = 1
@@ -154,6 +165,18 @@ def get_organization(cursor: Cursor, type: str, name: str,
         return 0
 
     return row[0]
+
+
+def get_contact_details(cursor: Cursor, person_id: int) -> Tuple[str, str]:
+    query = '''
+        SELECT COALESCE(email, ''), COALESCE(phone, '')
+          FROM people
+         WHERE id=%s
+    '''
+    cursor.execute(query, (person_id,))
+    assert cursor.rowcount == 1
+    for row in cursor:
+        return row
 
 
 def get_person(cursor: Cursor, first_name: str, last_name: str,
@@ -284,6 +307,18 @@ def update_authorships(cursor: Cursor,
     tsv.seek(0)
     cursor.copy_from(tsv, "pubmed_authorships", columns=("person_id", "pmid"))
     return cursor.rowcount
+
+
+def update_contact_details(cursor: Cursor,
+                           person_id: int, email: str, phone: str) -> bool:
+    update = '''
+        UPDATE people
+           SET email=%s,
+               phone=%s
+         WHERE id=%s
+    '''
+    cursor.execute(update, (email, phone, person_id))
+    return cursor.rowcount == 1
 
 
 def upsert_publication(cursor: Cursor, pmid: str, xml: str) -> None:
