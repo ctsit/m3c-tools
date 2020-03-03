@@ -575,8 +575,12 @@ def make_pub(citation: Citation) -> Publication:
             names.append(author['CollectiveName'])
             continue
         last_name = author['LastName']
-        initial = author['Initials']
-        name = last_name + ", " + initial + "."
+        name = last_name
+        try:
+            initial = author['Initials']
+            name = f"{last_name}, {initial}."
+        except KeyError:
+            name = last_name  # Allow surname-only authors.
         names.append(name)
     volume = citation.check_key(['MedlineCitation', 'Article', 'Journal',
                                  'JournalIssue', 'Volume'])
