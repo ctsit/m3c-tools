@@ -294,6 +294,10 @@ def update_authorships(cursor: psql_cursor, authorships_limit: int = -1):
             log(f"{person_id}: skipping withheld author")
             continue
 
+        if person_id not in affiliations:
+            log(f"{person_id}: skipping author without affiliations")
+            continue
+
         log(f"{person_id}: "
             f"fetching PMIDs for {person.first_name} {person.last_name}.")
 
