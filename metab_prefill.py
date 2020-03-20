@@ -48,7 +48,6 @@ def add_developers(sup_conn: psycopg2.extensions.connection) -> None:
         if len(pmids) == 0:
             return
 
-        institutes = fetch_institutes_sorted_by_name_length(cursor)
         for pmid in pmids:
             author_list = parse_author_list(publications[pmid])
             for author in author_list:
@@ -81,17 +80,14 @@ def add_developers(sup_conn: psycopg2.extensions.connection) -> None:
                         continue
                     print(f'PMID {pmid}: added {forename} {lastname}: {pid}')
 
-                matched = False
-                affiliations = find_matching_institutes(institutes, author)
-                for (institute, institute_id) in affiliations:
-                    matched = True
-                    db.associate(cursor, pid, institute_id)
-                    print(f'PMID {pmid}: associated {forename} {lastname} '
-                          f'({pid}) with {institute} ({institute_id}).')
+                affiliation_list = author.findall('.//Affiliation')
+                for affiliation in affiliation_list:
+                    affiliation = affiliation.text.strip()
+                    if not affiliation:
+                        continue
+                    print(f"PMID {pmid}: affiliation for {forename} {lastname}"
+                          f": {affiliation}")
 
-                if not matched:
-                    print(f'PMID {pmid}: failed to find affiliated institutes '
-                          f'for author {forename} {lastname} (id={pid}).')
     return
 
 
@@ -303,35 +299,6 @@ def add_people(mwb_conn: psycopg2.extensions.connection,
                               labs))
 
     return
-
-
-def fetch_institutes_sorted_by_name_length(sup_cur: db.Cursor) \
-        -> typing.List[typing.Tuple[str, int]]:
-    institutes: typing.List[typing.Tuple[str, int]] = []
-    records = db.get_organizations(sup_cur)
-    for (org_id, name, type, parent_id, withheld) in records:
-        if type == INSTITUTE and not withheld:
-            institutes.append((name, org_id))
-    institutes.sort(key=operator.itemgetter(0))
-    institutes.sort(key=lambda i: len(i[0]), reverse=True)
-    return institutes
-
-
-def find_matching_institutes(institutes: typing.List[typing.Tuple[str, int]],
-                             author_node: ET.Element) \
-        -> typing.Iterable[typing.Tuple[str, int]]:
-    affiliation_list = author_node.findall('.//Affiliation')
-    for affiliation in affiliation_list:
-        affiliation = affiliation.text.strip()
-        for (name, institute_id) in institutes:
-            if name.upper() not in affiliation.upper():
-                continue
-            if len(name.split(' ')) < 2:
-                print(f'Skipping matched affiliation; name "{name}" too short:'
-                      f' "{affiliation}""')
-                continue
-            yield (name, institute_id)
-            break
 
 
 def main():

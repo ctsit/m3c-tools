@@ -52,6 +52,7 @@ class MetabolomicsToolsWiki:
         csvdata = MetabolomicsToolsWiki.download()
     ```
     """
+
     URL = "https://docs.google.com/spreadsheets/d/1bEO9_SYznC9rrtzJdHtpjdKL-AEPYkLANBgQDpx52tI"
 
     @staticmethod
