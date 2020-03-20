@@ -226,14 +226,13 @@ def get_person(cursor: Cursor, first_name: str, last_name: str,
     query = '''
         SELECT person_id
           FROM names
-         WHERE first_name=%s
-           AND last_name=%s
+         WHERE CONCAT(first_name, ' ', last_name) = %s
     '''
 
     if exclude_withheld:
         query = f'{query} AND withheld=FALSE'
 
-    cursor.execute(query, (first_name, last_name))
+    cursor.execute(query, (f'{first_name} {last_name}', ))
 
     ids = []
     for row in cursor:
