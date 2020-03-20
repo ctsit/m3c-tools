@@ -34,6 +34,33 @@ def add_organization(cursor: Cursor, type: str, name: str,
     return row[0]
 
 
+def add_person(cursor: Cursor,
+               first_name: str, last_name: str, email: str, phone: str) -> int:
+
+    statement = '''
+        INSERT INTO people (id,      display_name, email, phone)
+             VALUES        (DEFAULT, %s          , %s   , %s)
+          RETURNING id
+    '''
+
+    first_name = first_name.strip()
+    last_name = last_name.strip()
+
+    display_name = f'{first_name} {last_name}'
+    cursor.execute(statement, (display_name, email, phone))
+
+    person_id = cursor.fetchone()[0]
+
+    statement = '''
+        INSERT INTO names (person_id, first_name, last_name)
+             VALUES       (%s       , %s        , %s       )
+    '''
+
+    cursor.execute(statement, (person_id, first_name, last_name))
+
+    return person_id
+
+
 def associate(cursor: Cursor, person_id: int, organization_id: int):
     insert_association = '''
         INSERT INTO associations (person_id, organization_id)
@@ -141,6 +168,18 @@ def get_confirmed_publications(cursor: Cursor) \
     return publications
 
 
+def get_contact_details(cursor: Cursor, person_id: int) -> Tuple[str, str]:
+    query = '''
+        SELECT COALESCE(email, ''), COALESCE(phone, '')
+          FROM people
+         WHERE id=%s
+    '''
+    cursor.execute(query, (person_id,))
+    assert cursor.rowcount == 1
+    for row in cursor:
+        return row
+
+
 def get_organization(cursor: Cursor, type: str, name: str,
                      parent_id: Optional[int] = None) -> int:
     assert type in [INSTITUTE, DEPARTMENT, LABORATORY]
@@ -167,16 +206,12 @@ def get_organization(cursor: Cursor, type: str, name: str,
     return row[0]
 
 
-def get_contact_details(cursor: Cursor, person_id: int) -> Tuple[str, str]:
-    query = '''
-        SELECT COALESCE(email, ''), COALESCE(phone, '')
-          FROM people
-         WHERE id=%s
-    '''
-    cursor.execute(query, (person_id,))
-    assert cursor.rowcount == 1
+def get_organizations(cursor: Cursor) \
+        -> Iterable[Tuple[int, str, str, int, bool]]:
+    query = "SELECT id, name, type, parent_id, withheld FROM organizations"
+    cursor.execute(query)
     for row in cursor:
-        return row
+        yield row
 
 
 def get_person(cursor: Cursor, first_name: str, last_name: str,
@@ -191,14 +226,13 @@ def get_person(cursor: Cursor, first_name: str, last_name: str,
     query = '''
         SELECT person_id
           FROM names
-         WHERE first_name=%s
-           AND last_name=%s
+         WHERE CONCAT(first_name, ' ', last_name) = %s
     '''
 
     if exclude_withheld:
         query = f'{query} AND withheld=FALSE'
 
-    cursor.execute(query, (first_name, last_name))
+    cursor.execute(query, (f'{first_name} {last_name}', ))
 
     ids = []
     for row in cursor:
@@ -268,14 +302,22 @@ def get_pubmed_download_timestamps(cursor: Cursor) \
     return {row[0]: row[1] for row in cursor}
 
 
-def get_pubmed_publications(cursor: Cursor) -> Mapping[str, str]:
-    select_pubs = """
-        SELECT pmid, xml
-          FROM pubmed_publications
-    """
-
-    cursor.execute(select_pubs)
-
+def get_pubmed_publications(cursor: Cursor,
+                            pmids: Optional[Iterable[str]] = []) \
+        -> Mapping[str, str]:
+    if pmids:
+        select_pubs = """
+            SELECT pmid, xml
+              FROM pubmed_publications
+             WHERE pmid = ANY(%s)
+        """
+        cursor.execute(select_pubs, (list(pmids),))
+    else:
+        select_pubs = """
+            SELECT pmid, xml
+            FROM pubmed_publications
+        """
+        cursor.execute(select_pubs)
     return {row[0]: row[1] for row in cursor}
 
 
