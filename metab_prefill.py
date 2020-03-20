@@ -14,14 +14,17 @@ Example:
     $ python metab_prefill.py config.yaml
 """
 
+import io
+import operator
 import sys
 import typing
+import xml.etree.ElementTree as ET
 
 import psycopg2
 
 import db
 import metab_import
-from metab_import import add_person
+import tools
 
 get_person = db.get_person  # Facilitate testing using monkeypatching.
 
@@ -31,9 +34,70 @@ DEPARTMENT = 'department'
 LABORATORY = 'laboratory'
 
 
+def add_developers(sup_conn: psycopg2.extensions.connection) -> None:
+    with sup_conn.cursor() as cursor:
+        pmids = set(tools.MetabolomicsToolsWiki.pmids())
+        total = len(pmids)
+        if total == 0:
+            return
+
+        publications = db.get_pubmed_publications(cursor, pmids)
+        pmids = pmids.intersection(publications.keys())
+        print(f'Found {len(pmids)} of {total} tools-related publications in '
+              'the Supplemental database.')
+        if len(pmids) == 0:
+            return
+
+        institutes = fetch_institutes_sorted_by_name_length(cursor)
+        for pmid in pmids:
+            author_list = parse_author_list(publications[pmid])
+            for author in author_list:
+                forename = author.findtext('ForeName', '').strip()
+                lastname = author.findtext('LastName', '').strip()
+
+                if not forename:
+                    print(f'PMID {pmid}: missing forename of author '
+                          f'{lastname}')
+                    continue
+
+                if not lastname:
+                    print(f'PMID {pmid}: missing surname of author {forename}')
+                    continue
+
+                matches = list(db.get_person(cursor, forename, lastname))
+                if len(matches) > 1:
+                    print(f"PMID {pmid}: WARNING! Found {len(matches)} people "
+                          f" named {forename} {lastname}: {' '.join(matches)}")
+                    continue
+
+                if matches:
+                    pid = matches[0]
+                    print(f'PMID {pmid}: found {forename} {lastname}: {pid}')
+                else:
+                    pid = db.add_person(cursor, forename, lastname, '', '')
+                    if not pid:
+                        print(f'PMID {pmid}: WARNING failed to add person: '
+                              f'{forename} {lastname}')
+                        continue
+                    print(f'PMID {pmid}: added {forename} {lastname}: {pid}')
+
+                matched = False
+                affiliations = find_matching_institutes(institutes, author)
+                for (institute, institute_id) in affiliations:
+                    matched = True
+                    db.associate(cursor, pid, institute_id)
+                    print(f'PMID {pmid}: associated {forename} {lastname} '
+                          f'({pid}) with {institute} ({institute_id}).')
+
+                if not matched:
+                    print(f'PMID {pmid}: failed to find affiliated institutes '
+                          f'for author {forename} {lastname} (id={pid}).')
+    return
+
+
 def add_organizations(mwb_conn: psycopg2.extensions.connection,
                       sup_conn: psycopg2.extensions.connection,
-                      embargoed: typing.List[str]):
+                      embargoed: typing.List[str]) -> None:
 
     with mwb_conn.cursor() as mwb_cur, sup_conn.cursor() as sup_cur:
         orgs = db.find_organizations(mwb_cur)
@@ -100,7 +164,7 @@ def add_organizations(mwb_conn: psycopg2.extensions.connection,
 
 def add_people(mwb_conn: psycopg2.extensions.connection,
                sup_conn: psycopg2.extensions.connection,
-               embargoed: typing.List[str]):
+               embargoed: typing.List[str]) -> None:
 
     # For each (first_name, last_name) across both project and study:
     #   if (first_name, last_name) in names => skip
@@ -166,8 +230,8 @@ def add_people(mwb_conn: psycopg2.extensions.connection,
                             print("Failed to update contact details for person"
                                   f" #{person_id}: {first_name} {last_name}.")
                 else:
-                    person_id = add_person(sup_cur, first_name, last_name,
-                                           email, phone)
+                    person_id = db.add_person(sup_cur, first_name, last_name,
+                                              email, phone)
                     print(f"Added person #{person_id}: {first_name} "
                           f"{last_name} (email={email}; phone={phone}).")
 
@@ -241,6 +305,35 @@ def add_people(mwb_conn: psycopg2.extensions.connection,
     return
 
 
+def fetch_institutes_sorted_by_name_length(sup_cur: db.Cursor) \
+        -> typing.List[typing.Tuple[str, int]]:
+    institutes: typing.List[typing.Tuple[str, int]] = []
+    records = db.get_organizations(sup_cur)
+    for (org_id, name, type, parent_id, withheld) in records:
+        if type == INSTITUTE and not withheld:
+            institutes.append((name, org_id))
+    institutes.sort(key=operator.itemgetter(0))
+    institutes.sort(key=lambda i: len(i[0]), reverse=True)
+    return institutes
+
+
+def find_matching_institutes(institutes: typing.List[typing.Tuple[str, int]],
+                             author_node: ET.Element) \
+        -> typing.Iterable[typing.Tuple[str, int]]:
+    affiliation_list = author_node.findall('.//Affiliation')
+    for affiliation in affiliation_list:
+        affiliation = affiliation.text.strip()
+        for (name, institute_id) in institutes:
+            if name.upper() not in affiliation.upper():
+                continue
+            if len(name.split(' ')) < 2:
+                print(f'Skipping matched affiliation; name "{name}" too short:'
+                      f' "{affiliation}""')
+                continue
+            yield (name, institute_id)
+            break
+
+
 def main():
     '''Adds people and organizations to the mwb_supplemental database.'''
     if len(sys.argv) < 2:
@@ -273,9 +366,17 @@ def main():
     with mwb_conn, sup_conn:
         add_organizations(mwb_conn, sup_conn, embargoed)
         add_people(mwb_conn, sup_conn, embargoed)
+        add_developers(sup_conn)
 
     sup_conn.close()
     mwb_conn.close()
+
+
+def parse_author_list(xml: str) -> ET.ElementTree:
+    file = io.StringIO(xml)
+    data = ET.parse(file)
+    author_list = data.findall('//Article/AuthorList/Author')
+    return author_list
 
 
 if __name__ == "__main__":

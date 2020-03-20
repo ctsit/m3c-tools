@@ -28,10 +28,10 @@ Copyright 2020 University of Florida
 import datetime
 import getopt
 import http
-import typing
 import sys
 import time
 import traceback
+import typing
 import urllib.error
 import xml.etree.ElementTree as ET
 
@@ -42,6 +42,7 @@ import psycopg2.extensions
 import catalyst
 import db
 import metab_import
+import tools
 
 psql_connection = psycopg2.extensions.connection
 psql_cursor = psycopg2.extensions.cursor
@@ -51,7 +52,8 @@ pubmed_delay: int = 0
 
 def fetch_publications(cursor: psql_cursor):
     authorships = db.get_pubmed_authorships(cursor)
-    pmids_to_download = set(authorships.keys())
+    tools_pmids = tools.MetabolomicsToolsWiki.pmids()
+    pmids_to_download = set(tools_pmids).union(authorships.keys())
     downloadts = db.get_pubmed_download_timestamps(cursor)
     skip = [pmid
             for pmid, downloaded
