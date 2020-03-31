@@ -34,6 +34,15 @@ DEPARTMENT = 'department'
 LABORATORY = 'laboratory'
 
 
+class AmbiguityError(Exception):
+    def __init__(self, uid: str, institutes: str, departments: str, labs: str):
+        msg = (f"Cannot determine organization hierarchy of {uid}: "
+               f'institutes="{institutes}" '
+               f'departments="{departments}" '
+               f'labs="{labs}"')
+        super().__init__(msg)
+
+
 def add_developers(sup_conn: psycopg2.extensions.connection) -> None:
     with sup_conn.cursor() as cursor:
         pmids = set(tools.MetabolomicsToolsWiki.pmids())
