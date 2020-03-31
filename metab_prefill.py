@@ -14,10 +14,9 @@ Example:
     $ python metab_prefill.py config.yaml
 """
 
+from typing import List, Optional, Tuple
 import io
-import operator
 import sys
-import typing
 import xml.etree.ElementTree as ET
 
 import psycopg2
@@ -100,76 +99,99 @@ def add_developers(sup_conn: psycopg2.extensions.connection) -> None:
     return
 
 
-def add_organizations(mwb_conn: psycopg2.extensions.connection,
-                      sup_conn: psycopg2.extensions.connection,
-                      embargoed: typing.List[str]) -> None:
+def add_organization(sup_cur: db.Cursor, institute_field: str,
+                     department_field: str, laboratory_field: str, uid: str):
+    if not institute_field:
+        assert not department_field
+        assert not laboratory_field
+        return
 
+    institutes = [inst.strip() for inst in institute_field.split(';')]
+    departments = [dept.strip() for dept in department_field.split(';')]
+    laboratories = [lab.strip() for lab in laboratory_field.split(';')]
+
+    # Special case: allow department field is be completely empty.
+    if department_field.strip() == "":
+        departments = [""] * len(institutes)
+    # Special case: allow laboratory field is be completely empty.
+    if laboratory_field.strip() == "":
+        laboratories = [""] * len(institutes)
+
+    icnt = len(institutes)
+    dcnt = len(departments)
+    lcnt = len(laboratories)
+
+    if not(dcnt in [1, lcnt] and icnt in [1, dcnt]):
+        raise AmbiguityError(uid, institute_field, department_field,
+                             laboratory_field)
+
+    institute_ids = []
+    for i, institute in enumerate(institutes):
+        oid = db.get_organization(sup_cur, INSTITUTE, institute)
+        if not oid:
+            oid = db.add_organization(sup_cur, INSTITUTE, institute)
+            print(f"Added institute #{oid}: {institute}.")
+        assert oid
+        institute_ids.append(oid)
+
+    department_ids = []
+    for i, department in enumerate(departments):
+        if not department:
+            department_ids.append(0)
+            continue
+
+        if icnt == 1:
+            parent = institute_ids[0]
+        elif icnt > 1:
+            parent = institute_ids[i]
+        assert parent > 0
+
+        oid = db.get_organization(sup_cur, DEPARTMENT, department, parent)
+
+        if not oid:
+            oid = db.add_organization(sup_cur, DEPARTMENT, department, parent)
+            print(f"Added department #{oid}: {department} (parent #{parent}).")
+        assert oid
+        department_ids.append(oid)
+
+    for i, laboratory in enumerate(laboratories):
+        if not laboratory:
+            continue
+
+        if dcnt == 1:
+            parent = department_ids[0]
+        elif dcnt > 1:
+            parent = department_ids[i]
+        if parent == 0:
+            # If there's no Department, the Institute is the parent.
+            if icnt == 1:
+                parent = institute_ids[0]
+            elif icnt > 0:
+                parent = institute_ids[i]
+        assert parent > 0
+
+        oid = db.get_organization(sup_cur, LABORATORY, laboratory, oid)
+
+        if not oid:
+            oid = db.add_organization(sup_cur, LABORATORY, laboratory, parent)
+            print(f"Added laboratory #{oid}: {laboratory} (parent #{parent}).")
+        assert oid
+
+
+def add_organizations(mwb_conn: db.Connection, sup_conn: db.Connection,
+                      embargoed: List[str]) -> None:
     with mwb_conn.cursor() as mwb_cur, sup_conn.cursor() as sup_cur:
         orgs = db.find_organizations(mwb_cur)
-
         for org in orgs:
-            institutes, departments, laboratories, uid = [t.strip()
-                                                          for t in org]
-
-            # Exclude embargoed studies.
+            institutes, departments, labs, uid = [t.strip() for t in org]
             if uid in embargoed:
-                continue
-
-            if not institutes:
-                assert not departments
-                assert not laboratories
-                continue
-
-            institute_list = [inst.strip() for inst in institutes.split(';')]
-            for institute in institute_list:
-                institute_id = db.get_organization(sup_cur, INSTITUTE,
-                                                   institute)
-                if not institute_id:
-                    institute_id = db.add_organization(sup_cur, INSTITUTE,
-                                                       institute)
-                    print("Added institute #{}: {}."
-                          .format(institute_id, institute))
-
-            department_id: typing.Optional[int] = None
-            if departments:
-                department_list = [dept.strip()
-                                   for dept in departments.split(';')]
-                for department in department_list:
-                    department_id = db.get_organization(sup_cur, DEPARTMENT,
-                                                        department,
-                                                        institute_id)
-
-                    if department and not department_id:
-                        department_id = db.add_organization(sup_cur,
-                                                            DEPARTMENT,
-                                                            department,
-                                                            institute_id)
-                        print("Added department #{}: {}."
-                              .format(department_id, department))
-
-            if not laboratories:
-                continue
-
-            laboratory_list = [lab.strip()
-                               for lab in laboratories.split(';')]
-            for laboratory in laboratory_list:
-                laboratory_id = db.get_organization(sup_cur, LABORATORY,
-                                                    laboratory, department_id)
-
-                if not laboratory_id:
-                    parent_id = department_id
-                    if not parent_id:
-                        # If there's no Department, the Institute is the parent
-                        parent_id = institute_id
-                    laboratory_id = db.add_organization(sup_cur, LABORATORY,
-                                                        laboratory, parent_id)
-                    print("Added laboratory #{}: {}."
-                          .format(laboratory_id, laboratory))
+                continue  # Exclude embargoed studies.
+            add_organization(sup_cur, institutes, departments, labs, uid)
 
 
 def add_people(mwb_conn: psycopg2.extensions.connection,
                sup_conn: psycopg2.extensions.connection,
-               embargoed: typing.List[str]) -> None:
+               embargoed: List[str]) -> None:
 
     # For each (first_name, last_name) across both project and study:
     #   if (first_name, last_name) in names => skip
@@ -334,7 +356,7 @@ def main():
         port=config.get('sup_port'))
 
     embargoed_path = config.get('embargoed', '')
-    embargoed: typing.List[str] = []
+    embargoed: List[str] = []
     if embargoed_path:
         with open(embargoed_path) as f:
             embargoed = [line.strip() for line in f if line]
