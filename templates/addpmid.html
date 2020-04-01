@@ -112,6 +112,7 @@ set categoryToAlertType = {
                 if (!displayName) {
                     displayName = session.displayNames[personID]
                     displayNameInput.value = displayName + " | " + personID
+                    window.scrollTo(0,0);
                 }
                 id.value = personID;
                 name.value = displayName;
