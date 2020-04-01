@@ -1,4 +1,11 @@
 <!doctype html>
+{%
+set categoryToAlertType = {
+    'error'  : 'danger',
+    'message': 'info',
+    'success': 'success',
+}
+%}
     <head>
         <title>Edit Publications for a Person</title>
         <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
@@ -9,10 +16,10 @@
                 <h1 class="mx-auto">Edit Publications for a Person</h1>
             </div>
             <a href="{{ url_for('metab_admin.main_menu') }}">Back to Home</a>
-            {% with messages = get_flashed_messages() %}
+            {% with messages = get_flashed_messages(with_categories=True) %}
                 {% if messages %}
-                    {% for message in messages %}
-                        <div class="alert alert-warning" role="alert">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ categoryToAlertType[category] }}" role="alert">
                             {{ message }}
                         </div>
                     {% endfor %}
@@ -21,10 +28,10 @@
 
             <div class="form-group">
                 <label>Search Display Name</label>
-                <input id=searchInput class="form-control" list=displaynames name=displayname>
+                <input autofocus id=searchInput class="form-control" list=displaynames name=displayname>
                 <datalist id=displaynames>
-                    {% for name in dispNameList %}
-                        <option value="{{name}}">
+                    {% for person_id, name in display_names|dictsort(by='value') %}
+                        <option value="{{ name }} | {{ person_id }}">
                     {% endfor %}
                 </datalist>
             </div>
@@ -49,32 +56,67 @@
 
                 <button class="btn btn-primary" type=submit name=include>Update PMIDs</button>
             </form>
+
+            <br>
+
+            <div class="form-group">
+                <label>Quick Picks</label>
+                <ul>
+                {% for person_id in include_pubs.keys() %}
+                <li>
+                    <a href="javascript:fillFormFor({{person_id}})">
+                        {{display_names[person_id]}} | {{ person_id }}
+                    </a>
+                </li>
+                {% endfor %}
+                </ul>
+            </div>
+
         </div>
         <script>
-            const include_data = JSON.parse('{{include_pubs | tojson | safe}}');
-            const exclude_data = JSON.parse('{{exclude_pubs | tojson | safe}}');
+            const session = {
+                includePubs: JSON.parse('{{include_pubs | tojson | safe}}'),
+                excludePubs: JSON.parse('{{exclude_pubs | tojson | safe}}'),
+                personID: '{{person_id | safe}}',
+                displayNames: {{ display_names | tojson | safe }},
+            }
+
             const displayNameInput = document.getElementById('searchInput');
-            const displayNames = [...document.getElementById('displaynames').childNodes].filter(name => name.value).map(name => name.value);
+            const displayNames = [...document.getElementById('displaynames').childNodes]
+                .filter(name => name.value)
+                .map(name => name.value);
             const name = document.getElementById('name');
             const id = document.getElementById('id');
             const inclpmid = document.getElementById('inclpmid');
             const exclpmid = document.getElementById('exclpmid');
-            displayNameInput.addEventListener('change', (e) => {
-                if (displayNames.includes(e.srcElement.value)) {
-                    const splitName = e.srcElement.value.split('|');
-                    const nameValue = splitName[0].trim();
-                    const idValue = splitName[1].trim();
-                    name.value = nameValue;
-                    id.value = idValue;
+            displayNameInput.addEventListener('input', (e) => {
+                const value = e.srcElement.value;
+                if (!displayNames.includes(value)) {
+                    id.value = '';
+                    name.value = '';
                     inclpmid.value = '';
                     exclpmid.value = '';
-                    if (include_data[idValue]) {
-                        inclpmid.value = include_data[idValue];
-                    }
-                    if (exclude_data[idValue]) {
-                        exclpmid.value = exclude_data[idValue];
-                    }
+                    return;
                 }
+                const splitName = value.split('|');
+                const nameValue = splitName[0].trim();
+                const idValue = splitName[1].trim();
+                fillFormFor(idValue, nameValue)
             });
+
+            fillFormFor(session.personID)
+
+            function fillFormFor(personID, displayName) {
+                if (!personID)
+                    return;
+                if (!displayName) {
+                    displayName = session.displayNames[personID]
+                    displayNameInput.value = displayName + " | " + personID
+                }
+                id.value = personID;
+                name.value = displayName;
+                inclpmid.value = session.includePubs[personID] || '';
+                exclpmid.value = session.excludePubs[personID] || '';
+            }
         </script>
     </body>
