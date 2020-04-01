@@ -397,6 +397,8 @@ def person_alias():
 @app.route('/addpmid', methods=['GET', 'POST'])
 def add_pmid():
     display_names = []
+    include_pubs = {}
+    exclude_pubs = {}
     cur = conn.cursor()
 
     cur.execute('SELECT display_name, id FROM people')
@@ -404,31 +406,39 @@ def add_pmid():
     for row in rows:
         display_names.append(str(row[0]) + ' | ' + str(row[1]))
 
+    cur.execute('SELECT pmid, person_id, include FROM publications')
+    rows = cur.fetchall()
+    for row in rows:
+        person_id = str(row[1])
+        if row[2]:
+            include_pubs[person_id] = include_pubs.get(person_id, []) + [row[0]]
+        else:
+            exclude_pubs[person_id] = exclude_pubs.get(person_id, []) + [row[0]]
+
     cur.close()
 
     if request.method == 'POST':
         cur = conn.cursor()
         try:
             person_id = request.form['id'].strip()
-            pmid_string = request.form['pmid'].strip()
-            pmid_list = pmid_string.replace(' ', '').split(',')
+            incl_pmid_string = request.form['inclpmid'].strip()
+            incl_pmid_list = incl_pmid_string.replace(' ', '').split(',')
+            excl_pmid_string = request.form['exclpmid'].strip()
+            excl_pmid_list = excl_pmid_string.replace(' ', '').split(',')
 
-            if person_id is '':
+            if person_id == '':
                 flash('Please search and select someone')
                 return redirect(request.url)
 
-            if pmid_string is '':
-                flash('Please enter a PMID')
-                return redirect(request.url)
+            cur.execute('DELETE FROM publications WHERE person_id = %s', (int(person_id),))
 
-            for pmid in pmid_list:
-                if 'include' in request.form:
-                    cur.execute("INSERT INTO publications (pmid, person_id, include) VALUES (%s, %s, %s) ON CONFLICT (pmid, person_id) DO UPDATE SET include='t'", (pmid, int(person_id), True))
-                elif 'exclude' in request.form:
-                    cur.execute("INSERT INTO publications (pmid, person_id, include) VALUES (%s, %s, %s) ON CONFLICT (pmid, person_id) DO UPDATE SET include='f'", (pmid, int(person_id), False))
+            for pmid in incl_pmid_list:
+                cur.execute("INSERT INTO publications (pmid, person_id, include) VALUES (%s, %s, %s) ON CONFLICT (pmid, person_id) DO UPDATE SET include='t'", (pmid, int(person_id), True))
+            for pmid in excl_pmid_list:
+                cur.execute("INSERT INTO publications (pmid, person_id, include) VALUES (%s, %s, %s) ON CONFLICT (pmid, person_id) DO UPDATE SET include='f'", (pmid, int(person_id), False))
 
             conn.commit()
-            flash('PMID(s) ' + pmid_string + ' modified for ' + request.form['name'].strip())
+            flash(f'PMID(s) incl:{incl_pmid_string}, excl:{excl_pmid_string} modified for {request.form["name"].strip()}')
         except Exception as e:
             print(e)
             conn.rollback()
@@ -437,7 +447,7 @@ def add_pmid():
             cur.close()
         return redirect(request.url)
 
-    return render_template('addpmid.html', dispNameList=display_names)
+    return render_template('addpmid.html', dispNameList=display_names, include_pubs=include_pubs, exclude_pubs=exclude_pubs)
 
 
 def main():

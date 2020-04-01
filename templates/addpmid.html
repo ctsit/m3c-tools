@@ -38,24 +38,42 @@
                 <input hidden readonly id=id type=text name=id>
 
                 <div class="form-group">
-                    <label>PubMed IDs</label>
-                    <input class="form-control" type=text name=pmid placeholder="separate ids with a comma i.e. 11111, 22222">
+                    <label>Include PubMed IDs</label>
+                    <input id="inclpmid" class="form-control" type=text name=inclpmid placeholder="separate ids with a comma i.e. 11111, 22222">
                 </div>
 
-                <button class="btn btn-primary" type=submit name=include>Add PMID</button>
-                <button class="btn btn-danger" type=submit name=exclude>Exclude PMID</button>
+                <div class="form-group">
+                    <label>Exclude PubMed IDs</label>
+                    <input id="exclpmid" class="form-control" type=text name=exclpmid placeholder="separate ids with a comma i.e. 11111, 22222">
+                </div>
+
+                <button class="btn btn-primary" type=submit name=include>Update PMIDs</button>
             </form>
         </div>
         <script>
+            const include_data = JSON.parse('{{include_pubs | tojson | safe}}');
+            const exclude_data = JSON.parse('{{exclude_pubs | tojson | safe}}');
             const displayNameInput = document.getElementById('searchInput');
             const displayNames = [...document.getElementById('displaynames').childNodes].filter(name => name.value).map(name => name.value);
             const name = document.getElementById('name');
             const id = document.getElementById('id');
+            const inclpmid = document.getElementById('inclpmid');
+            const exclpmid = document.getElementById('exclpmid');
             displayNameInput.addEventListener('change', (e) => {
                 if (displayNames.includes(e.srcElement.value)) {
                     const splitName = e.srcElement.value.split('|');
-                    name.value = splitName[0];
-                    id.value = splitName[1];
+                    const nameValue = splitName[0].trim();
+                    const idValue = splitName[1].trim();
+                    name.value = nameValue;
+                    id.value = idValue;
+                    inclpmid.value = '';
+                    exclpmid.value = '';
+                    if (include_data[idValue]) {
+                        inclpmid.value = include_data[idValue];
+                    }
+                    if (exclude_data[idValue]) {
+                        exclpmid.value = exclude_data[idValue];
+                    }
                 }
             });
         </script>
