@@ -5,19 +5,15 @@ from typing import Iterable, Mapping, Optional, Tuple
 import psycopg2
 import psycopg2.extensions
 
+from m3c import mwb
 
 Cursor = psycopg2.extensions.cursor
 Connection = psycopg2.extensions.connection
 
 
-INSTITUTE = 'institute'
-DEPARTMENT = 'department'
-LABORATORY = 'laboratory'
-
-
 def add_organization(cursor: Cursor, type: str, name: str,
                      parent_id: Optional[int] = None) -> int:
-    assert type in [INSTITUTE, DEPARTMENT, LABORATORY]
+    assert type in [mwb.INSTITUTE, mwb.DEPARTMENT, mwb.LABORATORY]
 
     insert_org = '''
         INSERT INTO organizations (id     , name, type, parent_id)
@@ -61,13 +57,14 @@ def add_person(cursor: Cursor,
     return person_id
 
 
-def associate(cursor: Cursor, person_id: int, organization_id: int):
+def associate(cursor: Cursor, person_id: int, organization_id: int) -> bool:
     insert_association = '''
         INSERT INTO associations (person_id, organization_id)
              VALUES              (%s       , %s             )
         ON CONFLICT DO NOTHING
     '''
     cursor.execute(insert_association, (person_id, organization_id))
+    return cursor.rowcount == 1
 
 
 def find_organizations(cursor: Cursor) \
@@ -93,27 +90,7 @@ def find_organizations(cursor: Cursor) \
 
 def find_people(cursor: Cursor) \
         -> Iterable[Tuple[str, str, str, str, str, str, str, str]]:
-
-    select_names = '''
-        SELECT COALESCE(first_name, ''), COALESCE(last_name, ''),
-               COALESCE(institute, ''), COALESCE(department, ''),
-               COALESCE(laboratory, ''), project_id,
-               COALESCE(email, ''), COALESCE(phone, '')
-          FROM project
-         UNION
-        SELECT COALESCE(study.first_name, ''), COALESCE(study.last_name, ''),
-               COALESCE(study.institute, ''), COALESCE(study.department, ''),
-               COALESCE(study.laboratory, ''), study.study_id,
-               COALESCE(email, ''), COALESCE(phone, '')
-          FROM study, study_status_prod
-         WHERE study.study_id = study_status_prod.study_id
-           AND study_status_prod.status = 1
-    '''
-
-    cursor.execute(select_names)
-
-    for row in cursor:
-        yield tuple(row)
+    return mwb.find_people(cursor)
 
 
 def get_affiliations(cursor: Cursor) -> Mapping[int, str]:
@@ -182,7 +159,7 @@ def get_contact_details(cursor: Cursor, person_id: int) -> Tuple[str, str]:
 
 def get_organization(cursor: Cursor, type: str, name: str,
                      parent_id: Optional[int] = None) -> int:
-    assert type in [INSTITUTE, DEPARTMENT, LABORATORY]
+    assert type in [mwb.INSTITUTE, mwb.DEPARTMENT, mwb.LABORATORY]
 
     if not parent_id:
         select_org = """

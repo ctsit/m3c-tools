@@ -14,107 +14,125 @@ Example:
     $ python metab_prefill.py config.yaml
 """
 
-from typing import List, Optional, Tuple
 import io
+import itertools
 import sys
+import typing
 import xml.etree.ElementTree as ET
 
 import psycopg2
 
 import db
+from m3c import mwb
 import metab_import
 import tools
+
+
+List = typing.List
+Tuple = typing.Tuple
+
 
 get_person = db.get_person  # Facilitate testing using monkeypatching.
 
 
-INSTITUTE = 'institute'
-DEPARTMENT = 'department'
-LABORATORY = 'laboratory'
-
-
 class AmbiguityError(Exception):
-    def __init__(self, uid: str, institutes: str, departments: str, labs: str):
-        msg = (f"Cannot determine organization hierarchy of {uid}: "
-               f'institutes="{institutes}" '
-               f'departments="{departments}" '
-               f'labs="{labs}"')
+    pass
+
+
+class AmbiguousHierarchyError(AmbiguityError):
+    def __init__(self, record: mwb.NameRecord):
+        msg = (f"Cannot determine organization hierarchy of {record.psid}: "
+               f'institutes="{record.institute}" '
+               f'departments="{record.department}" '
+               f'labs="{record.laboratory}"')
         super().__init__(msg)
 
 
-def add_developers(sup_conn: psycopg2.extensions.connection) -> None:
-    with sup_conn.cursor() as cursor:
-        pmids = set(tools.MetabolomicsToolsWiki.pmids())
-        total = len(pmids)
-        if total == 0:
-            return
+class AmbiguousNamesError(AmbiguityError):
+    def __init__(self, record: mwb.NameRecord):
+        msg = (f"Number of name parts differs for {record.psid}: "
+               f'first_name="{record.first_name}" '
+               f'last_name="{record.last_name}"')
+        super().__init__(msg)
 
-        publications = db.get_pubmed_publications(cursor, pmids)
-        pmids = pmids.intersection(publications.keys())
-        print(f'Found {len(pmids)} of {total} tools-related publications in '
-              'the Supplemental database.')
-        if len(pmids) == 0:
-            return
 
-        for pmid in pmids:
-            author_list = parse_author_list(publications[pmid])
-            for author in author_list:
-                forename = author.findtext('ForeName', '').strip()
-                lastname = author.findtext('LastName', '').strip()
+def add_developers(sup_cur: db.Cursor) -> None:
+    pmids = set(tools.MetabolomicsToolsWiki.pmids())
+    total = len(pmids)
+    if total == 0:
+        return
 
-                if not forename:
-                    print(f'PMID {pmid}: missing forename of author '
-                          f'{lastname}')
+    publications = db.get_pubmed_publications(sup_cur, pmids)
+    pmids = pmids.intersection(publications.keys())
+    print(f"Found {len(pmids)} of {total} tools-related publications in the "
+          "Supplemental database.")
+    if len(pmids) == 0:
+        return
+
+    for pmid in pmids:
+        author_list = parse_author_list(publications[pmid])
+        for author in author_list:
+            forename = author.findtext("ForeName", "").strip()
+            lastname = author.findtext("LastName", "").strip()
+
+            if not forename:
+                print(f"PMID {pmid}: missing forename of author {lastname}")
+                continue
+
+            if not lastname:
+                print(f"PMID {pmid}: missing surname of author {forename}")
+                continue
+
+            matches = list(db.get_person(sup_cur, forename, lastname))
+            if len(matches) > 1:
+                print(f"PMID {pmid}: WARNING! Found {len(matches)} people "
+                      f" named {forename} {lastname}: {' '.join(matches)}")
+                continue
+
+            if matches:
+                pid = matches[0]
+                print(f"PMID {pmid}: found {forename} {lastname}: {pid}")
+            else:
+                pid = db.add_person(sup_cur, forename, lastname, "", "")
+                if not pid:
+                    print(f"PMID {pmid}: WARNING failed to add person: "
+                          f"{forename} {lastname}")
                     continue
+                print(f"PMID {pmid}: added {forename} {lastname}: {pid}")
 
-                if not lastname:
-                    print(f'PMID {pmid}: missing surname of author {forename}')
+            affiliation_list = author.findall(".//Affiliation")
+            for affiliation in affiliation_list:
+                affiliation = affiliation.text.strip()
+                if not affiliation:
                     continue
-
-                matches = list(db.get_person(cursor, forename, lastname))
-                if len(matches) > 1:
-                    print(f"PMID {pmid}: WARNING! Found {len(matches)} people "
-                          f" named {forename} {lastname}: {' '.join(matches)}")
-                    continue
-
-                if matches:
-                    pid = matches[0]
-                    print(f'PMID {pmid}: found {forename} {lastname}: {pid}')
-                else:
-                    pid = db.add_person(cursor, forename, lastname, '', '')
-                    if not pid:
-                        print(f'PMID {pmid}: WARNING failed to add person: '
-                              f'{forename} {lastname}')
-                        continue
-                    print(f'PMID {pmid}: added {forename} {lastname}: {pid}')
-
-                affiliation_list = author.findall('.//Affiliation')
-                for affiliation in affiliation_list:
-                    affiliation = affiliation.text.strip()
-                    if not affiliation:
-                        continue
-                    print(f"PMID {pmid}: affiliation for {forename} {lastname}"
-                          f": {affiliation}")
+                print(f"PMID {pmid}: affiliation for {forename} {lastname}"
+                      f": {affiliation}")
 
     return
 
 
-def add_organization(sup_cur: db.Cursor, institute_field: str,
-                     department_field: str, laboratory_field: str, uid: str):
-    if not institute_field:
-        assert not department_field
-        assert not laboratory_field
+def add_organizations(sup_cur: db.Cursor,
+                      record: mwb.NameRecord
+                      ) -> List[Tuple[int, int, int]]:
+    """
+    Adds institutes, departments, and labs to the Supplemental database.
+
+    Returns the IDs as a 3-tuple (institute ID, department ID, lab ID).
+    """
+    if not record.institute:
+        assert not record.department
+        assert not record.laboratory
         return
 
-    institutes = [inst.strip() for inst in institute_field.split(';')]
-    departments = [dept.strip() for dept in department_field.split(';')]
-    laboratories = [lab.strip() for lab in laboratory_field.split(';')]
+    institutes = [inst.strip() for inst in record.institute.split(';')]
+    departments = [dept.strip() for dept in record.department.split(';')]
+    laboratories = [lab.strip() for lab in record.laboratory.split(';')]
 
     # Special case: allow department field is be completely empty.
-    if department_field.strip() == "":
+    if record.department.strip() == "":
         departments = [""] * len(institutes)
     # Special case: allow laboratory field is be completely empty.
-    if laboratory_field.strip() == "":
+    if record.laboratory.strip() == "":
         laboratories = [""] * len(institutes)
 
     icnt = len(institutes)
@@ -122,15 +140,16 @@ def add_organization(sup_cur: db.Cursor, institute_field: str,
     lcnt = len(laboratories)
 
     if not(dcnt in [1, lcnt] and icnt in [1, dcnt]):
-        raise AmbiguityError(uid, institute_field, department_field,
-                             laboratory_field)
+        raise AmbiguousHierarchyError(record)
 
     institute_ids = []
     for i, institute in enumerate(institutes):
-        oid = db.get_organization(sup_cur, INSTITUTE, institute)
+        oid = db.get_organization(sup_cur, mwb.INSTITUTE, institute)
         if not oid:
-            oid = db.add_organization(sup_cur, INSTITUTE, institute)
-            print(f"Added institute #{oid}: {institute}.")
+            oid = db.add_organization(sup_cur, mwb.INSTITUTE, institute)
+            print(record.psid, f"added institute #{oid}: {institute}.")
+        else:
+            print(record.psid, f"found institute #{oid}: {institute}.")
         assert oid
         institute_ids.append(oid)
 
@@ -146,16 +165,23 @@ def add_organization(sup_cur: db.Cursor, institute_field: str,
             parent = institute_ids[i]
         assert parent > 0
 
-        oid = db.get_organization(sup_cur, DEPARTMENT, department, parent)
+        oid = db.get_organization(sup_cur, mwb.DEPARTMENT, department, parent)
 
         if not oid:
-            oid = db.add_organization(sup_cur, DEPARTMENT, department, parent)
-            print(f"Added department #{oid}: {department} (parent #{parent}).")
+            oid = db.add_organization(sup_cur, mwb.DEPARTMENT, department,
+                                      parent)
+            print(record.psid,
+                  f"added department #{oid}: {department} (parent #{parent}).")
+        else:
+            print(record.psid, f"found department #{oid}: {department}.")
+
         assert oid
         department_ids.append(oid)
 
+    laboratory_ids = []
     for i, laboratory in enumerate(laboratories):
         if not laboratory:
+            laboratory_ids.append(0)
             continue
 
         if dcnt == 1:
@@ -170,172 +196,136 @@ def add_organization(sup_cur: db.Cursor, institute_field: str,
                 parent = institute_ids[i]
         assert parent > 0
 
-        oid = db.get_organization(sup_cur, LABORATORY, laboratory, oid)
+        oid = db.get_organization(sup_cur, mwb.LABORATORY, laboratory, parent)
 
         if not oid:
-            oid = db.add_organization(sup_cur, LABORATORY, laboratory, parent)
-            print(f"Added laboratory #{oid}: {laboratory} (parent #{parent}).")
+            oid = db.add_organization(sup_cur, mwb.LABORATORY, laboratory,
+                                      parent)
+            print(record.psid,
+                  f"added laboratory #{oid}: {laboratory} (parent #{parent}).")
+        else:
+            print(record.psid, f"found laboratory #{oid}: {laboratory}.")
+
         assert oid
+        laboratory_ids.append(oid)
+
+    ids: List[Tuple[int, int, int]] = []
+
+    for i, laboratory_id in enumerate(laboratory_ids):
+        institute_id = institute_ids[0]
+        if icnt > 1:
+            institute_id = institute_ids[i]
+
+        department_id = department_ids[0]
+        if dcnt > 1:
+            department_id = department_ids[i]
+
+        ids.append((institute_id, department_id, laboratory_id))
+
+    return ids
 
 
-def add_organizations(mwb_conn: db.Connection, sup_conn: db.Connection,
-                      embargoed: List[str]) -> None:
-    with mwb_conn.cursor() as mwb_cur, sup_conn.cursor() as sup_cur:
-        orgs = db.find_organizations(mwb_cur)
-        for org in orgs:
-            institutes, departments, labs, uid = [t.strip() for t in org]
-            if uid in embargoed:
-                continue  # Exclude embargoed studies.
-            add_organization(sup_cur, institutes, departments, labs, uid)
+def add_people(sup_cur: db.Cursor, record: mwb.NameRecord) -> List[int]:
+    """ Adds people to the Supplemental database, returning their IDs. """
+    ids: List[int] = []
 
+    psid = record.psid
+    last_names = [ln.strip() for ln in record.last_name.split(';')]
+    first_names = [fn.strip() for fn in record.first_name.split(';')]
+    emails = [e.strip() for e in record.email.split(';')]
+    phones = [p.strip() for p in record.phone.split(';')]
 
-def add_people(mwb_conn: psycopg2.extensions.connection,
-               sup_conn: psycopg2.extensions.connection,
-               embargoed: List[str]) -> None:
+    if len(last_names) != len(first_names):
+        raise AmbiguousNamesError(record)
 
-    # For each (first_name, last_name) across both project and study:
-    #   if (first_name, last_name) in names => skip
-    #   add person to people table and name to names table.
+    if len(emails) > len(last_names):
+        error(psid, "too many email addresses for", record.email)
+        emails = []  # Don't try to add ANY email addresses for this record.
+    if len(phones) > len(last_names):
+        error(psid, "too many phone numbers for", record.phone)
+        phones = []  # Don't try to add ANY phone numbers for this record.
 
-    with mwb_conn.cursor() as mwb_cur, sup_conn.cursor() as sup_cur:
-        people = db.find_people(mwb_cur)
+    # It's acceptable to have fewer emails and phone numbers than names.
+    combined = itertools.zip_longest(last_names, first_names, emails, phones,
+                                     fillvalue="")
 
-        for row in people:
-            (first_names, last_names,
-             institutes, departments, labs,
-             uid,
-             emails, phones
-             ) = tuple(row)
+    for last_name, first_name, email, phone in combined:
+        person_ids = get_person(sup_cur, first_name, last_name,
+                                exclude_withheld=False)
+        if bad_email(email):
+            error(psid, f"bad email address: {record.email}")
+            email = ""
 
-            # Exclude embargoed studies.
-            if uid in embargoed:
-                continue
-
-            last_name_list = [ln.strip() for ln in last_names.split(';')]
-            first_name_list = [fn.strip() for fn in first_names.split(';')]
-            emails = [e.strip() for e in emails.split(';')]
-            phones = [p.strip() for p in phones.split(';')]
-
-            for i in range(0, len(last_name_list)):
-                last_name = last_name_list[i]
-                first_name = first_name_list[i]
-                try:
-                    email = emails[i]
-                except IndexError:
-                    email = ""  # Allow fewer emails than names.
-                try:
-                    phone = phones[i]
-                except IndexError:
-                    phone = ""  # Allow fewer phone numbers than names
-
-                person_ids = get_person(sup_cur, first_name, last_name,
-                                        exclude_withheld=False)
-                if len(person_ids) > 1:
-                    print("ERROR: multiple people with same name",
-                          file=sys.stderr)
-                    print("first={}. last={}. ids={}."
-                          .format(first_name, last_name,
-                                  ', '.join(person_ids)),
-                          file=sys.stderr)
-                    sys.exit(1)
-
-                if len(person_ids) == 1:
-                    person_id = person_ids[0]
-                    details = db.get_contact_details(sup_cur, person_id)
-                    curr_email, curr_phone = details
-
-                    if email == curr_email and phone == curr_phone:
-                        print(f"Skipping person #{person_id}: "
-                              f"{first_name} {last_name}.")
-                    else:
-                        updated = db.update_contact_details(sup_cur, person_id,
-                                                            email, phone)
-                        if updated:
-                            print("Updated contact details for person "
-                                  f"#{person_id}: {first_name} {last_name}.")
-                        else:
-                            print("Failed to update contact details for person"
-                                  f" #{person_id}: {first_name} {last_name}.")
+        if len(person_ids) > 1:
+            pid = 0
+            error(psid, "multiple people with the same name:",
+                  f'first="{first_name}',
+                  f'last="{last_name}"',
+                  f'ids="{", ".join(person_ids)}"')
+        elif len(person_ids) == 1:
+            pid = person_ids[0]
+            details = db.get_contact_details(sup_cur, pid)
+            curr_email, curr_phone = details
+            print(psid, f"found person #{pid}: {first_name} {last_name}.")
+            if email != curr_email or phone != curr_phone:
+                updated = db.update_contact_details(sup_cur, pid, email, phone)
+                if updated:
+                    print(psid, "updated contact details for person",
+                          f"#{pid}: {first_name} {last_name}.")
                 else:
-                    person_id = db.add_person(sup_cur, first_name, last_name,
-                                              email, phone)
-                    print(f"Added person #{person_id}: {first_name} "
-                          f"{last_name} (email={email}; phone={phone}).")
+                    error(psid, "failed to update contact details for person",
+                          f"#{pid}: {first_name} {last_name}.")
+        else:
+            pid = db.add_person(sup_cur, first_name, last_name, email, phone)
+            print(psid, f"Added person #{pid}: {first_name} {last_name}",
+                  f"(email={email}; phone={phone}).")
 
-                # Create associations
-                institute_list = [inst.strip()
-                                  for inst in institutes.split(';')]
-                try:
-                    department_list = [dept.strip()
-                                       for dept in departments.split(';')]
-                except AttributeError:
-                    department_list = []
-                try:
-                    lab_list = [lab.strip() for lab in labs.split(';')]
-                except AttributeError:
-                    lab_list = []
-                max_range = len(institute_list)
-                if len(department_list) > max_range:
-                    max_range = len(department_list)
-                if len(lab_list) > max_range:
-                    max_range = len(lab_list)
+        ids.append(pid)
 
-                for i in range(0, max_range):
-                    # If there are not enough institutes, default to first
-                    try:
-                        institute_id = db.get_organization(
-                            sup_cur, INSTITUTE, institute_list[i])
-                        assert institute_id
-                        db.associate(sup_cur, person_id, institute_id)
-                        parent_id = institute_id
-                    except IndexError:
-                        institute_id = db.get_organization(
-                            sup_cur, INSTITUTE, institute_list[0])
-                        assert institute_id
-                        parent_id = institute_id
+    return ids
 
-                    # If there are not enough departments, default to first
-                    if departments:
-                        try:
-                            department_id = db.get_organization(
-                                sup_cur, DEPARTMENT, department_list[i],
-                                parent_id)
 
-                            if department_id:
-                                db.associate(sup_cur, person_id, department_id)
-                                parent_id = department_id
-                        except IndexError:
-                            department_id = db.get_organization(
-                                sup_cur, DEPARTMENT, department_list[0],
-                                parent_id)
-                            if department_id:
-                                parent_id = department_id
+def associate(sup_cur: db.Cursor, psid: str, person_id: int, institute_id: int,
+              department_id: int, laboratory_id: int):
+    if person_id == 0:
+        return
 
-                    if labs:
-                        try:
-                            laboratory_id = db.get_organization(
-                                sup_cur, LABORATORY, lab_list[i], parent_id)
-                            if laboratory_id:
-                                db.associate(sup_cur, person_id, laboratory_id)
-                        except IndexError:
-                            print('WARNING: There are more institutes/'
-                                  'departments than labs\n'
-                                  'Institute list: ' + institutes + '\n'
-                                  'Department list: ' + departments + '\n'
-                                  'Lab list: ' + labs)
+    templates = ["person #{} already associated with {} #{}.",
+                 "associated person #{} with {} #{}."]
 
-                print(('Associated {} {} (person) with '
-                       '{} (institute) {} (department) {} (lab)')
-                      .format(first_name, last_name, institutes, departments,
-                              labs))
+    if institute_id > 0:
+        t = db.associate(sup_cur, person_id, institute_id)
+        tmpl = templates[int(t)]
+        print(psid, tmpl.format(person_id, "institute", institute_id))
 
-    return
+    if department_id > 0:
+        t = db.associate(sup_cur, person_id, department_id)
+        tmpl = templates[int(t)]
+        print(psid, tmpl.format(person_id, "department", department_id))
+
+    if laboratory_id > 0:
+        t = db.associate(sup_cur, person_id, laboratory_id)
+        tmpl = templates[int(t)]
+        print(psid, tmpl.format(person_id, "laboratory", laboratory_id))
+
+
+def bad_email(email: str) -> bool:
+    return ' ' in email
+
+
+def error(*values, sep=' ', end='\n', flush=False) -> None:
+    """
+    Prints values to `stderr` instead of `stdout`.
+
+    Equivalent to `print(*values, file=sys.stderr)`.
+    """
+    print(*values, sep=sep, end=end, file=sys.stderr, flush=flush)
 
 
 def main():
-    '''Adds people and organizations to the mwb_supplemental database.'''
+    """Adds people and organizations to the mwb_supplemental database."""
     if len(sys.argv) < 2:
-        print(__doc__)
+        error(__doc__)
         sys.exit(2)
 
     if sys.argv[1] in ["-h", "--help"]:
@@ -345,36 +335,81 @@ def main():
     config_path = sys.argv[1]
     config = metab_import.get_config(config_path)
 
-    mwb_conn: psycopg2.extensions.connection = psycopg2.connect(
-        host=config.get('mwb_host'), dbname=config.get('mwb_database'),
-        user=config.get('mwb_username'), password=config.get('mwb_password'),
-        port=config.get('mwb_port'))
+    mwb_client = mwb.Client(config.get("mwb_host"), config.get("mwb_port"))
+    sup_conn: db.Connection = psycopg2.connect(
+        host=config.get("sup_host"), dbname=config.get("sup_database"),
+        user=config.get("sup_username"), password=config.get("sup_password"),
+        port=config.get("sup_port"))
 
-    sup_conn: psycopg2.extensions.connection = psycopg2.connect(
-        host=config.get('sup_host'), dbname=config.get('sup_database'),
-        user=config.get('sup_username'), password=config.get('sup_password'),
-        port=config.get('sup_port'))
-
-    embargoed_path = config.get('embargoed', '')
+    embargoed_path = config.get("embargoed", "")
     embargoed: List[str] = []
     if embargoed_path:
         with open(embargoed_path) as f:
             embargoed = [line.strip() for line in f if line]
 
-    with mwb_conn, sup_conn:
-        add_organizations(mwb_conn, sup_conn, embargoed)
-        add_people(mwb_conn, sup_conn, embargoed)
-        add_developers(sup_conn)
+    with sup_conn:
+        with sup_conn.cursor() as sup_cur:
+            process_projects_and_studies(mwb_client, sup_cur, embargoed)
+            add_developers(sup_cur)
 
     sup_conn.close()
-    mwb_conn.close()
 
 
 def parse_author_list(xml: str) -> ET.ElementTree:
     file = io.StringIO(xml)
     data = ET.parse(file)
-    author_list = data.findall('//Article/AuthorList/Author')
+    author_list = data.findall("//Article/AuthorList/Author")
     return author_list
+
+
+def process_projects_and_studies(mwb_client: mwb.Client,
+                                 sup_cur: db.Cursor,
+                                 embargoed: List[str]
+                                 ) -> None:
+    """
+    Process all `project` and `study` records from Metabolomics Workbench.
+
+    Parse names of people and organizations and then associate the right people
+    with the right organizations.
+
+    Note: embargoed studies are skipped.
+    """
+    records = mwb_client.fetch_names()
+
+    for rec in records:
+        if rec.pstype == mwb.STUDY and rec.psid in embargoed:
+            continue  # Exclude embargoed studies.
+
+        try:
+            ppl = add_people(sup_cur, rec)
+            orgs = add_organizations(sup_cur, rec)
+        except AmbiguityError as e:
+            error(rec.psid, type(e).__name__, e)
+            continue
+
+        if len(ppl) == 1:
+            person_id = ppl[0]
+            for (institute_id, dept_id, lab_id) in orgs:
+                associate(sup_cur,
+                          rec.psid, person_id, institute_id, dept_id, lab_id)
+            continue
+
+        if len(orgs) == 1:
+            institute_id, dept_id, lab_id = orgs[0]
+            for person_id in ppl:
+                associate(sup_cur,
+                          rec.psid, person_id, institute_id, dept_id, lab_id)
+            continue
+
+        if len(ppl) != len(orgs):
+            error(rec.psid, f"cannot determine association between {len(ppl)}",
+                  f"person(s) and {len(orgs)} organization(s).")
+            continue
+
+        for (person_id, org) in zip(ppl, orgs):
+            institute_id, dept_id, lab_id = org
+            associate(sup_cur,
+                      rec.psid, person_id, institute_id, dept_id, lab_id)
 
 
 if __name__ == "__main__":

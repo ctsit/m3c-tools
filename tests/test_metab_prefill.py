@@ -1,7 +1,11 @@
-from typing import List, Tuple
+import typing
 import unittest
 
+from m3c import mwb
 import metab_prefill
+
+
+List = typing.List
 
 
 class TestMetabPrefill(unittest.TestCase):
@@ -10,99 +14,136 @@ class TestMetabPrefill(unittest.TestCase):
             metab_prefill.db.add_organization,
             metab_prefill.db.find_organizations,
             metab_prefill.db.get_organization,
+            metab_prefill.db.add_person,
+            metab_prefill.get_person,
         ]
 
         metab_prefill.db.add_organization = add_organization
         metab_prefill.db.find_organizations = find_organizations
         metab_prefill.db.get_organization = get_organization
+        metab_prefill.db.add_person = add_person
+        metab_prefill.get_person = get_person
 
     def tearDown(self):
         metab_prefill.db.add_organization,
         metab_prefill.db.find_organizations,
-        metab_prefill.db.get_organization = self.olddb
+        metab_prefill.db.get_organization,
+        metab_prefill.db.add_person,
+        metab_prefill.get_person = self.olddb
         del self.olddb
 
         organizations.clear()
-        projects.clear()
 
     def test_monkeypatch(self):
         expected = "The Corporation"
-        projects.append((expected, "", ""))
-
-        conn = MockDatabaseConnection()
-        metab_prefill.add_organizations(conn, conn, [])
-
+        cursor = MockDatabaseConnection().cursor()
+        rec = make_record(institute=expected)
+        metab_prefill.add_organizations(cursor, rec)
         self.assertEqual(len(organizations), 1)
         self.assertEqual(organizations[0], expected)
 
     def test_strip_names(self):
         expected = ["The Corporation", "College University"]
-        projects.append(("The Corporation; College University", "", ""))
-
-        conn = MockDatabaseConnection()
-        metab_prefill.add_organizations(conn, conn, [])
-
+        cursor = MockDatabaseConnection().cursor()
+        rec = make_record(institute="The Corporation; College University")
+        metab_prefill.add_organizations(cursor, rec)
         self.assertListEqual(organizations, expected)
 
     def test_multiname_single_institute_department_lab(self):
         expected = ["The Institute", "The Department", "The Lab"]
-        projects.append(tuple(expected))
-        conn = MockDatabaseConnection()
-        metab_prefill.add_organizations(conn, conn, [])
+        cursor = MockDatabaseConnection().cursor()
+        rec = make_record(institute=expected[0], department=expected[1],
+                          laboratory=expected[2])
+        metab_prefill.add_organizations(cursor, rec)
         self.assertListEqual(organizations, expected)
 
     def test_multiname_same_number_of_institutes_departments_and_labs(self):
-        projects.append(("UF  ; FSU", "Chem; Chem", "Smith;Jones"))
-        conn = MockDatabaseConnection()
-        metab_prefill.add_organizations(conn, conn, [])
+        cursor = MockDatabaseConnection().cursor()
+        rec = make_record(institute="UF  ; FSU",
+                          department="Chem; Chem",
+                          laboratory="Smith;Jones")
+        metab_prefill.add_organizations(cursor, rec)
         expected = ["UF", "FSU", "Chem", "Chem", "Smith", "Jones"]
         self.assertListEqual(organizations, expected)
 
     def test_multiname_single_institute_and_dept_many_labs(self):
-        projects.append(("UF", "Computers", "Teabeau; Clueknee"))
-        conn = MockDatabaseConnection()
-        metab_prefill.add_organizations(conn, conn, [])
+        cursor = MockDatabaseConnection().cursor()
+        rec = make_record(institute="UF",
+                          department="Computers",
+                          laboratory="Teabeau; Clueknee")
+        metab_prefill.add_organizations(cursor, rec)
         expected = ["UF", "Computers", "Teabeau", "Clueknee"]
         self.assertListEqual(organizations, expected)
 
     def test_multiname_single_institute_same_number_of_depts_and_labs(self):
-        projects.append(("UF", "Chemistry; Taste and Smell", "Smith;Akkbar"))
-        conn = MockDatabaseConnection()
-        metab_prefill.add_organizations(conn, conn, [])
+        cursor = MockDatabaseConnection().cursor()
+        rec = make_record(institute="UF",
+                          department="Chemistry; Taste and Smell",
+                          laboratory="Smith;Akkbar")
+        metab_prefill.add_organizations(cursor, rec)
         expected = ["UF", "Chemistry", "Taste and Smell", "Smith", "Akkbar"]
         self.assertListEqual(organizations, expected)
 
     def test_multiname_fewer_depts_than_institutes_errors(self):
         # Ambiguity: which institute does the department belong to?
-        projects.append(("UF;FSU", "Biology", "Bobby"))
-        conn = MockDatabaseConnection()
+        rec = make_record(institute="UF;FSU",
+                          department="Biology",
+                          laboratory="Bobby")
+        cursor = MockDatabaseConnection().cursor()
         with self.assertRaises(metab_prefill.AmbiguityError):
-            metab_prefill.add_organizations(conn, conn, [])
+            metab_prefill.add_organizations(cursor, rec)
 
     def test_multiname_fewer_labs_than_departments_errors(self):
         # Ambiguity: which department does the lab belong to?
-        projects.append(("UF", "Biology;Chem", "Bobby"))
-        conn = MockDatabaseConnection()
+        rec = make_record(institute="UF",
+                          department="Biology;Chem",
+                          laboratory="Bobby")
+        cursor = MockDatabaseConnection().cursor()
         with self.assertRaises(metab_prefill.AmbiguityError):
-            metab_prefill.add_organizations(conn, conn, [])
+            metab_prefill.add_organizations(cursor, rec)
 
     def test_multiname_too_many_labs(self):
         # Ambiguity: which department does the last lab belong to?
-        projects.append(("UF;FSU", "Biology;Chem", "Bobby;Jones;Davis"))
-        conn = MockDatabaseConnection()
+        rec = make_record(institute="UF;FSU",
+                          department="Biology;Chem",
+                          laboratory="Bobby;Jones;Davis")
+        cursor = MockDatabaseConnection().cursor()
         with self.assertRaises(metab_prefill.AmbiguityError):
-            metab_prefill.add_organizations(conn, conn, [])
+            metab_prefill.add_organizations(cursor, rec)
 
     def test_multiname_too_many_departments(self):
         # Ambiguity: which institute does the last department belong to?
-        projects.append(("UF;FSU", "Biology;Chem;Yo", "Bobby;Jones;Davis"))
-        conn = MockDatabaseConnection()
+        rec = make_record(institute="UF;FSU",
+                          department="Biology;Chem;Yo",
+                          laboratory="Bobby;Jones;Davis")
+        cursor = MockDatabaseConnection().cursor()
         with self.assertRaises(metab_prefill.AmbiguityError):
-            metab_prefill.add_organizations(conn, conn, [])
+            metab_prefill.add_organizations(cursor, rec)
+
+    def test_multiname_single_person(self):
+        rec = make_record(last_name="Bond", first_name="James")
+        cursor = MockDatabaseConnection().cursor()
+        actual = metab_prefill.add_people(cursor, rec)
+        self.assertEqual(len(actual), 1)
+        self.assertEqual(people[0], "James Bond")
+
+    def test_multiname_too_few_surnames(self):
+        rec = make_record(last_name="Bond", first_name="James;Michael")
+        cursor = MockDatabaseConnection().cursor()
+        with self.assertRaises(metab_prefill.AmbiguousNamesError):
+            metab_prefill.add_people(cursor, rec)
+
+    def test_multiname_too_many_emails(self):
+        rec = make_record(last_name="Bond", first_name="James",
+                          email="007@secret.gov.uk and foo@example.com")
+        cursor = MockDatabaseConnection().cursor()
+        metab_prefill.add_people(cursor, rec)
+        self.assertEqual(emails[0], "")
 
 
-projects: List[Tuple[str, str, str]] = []
-organizations: List[Tuple[str, int]] = []
+organizations: List[str] = []
+people: List[str] = []
+emails: List[str] = []
 
 
 def add_organization(cursor, type, name, parent_id=None):
@@ -110,9 +151,14 @@ def add_organization(cursor, type, name, parent_id=None):
     return len(organizations)
 
 
+def add_person(cursor, first_name, last_name, email, phone):
+    people.append(f"{first_name} {last_name}")
+    emails.append(email)
+    return len(people)
+
+
 def find_organizations(cursor):
-    for (institute, department, lab) in projects:
-        yield [institute, department, lab, "PROJECT_ID"]
+    return []
 
 
 def get_organization(cursor, type, name, parent_id=None):
@@ -124,6 +170,10 @@ def get_organization(cursor, type, name, parent_id=None):
         return 0
 
 
+def get_person(cursor, first_name, last_name, exclude_withheld=True):
+    return []
+
+
 class MockDatabaseConnection:
     def cursor(self):
         return self
@@ -133,6 +183,13 @@ class MockDatabaseConnection:
 
     def __exit__(self, a, b, c):
         pass
+
+
+def make_record(psid="PR123", pstype=mwb.PROJECT, first_name="", last_name="",
+                institute="", department="", laboratory="", email="", phone=""
+                ) -> mwb.NameRecord:
+    return mwb.NameRecord(psid, pstype, first_name, last_name, institute,
+                          department, laboratory, email, phone)
 
 
 if __name__ == "__main__":
