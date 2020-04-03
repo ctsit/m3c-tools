@@ -2,7 +2,7 @@ import typing
 import unittest
 
 from m3c import mwb
-import metab_prefill
+from m3c import prefill
 
 
 List = typing.List
@@ -11,25 +11,25 @@ List = typing.List
 class TestMetabPrefill(unittest.TestCase):
     def setUp(self):
         self.olddb = [
-            metab_prefill.db.add_organization,
-            metab_prefill.db.find_organizations,
-            metab_prefill.db.get_organization,
-            metab_prefill.db.add_person,
-            metab_prefill.get_person,
+            prefill.db.add_organization,
+            prefill.db.find_organizations,
+            prefill.db.get_organization,
+            prefill.db.add_person,
+            prefill.get_person,
         ]
 
-        metab_prefill.db.add_organization = add_organization
-        metab_prefill.db.find_organizations = find_organizations
-        metab_prefill.db.get_organization = get_organization
-        metab_prefill.db.add_person = add_person
-        metab_prefill.get_person = get_person
+        prefill.db.add_organization = add_organization
+        prefill.db.find_organizations = find_organizations
+        prefill.db.get_organization = get_organization
+        prefill.db.add_person = add_person
+        prefill.get_person = get_person
 
     def tearDown(self):
-        metab_prefill.db.add_organization,
-        metab_prefill.db.find_organizations,
-        metab_prefill.db.get_organization,
-        metab_prefill.db.add_person,
-        metab_prefill.get_person = self.olddb
+        prefill.db.add_organization,
+        prefill.db.find_organizations,
+        prefill.db.get_organization,
+        prefill.db.add_person,
+        prefill.get_person = self.olddb
         del self.olddb
 
         organizations.clear()
@@ -38,7 +38,7 @@ class TestMetabPrefill(unittest.TestCase):
         expected = "The Corporation"
         cursor = MockDatabaseConnection().cursor()
         rec = make_record(institute=expected)
-        metab_prefill.add_organizations(cursor, rec)
+        prefill.add_organizations(cursor, rec)
         self.assertEqual(len(organizations), 1)
         self.assertEqual(organizations[0], expected)
 
@@ -46,7 +46,7 @@ class TestMetabPrefill(unittest.TestCase):
         expected = ["The Corporation", "College University"]
         cursor = MockDatabaseConnection().cursor()
         rec = make_record(institute="The Corporation; College University")
-        metab_prefill.add_organizations(cursor, rec)
+        prefill.add_organizations(cursor, rec)
         self.assertListEqual(organizations, expected)
 
     def test_multiname_single_institute_department_lab(self):
@@ -54,7 +54,7 @@ class TestMetabPrefill(unittest.TestCase):
         cursor = MockDatabaseConnection().cursor()
         rec = make_record(institute=expected[0], department=expected[1],
                           laboratory=expected[2])
-        metab_prefill.add_organizations(cursor, rec)
+        prefill.add_organizations(cursor, rec)
         self.assertListEqual(organizations, expected)
 
     def test_multiname_same_number_of_institutes_departments_and_labs(self):
@@ -62,7 +62,7 @@ class TestMetabPrefill(unittest.TestCase):
         rec = make_record(institute="UF  ; FSU",
                           department="Chem; Chem",
                           laboratory="Smith;Jones")
-        metab_prefill.add_organizations(cursor, rec)
+        prefill.add_organizations(cursor, rec)
         expected = ["UF", "FSU", "Chem", "Chem", "Smith", "Jones"]
         self.assertListEqual(organizations, expected)
 
@@ -71,7 +71,7 @@ class TestMetabPrefill(unittest.TestCase):
         rec = make_record(institute="UF",
                           department="Computers",
                           laboratory="Teabeau; Clueknee")
-        metab_prefill.add_organizations(cursor, rec)
+        prefill.add_organizations(cursor, rec)
         expected = ["UF", "Computers", "Teabeau", "Clueknee"]
         self.assertListEqual(organizations, expected)
 
@@ -80,7 +80,7 @@ class TestMetabPrefill(unittest.TestCase):
         rec = make_record(institute="UF",
                           department="Chemistry; Taste and Smell",
                           laboratory="Smith;Akkbar")
-        metab_prefill.add_organizations(cursor, rec)
+        prefill.add_organizations(cursor, rec)
         expected = ["UF", "Chemistry", "Taste and Smell", "Smith", "Akkbar"]
         self.assertListEqual(organizations, expected)
 
@@ -90,8 +90,8 @@ class TestMetabPrefill(unittest.TestCase):
                           department="Biology",
                           laboratory="Bobby")
         cursor = MockDatabaseConnection().cursor()
-        with self.assertRaises(metab_prefill.AmbiguityError):
-            metab_prefill.add_organizations(cursor, rec)
+        with self.assertRaises(prefill.AmbiguityError):
+            prefill.add_organizations(cursor, rec)
 
     def test_multiname_fewer_labs_than_departments_errors(self):
         # Ambiguity: which department does the lab belong to?
@@ -99,8 +99,8 @@ class TestMetabPrefill(unittest.TestCase):
                           department="Biology;Chem",
                           laboratory="Bobby")
         cursor = MockDatabaseConnection().cursor()
-        with self.assertRaises(metab_prefill.AmbiguityError):
-            metab_prefill.add_organizations(cursor, rec)
+        with self.assertRaises(prefill.AmbiguityError):
+            prefill.add_organizations(cursor, rec)
 
     def test_multiname_too_many_labs(self):
         # Ambiguity: which department does the last lab belong to?
@@ -108,8 +108,8 @@ class TestMetabPrefill(unittest.TestCase):
                           department="Biology;Chem",
                           laboratory="Bobby;Jones;Davis")
         cursor = MockDatabaseConnection().cursor()
-        with self.assertRaises(metab_prefill.AmbiguityError):
-            metab_prefill.add_organizations(cursor, rec)
+        with self.assertRaises(prefill.AmbiguityError):
+            prefill.add_organizations(cursor, rec)
 
     def test_multiname_too_many_departments(self):
         # Ambiguity: which institute does the last department belong to?
@@ -117,27 +117,27 @@ class TestMetabPrefill(unittest.TestCase):
                           department="Biology;Chem;Yo",
                           laboratory="Bobby;Jones;Davis")
         cursor = MockDatabaseConnection().cursor()
-        with self.assertRaises(metab_prefill.AmbiguityError):
-            metab_prefill.add_organizations(cursor, rec)
+        with self.assertRaises(prefill.AmbiguityError):
+            prefill.add_organizations(cursor, rec)
 
     def test_multiname_single_person(self):
         rec = make_record(last_name="Bond", first_name="James")
         cursor = MockDatabaseConnection().cursor()
-        actual = metab_prefill.add_people(cursor, rec)
+        actual = prefill.add_people(cursor, rec)
         self.assertEqual(len(actual), 1)
         self.assertEqual(people[0], "James Bond")
 
     def test_multiname_too_few_surnames(self):
         rec = make_record(last_name="Bond", first_name="James;Michael")
         cursor = MockDatabaseConnection().cursor()
-        with self.assertRaises(metab_prefill.AmbiguousNamesError):
-            metab_prefill.add_people(cursor, rec)
+        with self.assertRaises(prefill.AmbiguousNamesError):
+            prefill.add_people(cursor, rec)
 
     def test_multiname_too_many_emails(self):
         rec = make_record(last_name="Bond", first_name="James",
                           email="007@secret.gov.uk and foo@example.com")
         cursor = MockDatabaseConnection().cursor()
-        metab_prefill.add_people(cursor, rec)
+        prefill.add_people(cursor, rec)
         self.assertEqual(emails[0], "")
 
 

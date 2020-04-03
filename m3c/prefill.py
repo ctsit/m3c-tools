@@ -1,8 +1,8 @@
 """
 Metab Importer
 Usage:
-    python metab_prefill.py (-h | --help)
-    python metab_prefill.py <path_to_config>
+    python m3c/prefill.py (-h | --help)
+    python m3c/prefill.py <path_to_config>
 
 Options:
     -h --help       Show this message and exit
@@ -11,7 +11,7 @@ Instructions:
     See README
 
 Example:
-    $ python metab_prefill.py config.yaml
+    $ python m3c/prefill.py config.yaml
 """
 
 import io

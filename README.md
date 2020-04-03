@@ -38,7 +38,7 @@ its own terminal tab.
 
 Once the tunnel is prepared, you can run the pre-fill script.
 
-    $ python metab_prefill.py $CONFIG_PATH
+    $ python m3c/prefill.py $CONFIG_PATH
 
 This pre-fills the supplemental tables with necessary information like people
 and organizations.
