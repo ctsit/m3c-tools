@@ -220,7 +220,8 @@ def get_people(cursor: Cursor) \
         -> Mapping[int, Tuple[str, str, str, str, str, bool]]:
     select_names = """
         SELECT id, first_name, last_name, COALESCE(display_name, ''),
-               COALESCE(email, ''), COALESCE(phone, ''), p.withheld
+               COALESCE(email, ''), COALESCE(phone, ''),
+               (p.withheld OR n.withheld) as withheld
           FROM people p, names n
          WHERE p.id=n.person_id
     """
