@@ -259,7 +259,7 @@ def add_people(sup_cur: db.Cursor, record: mwb.NameRecord) -> List[int]:
         if len(person_ids) > 1:
             pid = 0
             error(psid, "multiple people with the same name:",
-                  f'first="{first_name}',
+                  f'first="{first_name}"',
                   f'last="{last_name}"',
                   f'ids={person_ids}')
         elif len(person_ids) == 1:
