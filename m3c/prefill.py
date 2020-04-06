@@ -86,7 +86,7 @@ def add_developers(sup_cur: db.Cursor) -> None:
             matches = list(db.get_person(sup_cur, forename, lastname))
             if len(matches) > 1:
                 print(f"PMID {pmid}: WARNING! Found {len(matches)} people "
-                      f" named {forename} {lastname}: {' '.join(matches)}")
+                      f" named {forename} {lastname}: {matches}")
                 continue
 
             if matches:
@@ -261,7 +261,7 @@ def add_people(sup_cur: db.Cursor, record: mwb.NameRecord) -> List[int]:
             error(psid, "multiple people with the same name:",
                   f'first="{first_name}',
                   f'last="{last_name}"',
-                  f'ids="{", ".join(person_ids)}"')
+                  f'ids={person_ids}')
         elif len(person_ids) == 1:
             pid = person_ids[0]
             details = db.get_contact_details(sup_cur, pid)
