@@ -8,7 +8,7 @@ from m3c import prefill
 List = typing.List
 
 
-class TestMetabPrefill(unittest.TestCase):
+class TestPrefill(unittest.TestCase):
     def setUp(self):
         self.olddb = [
             prefill.db.add_organization,
