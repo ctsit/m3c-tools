@@ -191,31 +191,29 @@ def get_organizations(cursor: Cursor) \
         yield row
 
 
-def get_person(cursor: Cursor, first_name: str, last_name: str,
-               exclude_withheld: bool = True) \
-        -> Iterable[int]:
+def get_person(cursor: Cursor,
+               first_name: str, last_name: str, exclude_withheld: bool = True
+               ) -> Iterable[int]:
 
     first_name = first_name.strip()
     last_name = last_name.strip()
 
     assert first_name and last_name
 
-    query = '''
-        SELECT person_id
+    query = """
+        SELECT person_id, first_name, last_name, withheld
           FROM names
-         WHERE CONCAT(first_name, ' ', last_name) = %s
-    '''
+    """
 
-    if exclude_withheld:
-        query = f'{query} AND withheld=FALSE'
+    cursor.execute(query)
 
-    cursor.execute(query, (f'{first_name} {last_name}', ))
-
-    ids = []
-    for row in cursor:
-        ids.append(row[0])
-
-    return ids
+    for (person_id, given, surname, withheld) in cursor:
+        name = f"{given} {surname}"
+        if name != f"{first_name} {last_name}":
+            continue
+        if exclude_withheld and withheld:
+            continue
+        yield person_id
 
 
 def get_people(cursor: Cursor) \

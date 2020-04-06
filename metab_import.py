@@ -366,7 +366,7 @@ def get_projects(mwb_cur, sup_cur,
         for i in range(0, len(last_name_list)):
             last_name = last_name_list[i]
             first_name = first_name_list[i]
-            ids = db.get_person(sup_cur, first_name, last_name)
+            ids = list(db.get_person(sup_cur, first_name, last_name))
             try:
                 person_id = ids[0]
                 project.pi.append(people[person_id].person_id)
@@ -554,7 +554,7 @@ def get_studies(mwb_cur, sup_cur, people, orgs, embargoed: typing.List[str]):
             last_name = last_name_list[i]
             first_name = first_name_list[i]
 
-            ids = db.get_person(sup_cur, first_name, last_name)
+            ids = list(db.get_person(sup_cur, first_name, last_name))
             try:
                 person_id = ids[0]
                 study.runner.append(people[person_id].person_id)
