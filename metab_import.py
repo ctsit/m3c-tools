@@ -25,7 +25,6 @@ Instructions:
 """
 
 from datetime import datetime
-from typing import List
 import csv
 import getopt
 import os
@@ -50,6 +49,9 @@ from metab_classes import Publication
 from metab_classes import Study
 from metab_classes import Tool
 import pubfetch
+
+Dict = typing.Dict
+List = typing.List
 
 
 def get_config(config_path):
@@ -114,18 +116,20 @@ def make_organizations(namespace, orgs):
     return triples
 
 
-def get_people(sup_cur):
+def get_people(sup_cur: db.Cursor) -> Dict[int, Person]:
     print("Gathering People")
-    people = {}
-    sup_cur.execute("""\
-            SELECT id, first_name, last_name, display_name, email, phone, (p.withheld OR n.withheld)
-            FROM people p
-            JOIN names n
-            ON id=person_id""")
-    for row in sup_cur:
-        person = Person(person_id=row[0], first_name=row[1].strip(), last_name=row[2].strip(),
-                        display_name=row[3], email=row[4], phone=row[5], withheld=row[6])
+    people: Dict[int, Person] = {}
+    records = db.get_people(sup_cur)
+    for pid, (first, last, display, email, phone, withheld) in records.items():
+        person = Person(person_id=pid,
+                        first_name=first,
+                        last_name=last,
+                        display_name=display,
+                        email=email,
+                        phone=phone,
+                        withheld=withheld)
         people[person.person_id] = person
+    print(f"There are {len(people)} people.")
     return people
 
 
@@ -366,7 +370,7 @@ def get_projects(mwb_cur, sup_cur,
         for i in range(0, len(last_name_list)):
             last_name = last_name_list[i]
             first_name = first_name_list[i]
-            ids = db.get_person(sup_cur, first_name, last_name)
+            ids = list(db.get_person(sup_cur, first_name, last_name))
             try:
                 person_id = ids[0]
                 project.pi.append(people[person_id].person_id)
@@ -554,7 +558,7 @@ def get_studies(mwb_cur, sup_cur, people, orgs, embargoed: typing.List[str]):
             last_name = last_name_list[i]
             first_name = first_name_list[i]
 
-            ids = db.get_person(sup_cur, first_name, last_name)
+            ids = list(db.get_person(sup_cur, first_name, last_name))
             try:
                 person_id = ids[0]
                 study.runner.append(people[person_id].person_id)

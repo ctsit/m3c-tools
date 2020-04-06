@@ -191,38 +191,37 @@ def get_organizations(cursor: Cursor) \
         yield row
 
 
-def get_person(cursor: Cursor, first_name: str, last_name: str,
-               exclude_withheld: bool = True) \
-        -> Iterable[int]:
+def get_person(cursor: Cursor,
+               first_name: str, last_name: str, exclude_withheld: bool = True
+               ) -> Iterable[int]:
 
     first_name = first_name.strip()
     last_name = last_name.strip()
 
     assert first_name and last_name
 
-    query = '''
-        SELECT person_id
+    query = """
+        SELECT person_id, first_name, last_name, withheld
           FROM names
-         WHERE CONCAT(first_name, ' ', last_name) = %s
-    '''
+    """
 
-    if exclude_withheld:
-        query = f'{query} AND withheld=FALSE'
+    cursor.execute(query)
 
-    cursor.execute(query, (f'{first_name} {last_name}', ))
-
-    ids = []
-    for row in cursor:
-        ids.append(row[0])
-
-    return ids
+    for (person_id, given, surname, withheld) in cursor:
+        name = f"{given} {surname}"
+        if not samename(name, f"{first_name} {last_name}"):
+            continue
+        if withheld and exclude_withheld:
+            continue
+        yield person_id
 
 
 def get_people(cursor: Cursor) \
         -> Mapping[int, Tuple[str, str, str, str, str, bool]]:
     select_names = """
         SELECT id, first_name, last_name, COALESCE(display_name, ''),
-               COALESCE(email, ''), COALESCE(phone, ''), p.withheld
+               COALESCE(email, ''), COALESCE(phone, ''),
+               (p.withheld OR n.withheld) as withheld
           FROM people p, names n
          WHERE p.id=n.person_id
     """
@@ -296,6 +295,13 @@ def get_pubmed_publications(cursor: Cursor,
         """
         cursor.execute(select_pubs)
     return {row[0]: row[1] for row in cursor}
+
+
+def samename(name1: str, name2: str) -> bool:
+    """
+    Returns `True` if `name1` is the same as `name2`, ignoring case and space.
+    """
+    return name1.strip().lower() == name2.strip().lower()
 
 
 def update_authorships(cursor: Cursor,
