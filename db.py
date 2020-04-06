@@ -209,9 +209,9 @@ def get_person(cursor: Cursor,
 
     for (person_id, given, surname, withheld) in cursor:
         name = f"{given} {surname}"
-        if name != f"{first_name} {last_name}":
+        if not samename(name, f"{first_name} {last_name}"):
             continue
-        if exclude_withheld and withheld:
+        if withheld and exclude_withheld:
             continue
         yield person_id
 
@@ -294,6 +294,13 @@ def get_pubmed_publications(cursor: Cursor,
         """
         cursor.execute(select_pubs)
     return {row[0]: row[1] for row in cursor}
+
+
+def samename(name1: str, name2: str) -> bool:
+    """
+    Returns `True` if `name1` is the same as `name2`, ignoring case and space.
+    """
+    return name1.strip().lower() == name2.strip().lower()
 
 
 def update_authorships(cursor: Cursor,
