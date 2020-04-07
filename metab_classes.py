@@ -505,10 +505,11 @@ class Publication(object):
 
     @staticmethod
     def from_pubmed(xml: str):
-        handle = io.StringIO(f"""<?xml version="1.0"?>
+        fullxml = f"""<?xml version="1.0"?>
             <!DOCTYPE PubmedArticle PUBLIC "-//NLM//DTD PubMedArticle, 1st January 2019//EN" "https://dtd.nlm.nih.gov/ncbi/pubmed/out/pubmed_190101.dtd">
             {xml}
-        """)
+        """
+        handle = io.BytesIO(fullxml.encode("utf-8"))
         article = Entrez.read(handle)
         citation = Citation(article)
         pub = make_pub(citation)
@@ -526,8 +527,13 @@ def escape(text):
 
 
 def make_pub(citation: Citation) -> Publication:
-    title = (citation.check_key(
-        ['MedlineCitation', 'Article', 'ArticleTitle'])).replace('"', '\\"')
+    title = citation.check_key(['MedlineCitation', 'Article', 'ArticleTitle'])
+    if not title:
+        title = citation.check_key(
+            ['MedlineCitation', 'Article', 'VernacularTitle']
+        )
+    title = title.replace('"', '\\"')
+    assert title
 
     # For more information on parsing publication dates in PubMed, see:
     #   https://www.nlm.nih.gov/bsd/licensee/elements_descriptions.html#pubdate

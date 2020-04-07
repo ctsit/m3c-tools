@@ -78,6 +78,7 @@ class TestParsing(unittest.TestCase):
                                 </PubDate>
                             </JournalIssue>
                         </Journal>
+                        <ArticleTitle>Testing</ArticleTitle>
                     </Article>
                 </MedlineCitation>
             </PubmedArticle>
@@ -218,7 +219,6 @@ class TestParsing(unittest.TestCase):
                 </PubmedData>
             </PubmedArticle>
         """
-
         pub = metab_classes.Publication.from_pubmed(xml.strip())
         self.assertEqual(pub.title,
                          "Factores nutricionales y no nutricionales pueden afectar la fertilidad masculina mediante mecanismos epigenéticos.")
