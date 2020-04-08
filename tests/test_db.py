@@ -1,7 +1,7 @@
 import sqlite3
 import unittest
 
-import db
+from m3c import db
 
 
 class TestDb(unittest.TestCase):

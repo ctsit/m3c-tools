@@ -39,10 +39,10 @@ from Bio import Entrez
 import psycopg2
 import psycopg2.extensions
 
-import catalyst
-import db
-import metab_import
-import tools
+from m3c import catalyst
+from m3c import db
+from m3c import triples as metab_import
+from m3c import tools
 
 psql_connection = psycopg2.extensions.connection
 psql_cursor = psycopg2.extensions.cursor

@@ -26,7 +26,7 @@ import werkzeug.datastructures
 import psycopg2
 import psycopg2.errorcodes
 
-import metab_classes
+import m3c.classes as metab_classes
 
 # Globals
 app = Blueprint('metab_admin', __name__)

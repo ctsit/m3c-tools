@@ -22,10 +22,10 @@ import xml.etree.ElementTree as ET
 
 import psycopg2
 
-import db
+from m3c import db
 from m3c import mwb
-import metab_import
-import tools
+import m3c.triples as metab_import
+from m3c import tools
 
 
 List = typing.List

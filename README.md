@@ -1,57 +1,48 @@
-Metab Import
-============
+M3C Tools
+=========
 
-## Prerequisites
+## Installation
 
-Setup a Python Virtual Environment, then install the required dependencies.
+    $ pip install git+https://github.com/ctsit/metab_import.git
 
-    $ python3 -m venv venv
-    $ source venv/bin/activate
-    $ pip install -r requirements.txt
+## PubMed API Token
 
-Also obtain a PubMed API token for increased API limits. See [this site](https://ncbiinsights.ncbi.nlm.nih.gov/2017/11/02/new-api-keys-for-the-e-utilities/) for more information.
+[Obtain a PubMed API token](https://ncbiinsights.ncbi.nlm.nih.gov/2017/11/02/new-api-keys-for-the-e-utilities/) for increased API limits.
 
-## Preparing your config file
+## Configuration
 
-To run the importer, you will need a config file containing two sections: one
-related to the Postgres database, and one related to accessing VIVO. The
-Postgres section includes credentials for accessing the database, the open port
-you used to set up the SSH tunnel, and the name of the database. The VIVO
-section includes credentials for accessing the VIVO query API, as well as the
-query endpoint and the namespace used for VIVO URIs. There is an example config
-file with the required fields. Download a CSV export from the
-[Metabolomics Software Tools](https://docs.google.com/spreadsheets/d/1a096jlzbAwTxUdvTtJB2bwfkBRdDcMKrkywS8YZf344/edit?usp=sharing)
-and note the file name in the config for `csv_tools`.
+To run the tools, you will need a YAML configuration file containing several
+properties. See `config.yaml.example` for an example.
 
+## Database Tunnel
 
-## Connect to the database
+If Postgres is behind a firewall, you can setup an SSH tunnel to connect to it:
 
-The first step to using the importer is setting up an SSH tunnel to
-stage.vivo.metabolomics.info to access the Postgres database with the
-information from Metabolomics Workbench. You will need to set up the tunnel in
-its own terminal tab.
+    $ ssh -L 5432:localhost:5432 stage.vivo.metabolomics.info
 
-    $ ssh -N -L 5432:localhost:5432 stage.vivo.metabolomics.info
+Where `stage.vivo.metabolomics.info` is the host running Postgres and `5432` is
+the standard Postgres port.
 
 
-## Running the Pre-fill script
+## Run the Pre-fill script
 
-Once the tunnel is prepared, you can run the pre-fill script.
+The `prefill` command pre-fills the Supplemental tables with necessary
+information like people and organizations.
 
-    $ python m3c/prefill.py $CONFIG_PATH
+Run it:
 
-This pre-fills the supplemental tables with necessary information like people
-and organizations.
+    $ m3c prefill $CONFIG_PATH
 
 
 ## Running the Importer
 
 Next, run:
 
-    $ python metab_import.py $CONFIG_PATH
+    $ m3c generate $CONFIG_PATH
 
-This will produce up to four files: projects.rdf, studies.rdf, datasets.rdf,
-and people.rdf. These files contain the triples for each respective class.
+This will produce up to several N-Triples files including: projects.nt,
+studies.nt, datasets.nt, and people.nt. These files contain the triples for
+each respective type.
 
 
 ## Running the Publication Fetcher
@@ -62,14 +53,28 @@ PubMed and adds them to the supplemental database. Use the admin page to
 mark publications for inclusion and exclusion. (At least one PMID and an
 affiliation is required to use Catalyst).
 
-    $ python pubfetch.py $CONFIG_PATH
+    $ m3c pubfetch $CONFIG_PATH
 
 
-## Running the Admin Page
+## Starting the Admin Forms server
 
-To start the admin page run:
+To start the Admin Froms server, run:
 
-    $ python metab_admin.py $CONFIG_PATH
+    $ m3c serve $CONFIG_PATH
+
+They should be accessible at: http://localhost:5000/
+
+
+## Development
+
+Download the code, setup a virtual environment, and configure it for
+development.
+
+    $ git clone https://github.com/ctsit/metab_import.git
+    $ cd metab_import/
+    $ python3 -m venv venv
+    $ source venv/bin/activate
+    $ python setup.py develop
 
 
 ## Testing

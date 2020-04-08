@@ -38,17 +38,17 @@ import yaml
 
 import psycopg2
 
-from aide import Aide
-import db
-from metab_classes import Dataset
-from metab_classes import Organization
-from metab_classes import Person
-from metab_classes import Photo
-from metab_classes import Project
-from metab_classes import Publication
-from metab_classes import Study
-from metab_classes import Tool
-import pubfetch
+from m3c.aide import Aide
+from m3c import db
+from m3c.classes import Dataset
+from m3c.classes import Organization
+from m3c.classes import Person
+from m3c.classes import Photo
+from m3c.classes import Project
+from m3c.classes import Publication
+from m3c.classes import Study
+from m3c.classes import Tool
+from m3c import pubfetch
 
 Dict = typing.Dict
 List = typing.List

@@ -4,9 +4,9 @@ import logging
 import sys
 
 from m3c import prefill
-import metab_admin as server
-import metab_import as generate
-import pubfetch
+from m3c import pubfetch
+from m3c import server
+from m3c import triples
 
 
 PROGRAM: str = "m3c"
@@ -44,7 +44,7 @@ def main():
     elif args.cmd == "serve":
         server.serve(args.config)
     elif args.cmd == "generate":
-        generate.generate(args.config, args.add_devs, args.diff)
+        triples.generate(args.config, args.add_devs, args.diff)
     elif args.cmd == "pubfetch":
         pubfetch.pubfetch(args.config, args.authorships, args.delay, args.max)
 
