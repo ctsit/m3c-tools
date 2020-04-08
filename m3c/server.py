@@ -499,7 +499,7 @@ def serve(config_path: str):
         print('Cannot connect to the database')
         sys.exit(-1)
 
-    server = Flask(__name__)
+    server = Flask(__name__, template_folder=config_map.get('forms'))
     server.register_blueprint(app, url_prefix=os.getenv('APPLICATION_ROOT', ''))
     server.secret_key = secret_key
     server.run()

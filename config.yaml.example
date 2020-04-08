@@ -29,6 +29,7 @@ csv_tools: "tools.csv"
 secret: "CHANGE ME! DO NOT leave this as is."
 picturepath: "pics"
 file_storage_alias: "a"
+forms: /path/to/templates
 
 pubmed_email: "your_application@email.com"
 pubmed_api_token: "pubmed_api_token_see_readme"
