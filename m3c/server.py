@@ -26,7 +26,7 @@ import werkzeug.datastructures
 import psycopg2
 import psycopg2.errorcodes
 
-import metab_classes
+import m3c.classes as metab_classes
 
 # Globals
 app = Blueprint('metab_admin', __name__)
@@ -465,10 +465,6 @@ def add_pmid():
 
 def main():
     '''Sets up a simple website for admin tasks'''
-    global conn
-    global picture_path
-    global file_storage_alias
-
     if len(sys.argv) < 2:
         print(__doc__)
         sys.exit(2)
@@ -477,7 +473,13 @@ def main():
         print(__doc__)
         sys.exit()
 
-    config_path = sys.argv[1]
+    serve(sys.argv[1])
+
+
+def serve(config_path: str):
+    global conn
+    global picture_path
+    global file_storage_alias
 
     with open(config_path, 'r') as f:
         config_map = safe_load(f)

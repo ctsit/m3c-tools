@@ -1,7 +1,7 @@
 import io
 import unittest
 
-import metab_import
+import m3c.triples as metab_import
 
 
 class TestMetabImport(unittest.TestCase):

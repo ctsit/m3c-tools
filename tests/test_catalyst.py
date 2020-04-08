@@ -1,8 +1,8 @@
 import unittest
 import xml.etree.ElementTree as ET
 
-import catalyst
-from metab_classes import Person
+from m3c import catalyst
+from m3c.classes import Person
 
 
 class TestCatalyst(unittest.TestCase):
