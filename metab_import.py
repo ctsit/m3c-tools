@@ -769,38 +769,7 @@ def print_to_open_file(triples: typing.List[str], file: typing.IO) -> None:
         file.write(f"{spo} .\n")
 
 
-def main():
-    if len(sys.argv) < 2:
-        print(__doc__)
-        sys.exit(2)
-
-    try:
-        optlist, args = getopt.getopt(sys.argv[1:],
-                                      "hx:", ["help", "diff=", "add-devs"])
-    except getopt.GetoptError:
-        print(__doc__)
-        sys.exit(2)
-
-    old_path = ""
-    add_devs = False
-
-    for o, a in optlist:
-        if o in ["-h", "--help"]:
-            print(__doc__)
-            sys.exit()
-        elif o in ["-x", "--diff"]:
-            old_path = a
-            print("Differential update with previous run: " + old_path)
-        elif o == "--add-devs":
-            add_devs = True
-            print("Creating new developers for tools.")
-
-    if len(args) != 1:
-        print(__doc__)
-        sys.exit(2)
-
-    config_path = args[0]
-
+def generate(config_path: str, add_devs: bool, old_path: str):
     timestamp = datetime.now()
     path = 'data_out/' + timestamp.strftime("%Y") + '/' + \
         timestamp.strftime("%m") + '/' + timestamp.strftime("%Y_%m_%d")
@@ -915,6 +884,40 @@ def main():
 
     sup_conn.close()
     mwb_conn.close()
+
+
+def main():
+    if len(sys.argv) < 2:
+        print(__doc__)
+        sys.exit(2)
+
+    try:
+        optlist, args = getopt.getopt(sys.argv[1:],
+                                      "hx:", ["help", "diff=", "add-devs"])
+    except getopt.GetoptError:
+        print(__doc__)
+        sys.exit(2)
+
+    old_path = ""
+    add_devs = False
+
+    for o, a in optlist:
+        if o in ["-h", "--help"]:
+            print(__doc__)
+            sys.exit()
+        elif o in ["-x", "--diff"]:
+            old_path = a
+            print("Differential update with previous run: " + old_path)
+        elif o == "--add-devs":
+            add_devs = True
+            print("Creating new developers for tools.")
+
+    if len(args) != 1:
+        print(__doc__)
+        sys.exit(2)
+
+    config_path = args[0]
+    generate(config_path, add_devs, old_path)
 
 
 if __name__ == "__main__":

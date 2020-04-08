@@ -332,7 +332,17 @@ def main():
         print(__doc__)
         sys.exit()
 
-    config_path = sys.argv[1]
+    prefill(sys.argv[1])
+
+
+def parse_author_list(xml: str) -> ET.ElementTree:
+    file = io.StringIO(xml)
+    data = ET.parse(file)
+    author_list = data.findall("//Article/AuthorList/Author")
+    return author_list
+
+
+def prefill(config_path: str):
     config = metab_import.get_config(config_path)
 
     mwb_client = mwb.Client(config.get("mwb_host"), config.get("mwb_port"))
@@ -353,13 +363,6 @@ def main():
             add_developers(sup_cur)
 
     sup_conn.close()
-
-
-def parse_author_list(xml: str) -> ET.ElementTree:
-    file = io.StringIO(xml)
-    data = ET.parse(file)
-    author_list = data.findall("//Article/AuthorList/Author")
-    return author_list
 
 
 def process_projects_and_studies(mwb_client: mwb.Client,

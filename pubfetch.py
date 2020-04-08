@@ -149,28 +149,7 @@ def main():
         log(__doc__)
         sys.exit(2)
 
-    global pubmed_delay
-    pubmed_delay = delay
-
-    config = metab_import.get_config(config_path)
-
-    pubmed_init(email=config.get("pubmed_email"),
-                api_key=config.get("pubmed_api_token"))
-
-    sup_conn: psql_connection = psycopg2.connect(
-        host=config.get("sup_host"),
-        dbname=config.get("sup_database"),
-        user=config.get("sup_username"),
-        password=config.get("sup_password"),
-        port=config.get("sup_port"))
-
-    with sup_conn:
-        with sup_conn.cursor() as cursor:
-            update_authorships(cursor, max_authorships)
-            if not only_update_authorships:
-                fetch_publications(cursor)
-
-    sup_conn.close()
+    pubfetch(config_path, only_update_authorships, delay, max_authorships)
 
 
 def parse_args(argv) -> typing.Tuple[bool, str, bool, int]:
@@ -214,6 +193,36 @@ def parse_args(argv) -> typing.Tuple[bool, str, bool, int]:
     config = args[0]
 
     return (help, config, authorships, delay, max_authorships)
+
+
+def pubfetch(
+    config_path: str,
+    only_update_authorships: bool,
+    delay: int,
+    max_authorships: int
+) -> None:
+    global pubmed_delay
+    pubmed_delay = delay
+
+    config = metab_import.get_config(config_path)
+
+    pubmed_init(email=config.get("pubmed_email"),
+                api_key=config.get("pubmed_api_token"))
+
+    sup_conn: psql_connection = psycopg2.connect(
+        host=config.get("sup_host"),
+        dbname=config.get("sup_database"),
+        user=config.get("sup_username"),
+        password=config.get("sup_password"),
+        port=config.get("sup_port"))
+
+    with sup_conn:
+        with sup_conn.cursor() as cursor:
+            update_authorships(cursor, max_authorships)
+            if not only_update_authorships:
+                fetch_publications(cursor)
+
+    sup_conn.close()
 
 
 def pubmed_efetch(id_list: typing.List[str]) -> ET.ElementTree:
