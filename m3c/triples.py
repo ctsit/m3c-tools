@@ -7,7 +7,6 @@ Usage:
 Options:
     -h --help      Show this message and exit
     -x --diff      See Differential Update.
-    -a --add-devs  Add a Person record for new tools developers.
 
 Differential Update:
     A differential update compares the triples produced by a run with that of
@@ -720,7 +719,7 @@ def get_csv_tools(csv_tools_path: str) -> List[Tool]:
         return []
 
 
-def make_tools(namespace, tools: List[Tool], people, withheld_people, mwb_cur, sup_cur, add_devs):
+def make_tools(namespace, tools: List[Tool], people, withheld_people, mwb_cur, sup_cur):
     print("Making Tools")
     triples = []
     tool_count = 0
@@ -728,24 +727,8 @@ def make_tools(namespace, tools: List[Tool], people, withheld_people, mwb_cur, s
         # First, find all the authors' URIs
         non_matched_authors = tool.match_authors({**people, **withheld_people}, namespace)
         if len(non_matched_authors) != 0:
-            if not add_devs:
-                print('Not all authors matched for Tool. Use --add-devs to add these people. Skipping...')
-                continue
-            try:
-                print("Not all authors matched for Tool. Inserting new people.")
-                for author in non_matched_authors:
-                    first_name = author.name.split(' ')[0]
-                    last_name = " ".join(author.name.split(' ')[1:])
-                    person_id = db.add_person(sup_cur, first_name, last_name,
-                                              "", "")
-                    print(f"Added {first_name} {last_name}: {person_id}")
-                    people[person_id] = get_person(sup_cur, person_id)
-                print("Trying to match authors again.")
-                tool.match_authors(people, namespace)
-            except Exception:
-                traceback.print_exc()
-                print('Error occurred creating new authors for tool. Skipping tool.')
-                continue
+            print(f"Not all authors matched for Tool: {tool.tool_id}")
+            continue
         # Now, generate the triples.
         triples.extend(tool.get_triples(namespace))
         tool_count += 1
@@ -769,7 +752,7 @@ def print_to_open_file(triples: typing.List[str], file: typing.IO) -> None:
         file.write(f"{spo} .\n")
 
 
-def generate(config_path: str, add_devs: bool, old_path: str):
+def generate(config_path: str, old_path: str):
     timestamp = datetime.now()
     path = 'data_out/' + timestamp.strftime("%Y") + '/' + \
         timestamp.strftime("%m") + '/' + timestamp.strftime("%Y_%m_%d")
@@ -837,7 +820,7 @@ def generate(config_path: str, add_devs: bool, old_path: str):
             # Tools
             yaml_tools = get_yaml_tools(config)
             csv_tools = get_csv_tools(config.get("tools_csv", "tools.csv"))
-            tools_triples = make_tools(aide.namespace, yaml_tools + csv_tools, people, withheld_people, mwb_cur, sup_cur, add_devs)
+            tools_triples = make_tools(aide.namespace, yaml_tools + csv_tools, people, withheld_people, mwb_cur, sup_cur)
             print_to_file(tools_triples, tools_file)
 
             # Projects
@@ -899,7 +882,6 @@ def main():
         sys.exit(2)
 
     old_path = ""
-    add_devs = False
 
     for o, a in optlist:
         if o in ["-h", "--help"]:
@@ -909,15 +891,14 @@ def main():
             old_path = a
             print("Differential update with previous run: " + old_path)
         elif o == "--add-devs":
-            add_devs = True
-            print("Creating new developers for tools.")
+            print("WARNING! --add-devs has been removed")
 
     if len(args) != 1:
         print(__doc__)
         sys.exit(2)
 
     config_path = args[0]
-    generate(config_path, add_devs, old_path)
+    generate(config_path, old_path)
 
 
 if __name__ == "__main__":

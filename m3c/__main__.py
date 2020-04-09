@@ -44,7 +44,7 @@ def main():
     elif args.cmd == "serve":
         server.serve(args.config)
     elif args.cmd == "generate":
-        triples.generate(args.config, args.add_devs, args.diff)
+        triples.generate(args.config, args.diff)
     elif args.cmd == "pubfetch":
         pubfetch.pubfetch(args.config, args.authorships, args.delay, args.max)
 
@@ -68,10 +68,6 @@ def parse_args(args):
     generate = subparsers.add_parser(
         "generate",
         help="generates N-Triples for import into the People Portal"
-    )
-    generate.add_argument(
-        "-a", "--add-devs", action="store_true", default=True, dest="add_devs",
-        help="add a Person record for new tools developers"
     )
     generate.add_argument("-x", "--diff", help="path for differential update")
     pubfetchcmd = subparsers.add_parser(
