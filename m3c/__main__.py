@@ -86,7 +86,7 @@ def parse_args(args):
         help="number of seconds to wait between PubMed requests"
     )
     pubfetchcmd.add_argument(
-        "--max", type=nat, default=None,
+        "--max", type=nat, default=-1,
         help="maximum number of authorship searches to perform"
     )
     subparsers.add_parser(
