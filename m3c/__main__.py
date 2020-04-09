@@ -14,9 +14,9 @@ PROGRAM: str = "m3c"
 logger = logging.getLogger(PROGRAM)
 
 
-def init_logger(log: str, verbose: bool):
+def init_logger(filename: str, verbose: bool):
     # Create the file logger.
-    logfile = logging.FileHandler(f"{PROGRAM}.log", delay=True)
+    logfile = logging.FileHandler(filename, delay=True)
     logfile.setFormatter(logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     ))
