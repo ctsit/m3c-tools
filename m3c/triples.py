@@ -7,7 +7,6 @@ Usage:
 Options:
     -h --help      Show this message and exit
     -x --diff      See Differential Update.
-    -a --add-devs  Add a Person record for new tools developers.
 
 Differential Update:
     A differential update compares the triples produced by a run with that of
@@ -25,7 +24,6 @@ Instructions:
 """
 
 from datetime import datetime
-from typing import List
 import csv
 import getopt
 import os
@@ -39,17 +37,20 @@ import yaml
 
 import psycopg2
 
-from aide import Aide
-import db
-from metab_classes import Dataset
-from metab_classes import Organization
-from metab_classes import Person
-from metab_classes import Photo
-from metab_classes import Project
-from metab_classes import Publication
-from metab_classes import Study
-from metab_classes import Tool
-import pubfetch
+from m3c.aide import Aide
+from m3c import db
+from m3c.classes import Dataset
+from m3c.classes import Organization
+from m3c.classes import Person
+from m3c.classes import Photo
+from m3c.classes import Project
+from m3c.classes import Publication
+from m3c.classes import Study
+from m3c.classes import Tool
+from m3c import pubfetch
+
+Dict = typing.Dict
+List = typing.List
 
 
 def get_config(config_path):
@@ -114,43 +115,21 @@ def make_organizations(namespace, orgs):
     return triples
 
 
-def get_people(sup_cur):
+def get_people(sup_cur: db.Cursor) -> Dict[int, Person]:
     print("Gathering People")
-    people = {}
-    sup_cur.execute("""\
-            SELECT id, first_name, last_name, display_name, email, phone, (p.withheld OR n.withheld)
-            FROM people p
-            JOIN names n
-            ON id=person_id""")
-    for row in sup_cur:
-        person = Person(person_id=row[0], first_name=row[1].strip(), last_name=row[2].strip(),
-                        display_name=row[3], email=row[4], phone=row[5], withheld=row[6])
+    people: Dict[int, Person] = {}
+    records = db.get_people(sup_cur)
+    for pid, (first, last, display, email, phone, withheld) in records.items():
+        person = Person(person_id=pid,
+                        first_name=first,
+                        last_name=last,
+                        display_name=display,
+                        email=email,
+                        phone=phone,
+                        withheld=withheld)
         people[person.person_id] = person
+    print(f"There are {len(people)} people.")
     return people
-
-
-def add_person(cursor: psycopg2.extensions.cursor,
-               first_name: str, last_name: str, email: str, phone: str) -> int:
-
-    statement = '''
-        INSERT INTO people (id,      display_name, email, phone)
-             VALUES        (DEFAULT, %s          , %s   , %s)
-          RETURNING id
-    '''
-
-    display_name = '{} {}'.format(first_name.strip(), last_name.strip())
-    cursor.execute(statement, (display_name, email, phone))
-
-    person_id = cursor.fetchone()[0]
-
-    statement = '''
-        INSERT INTO names (person_id, first_name, last_name)
-             VALUES       (%s       , %s        , %s       )
-    '''
-
-    cursor.execute(statement, (person_id, first_name.strip(), last_name.strip()))
-
-    return person_id
 
 
 def get_person(sup_cur, person_id):
@@ -390,7 +369,7 @@ def get_projects(mwb_cur, sup_cur,
         for i in range(0, len(last_name_list)):
             last_name = last_name_list[i]
             first_name = first_name_list[i]
-            ids = db.get_person(sup_cur, first_name, last_name)
+            ids = list(db.get_person(sup_cur, first_name, last_name))
             try:
                 person_id = ids[0]
                 project.pi.append(people[person_id].person_id)
@@ -578,7 +557,7 @@ def get_studies(mwb_cur, sup_cur, people, orgs, embargoed: typing.List[str]):
             last_name = last_name_list[i]
             first_name = first_name_list[i]
 
-            ids = db.get_person(sup_cur, first_name, last_name)
+            ids = list(db.get_person(sup_cur, first_name, last_name))
             try:
                 person_id = ids[0]
                 study.runner.append(people[person_id].person_id)
@@ -740,7 +719,7 @@ def get_csv_tools(csv_tools_path: str) -> List[Tool]:
         return []
 
 
-def make_tools(namespace, tools: List[Tool], people, withheld_people, mwb_cur, sup_cur, add_devs):
+def make_tools(namespace, tools: List[Tool], people, withheld_people, mwb_cur, sup_cur):
     print("Making Tools")
     triples = []
     tool_count = 0
@@ -748,24 +727,8 @@ def make_tools(namespace, tools: List[Tool], people, withheld_people, mwb_cur, s
         # First, find all the authors' URIs
         non_matched_authors = tool.match_authors({**people, **withheld_people}, namespace)
         if len(non_matched_authors) != 0:
-            if not add_devs:
-                print('Not all authors matched for Tool. Use --add-devs to add these people. Skipping...')
-                continue
-            try:
-                print("Not all authors matched for Tool. Inserting new people.")
-                for author in non_matched_authors:
-                    first_name = author.name.split(' ')[0]
-                    last_name = " ".join(author.name.split(' ')[1:])
-                    person_id = add_person(sup_cur, first_name, last_name,
-                                           "", "")
-                    print(f"Added {first_name} {last_name}: {person_id}")
-                    people[person_id] = get_person(sup_cur, person_id)
-                print("Trying to match authors again.")
-                tool.match_authors(people, namespace)
-            except Exception:
-                traceback.print_exc()
-                print('Error occurred creating new authors for tool. Skipping tool.')
-                continue
+            print(f"Not all authors matched for Tool: {tool.tool_id}")
+            continue
         # Now, generate the triples.
         triples.extend(tool.get_triples(namespace))
         tool_count += 1
@@ -789,38 +752,7 @@ def print_to_open_file(triples: typing.List[str], file: typing.IO) -> None:
         file.write(f"{spo} .\n")
 
 
-def main():
-    if len(sys.argv) < 2:
-        print(__doc__)
-        sys.exit(2)
-
-    try:
-        optlist, args = getopt.getopt(sys.argv[1:],
-                                      "hx:", ["help", "diff=", "add-devs"])
-    except getopt.GetoptError:
-        print(__doc__)
-        sys.exit(2)
-
-    old_path = ""
-    add_devs = False
-
-    for o, a in optlist:
-        if o in ["-h", "--help"]:
-            print(__doc__)
-            sys.exit()
-        elif o in ["-x", "--diff"]:
-            old_path = a
-            print("Differential update with previous run: " + old_path)
-        elif o == "--add-devs":
-            add_devs = True
-            print("Creating new developers for tools.")
-
-    if len(args) != 1:
-        print(__doc__)
-        sys.exit(2)
-
-    config_path = args[0]
-
+def generate(config_path: str, old_path: str):
     timestamp = datetime.now()
     path = 'data_out/' + timestamp.strftime("%Y") + '/' + \
         timestamp.strftime("%m") + '/' + timestamp.strftime("%Y_%m_%d")
@@ -888,7 +820,7 @@ def main():
             # Tools
             yaml_tools = get_yaml_tools(config)
             csv_tools = get_csv_tools(config.get("tools_csv", "tools.csv"))
-            tools_triples = make_tools(aide.namespace, yaml_tools + csv_tools, people, withheld_people, mwb_cur, sup_cur, add_devs)
+            tools_triples = make_tools(aide.namespace, yaml_tools + csv_tools, people, withheld_people, mwb_cur, sup_cur)
             print_to_file(tools_triples, tools_file)
 
             # Projects
@@ -935,6 +867,38 @@ def main():
 
     sup_conn.close()
     mwb_conn.close()
+
+
+def main():
+    if len(sys.argv) < 2:
+        print(__doc__)
+        sys.exit(2)
+
+    try:
+        optlist, args = getopt.getopt(sys.argv[1:],
+                                      "hx:", ["help", "diff=", "add-devs"])
+    except getopt.GetoptError:
+        print(__doc__)
+        sys.exit(2)
+
+    old_path = ""
+
+    for o, a in optlist:
+        if o in ["-h", "--help"]:
+            print(__doc__)
+            sys.exit()
+        elif o in ["-x", "--diff"]:
+            old_path = a
+            print("Differential update with previous run: " + old_path)
+        elif o == "--add-devs":
+            print("WARNING! --add-devs has been removed")
+
+    if len(args) != 1:
+        print(__doc__)
+        sys.exit(2)
+
+    config_path = args[0]
+    generate(config_path, old_path)
 
 
 if __name__ == "__main__":

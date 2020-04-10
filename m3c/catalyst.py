@@ -11,7 +11,7 @@ import xml.etree.ElementTree as ET
 
 import requests
 
-from metab_classes import Person
+from m3c.classes import Person
 
 
 ENDPOINT = "http://profiles.catalyst.harvard.edu/services/GetPMIDs/default.asp"

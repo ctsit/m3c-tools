@@ -5,19 +5,15 @@ from typing import Iterable, Mapping, Optional, Tuple
 import psycopg2
 import psycopg2.extensions
 
+from m3c import mwb
 
 Cursor = psycopg2.extensions.cursor
 Connection = psycopg2.extensions.connection
 
 
-INSTITUTE = 'institute'
-DEPARTMENT = 'department'
-LABORATORY = 'laboratory'
-
-
 def add_organization(cursor: Cursor, type: str, name: str,
                      parent_id: Optional[int] = None) -> int:
-    assert type in [INSTITUTE, DEPARTMENT, LABORATORY]
+    assert type in [mwb.INSTITUTE, mwb.DEPARTMENT, mwb.LABORATORY]
 
     insert_org = '''
         INSERT INTO organizations (id     , name, type, parent_id)
@@ -34,13 +30,41 @@ def add_organization(cursor: Cursor, type: str, name: str,
     return row[0]
 
 
-def associate(cursor: Cursor, person_id: int, organization_id: int):
+def add_person(cursor: Cursor,
+               first_name: str, last_name: str, email: str, phone: str) -> int:
+
+    statement = '''
+        INSERT INTO people (id,      display_name, email, phone)
+             VALUES        (DEFAULT, %s          , %s   , %s)
+          RETURNING id
+    '''
+
+    first_name = first_name.strip()
+    last_name = last_name.strip()
+
+    display_name = f'{first_name} {last_name}'
+    cursor.execute(statement, (display_name, email, phone))
+
+    person_id = cursor.fetchone()[0]
+
+    statement = '''
+        INSERT INTO names (person_id, first_name, last_name)
+             VALUES       (%s       , %s        , %s       )
+    '''
+
+    cursor.execute(statement, (person_id, first_name, last_name))
+
+    return person_id
+
+
+def associate(cursor: Cursor, person_id: int, organization_id: int) -> bool:
     insert_association = '''
         INSERT INTO associations (person_id, organization_id)
              VALUES              (%s       , %s             )
         ON CONFLICT DO NOTHING
     '''
     cursor.execute(insert_association, (person_id, organization_id))
+    return cursor.rowcount == 1
 
 
 def find_organizations(cursor: Cursor) \
@@ -66,27 +90,7 @@ def find_organizations(cursor: Cursor) \
 
 def find_people(cursor: Cursor) \
         -> Iterable[Tuple[str, str, str, str, str, str, str, str]]:
-
-    select_names = '''
-        SELECT COALESCE(first_name, ''), COALESCE(last_name, ''),
-               COALESCE(institute, ''), COALESCE(department, ''),
-               COALESCE(laboratory, ''), project_id,
-               COALESCE(email, ''), COALESCE(phone, '')
-          FROM project
-         UNION
-        SELECT COALESCE(study.first_name, ''), COALESCE(study.last_name, ''),
-               COALESCE(study.institute, ''), COALESCE(study.department, ''),
-               COALESCE(study.laboratory, ''), study.study_id,
-               COALESCE(email, ''), COALESCE(phone, '')
-          FROM study, study_status_prod
-         WHERE study.study_id = study_status_prod.study_id
-           AND study_status_prod.status = 1
-    '''
-
-    cursor.execute(select_names)
-
-    for row in cursor:
-        yield tuple(row)
+    return mwb.find_people(cursor)
 
 
 def get_affiliations(cursor: Cursor) -> Mapping[int, str]:
@@ -141,9 +145,21 @@ def get_confirmed_publications(cursor: Cursor) \
     return publications
 
 
+def get_contact_details(cursor: Cursor, person_id: int) -> Tuple[str, str]:
+    query = '''
+        SELECT COALESCE(email, ''), COALESCE(phone, '')
+          FROM people
+         WHERE id=%s
+    '''
+    cursor.execute(query, (person_id,))
+    assert cursor.rowcount == 1
+    for row in cursor:
+        return row
+
+
 def get_organization(cursor: Cursor, type: str, name: str,
                      parent_id: Optional[int] = None) -> int:
-    assert type in [INSTITUTE, DEPARTMENT, LABORATORY]
+    assert type in [mwb.INSTITUTE, mwb.DEPARTMENT, mwb.LABORATORY]
 
     if not parent_id:
         select_org = """
@@ -167,51 +183,45 @@ def get_organization(cursor: Cursor, type: str, name: str,
     return row[0]
 
 
-def get_contact_details(cursor: Cursor, person_id: int) -> Tuple[str, str]:
-    query = '''
-        SELECT COALESCE(email, ''), COALESCE(phone, '')
-          FROM people
-         WHERE id=%s
-    '''
-    cursor.execute(query, (person_id,))
-    assert cursor.rowcount == 1
+def get_organizations(cursor: Cursor) \
+        -> Iterable[Tuple[int, str, str, int, bool]]:
+    query = "SELECT id, name, type, parent_id, withheld FROM organizations"
+    cursor.execute(query)
     for row in cursor:
-        return row
+        yield row
 
 
-def get_person(cursor: Cursor, first_name: str, last_name: str,
-               exclude_withheld: bool = True) \
-        -> Iterable[int]:
+def get_person(cursor: Cursor,
+               first_name: str, last_name: str, exclude_withheld: bool = True
+               ) -> Iterable[int]:
 
     first_name = first_name.strip()
     last_name = last_name.strip()
 
     assert first_name and last_name
 
-    query = '''
-        SELECT person_id
+    query = """
+        SELECT person_id, first_name, last_name, withheld
           FROM names
-         WHERE first_name=%s
-           AND last_name=%s
-    '''
+    """
 
-    if exclude_withheld:
-        query = f'{query} AND withheld=FALSE'
+    cursor.execute(query)
 
-    cursor.execute(query, (first_name, last_name))
-
-    ids = []
-    for row in cursor:
-        ids.append(row[0])
-
-    return ids
+    for (person_id, given, surname, withheld) in cursor:
+        name = f"{given} {surname}"
+        if not samename(name, f"{first_name} {last_name}"):
+            continue
+        if withheld and exclude_withheld:
+            continue
+        yield person_id
 
 
 def get_people(cursor: Cursor) \
         -> Mapping[int, Tuple[str, str, str, str, str, bool]]:
     select_names = """
         SELECT id, first_name, last_name, COALESCE(display_name, ''),
-               COALESCE(email, ''), COALESCE(phone, ''), p.withheld
+               COALESCE(email, ''), COALESCE(phone, ''),
+               (p.withheld OR n.withheld) as withheld
           FROM people p, names n
          WHERE p.id=n.person_id
     """
@@ -268,15 +278,30 @@ def get_pubmed_download_timestamps(cursor: Cursor) \
     return {row[0]: row[1] for row in cursor}
 
 
-def get_pubmed_publications(cursor: Cursor) -> Mapping[str, str]:
-    select_pubs = """
-        SELECT pmid, xml
-          FROM pubmed_publications
-    """
-
-    cursor.execute(select_pubs)
-
+def get_pubmed_publications(cursor: Cursor,
+                            pmids: Optional[Iterable[str]] = []) \
+        -> Mapping[str, str]:
+    if pmids:
+        select_pubs = """
+            SELECT pmid, xml
+              FROM pubmed_publications
+             WHERE pmid = ANY(%s)
+        """
+        cursor.execute(select_pubs, (list(pmids),))
+    else:
+        select_pubs = """
+            SELECT pmid, xml
+            FROM pubmed_publications
+        """
+        cursor.execute(select_pubs)
     return {row[0]: row[1] for row in cursor}
+
+
+def samename(name1: str, name2: str) -> bool:
+    """
+    Returns `True` if `name1` is the same as `name2`, ignoring case and space.
+    """
+    return name1.strip().lower() == name2.strip().lower()
 
 
 def update_authorships(cursor: Cursor,

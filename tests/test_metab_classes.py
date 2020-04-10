@@ -1,6 +1,6 @@
 import unittest
 
-import metab_classes
+import m3c.classes as metab_classes
 
 
 class TestStudy(unittest.TestCase):

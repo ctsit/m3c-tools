@@ -1,6 +1,26 @@
 Changelog
 =========
 
+## [0.8.0] - 2020-04-10
+
+Created a unified `m3c` command which accepts sub-commands that correspond to
+the old stand-alone scripts. Specifically:
+ - `python3 metab_prefill.py -> m3c prefill`
+ - `python3 metab_import.py  -> m3c generate`
+ - `python3 pubfetch.py      -> m3c pubfetch`
+ - `python3 metab_admin.py   -> m3c serve`
+
+ * Create m3c utility program (Taeber Rapczak)
+ * Use `VernacularTitle` if no `ArticleTitle` (Taeber Rapczak)
+ * Ignore case when matching names (Taeber Rapczak)
+ * Massive rewrite to remove duplicated prefill logic (Taeber Rapczak)
+ * Improve UX of "Edit Publications" form (Taeber Rapczak)
+ * Fix mishandling of multiple, organization names (Taeber Rapczak)
+ * Add existing publications to the edit publications admin page. (Hunter Jarrell)
+ * Fix missing matches when middle initial in surname (Taeber Rapczak)
+ * Better integrate Metabolomics Tools Wiki (Taeber Rapczak)
+
+
 ## [0.7.1] - 2020-03-13
 
  * Exclude people without affiliations from pubfetch (Taeber Rapczak)

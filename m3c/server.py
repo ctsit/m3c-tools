@@ -13,10 +13,11 @@ Instructions:
 Example:
     $ python metab_admin.py config.yaml
 """
-import json
+
 import logging
 import os
 import sys
+import traceback
 from yaml import safe_load
 
 from flask import Blueprint, Flask, request, flash, redirect, render_template, send_file
@@ -25,7 +26,7 @@ import werkzeug.datastructures
 import psycopg2
 import psycopg2.errorcodes
 
-import metab_classes
+import m3c.classes as metab_classes
 
 # Globals
 app = Blueprint('metab_admin', __name__)
@@ -396,56 +397,74 @@ def person_alias():
 
 @app.route('/addpmid', methods=['GET', 'POST'])
 def add_pmid():
-    display_names = []
+    display_names = {}
+    include_pubs = {}
+    exclude_pubs = {}
+    person_id = request.args.get('person', '')
+
     cur = conn.cursor()
 
-    cur.execute('SELECT display_name, id FROM people')
+    cur.execute('SELECT id, display_name FROM people')
     rows = cur.fetchall()
-    for row in rows:
-        display_names.append(str(row[0]) + ' | ' + str(row[1]))
+    for (pid, display_name) in rows:
+        display_names[pid] = display_name
 
-    cur.close()
+    cur.execute('SELECT pmid, person_id, include FROM publications')
+    rows = cur.fetchall()
+    for (pmid, person, include) in rows:
+        if include:
+            include_pubs[person] = include_pubs.get(person, []) + [pmid]
+        else:
+            exclude_pubs[person] = exclude_pubs.get(person, []) + [pmid]
 
-    if request.method == 'POST':
-        cur = conn.cursor()
-        try:
-            person_id = request.form['id'].strip()
-            pmid_string = request.form['pmid'].strip()
-            pmid_list = pmid_string.replace(' ', '').split(',')
+    if request.method == 'GET':
+        cur.close()
+        template = render_template('addpmid.html',
+                                   display_names=display_names,
+                                   include_pubs=include_pubs,
+                                   exclude_pubs=exclude_pubs,
+                                   person_id=person_id)
+        return template
 
-            if person_id is '':
-                flash('Please search and select someone')
-                return redirect(request.url)
+    try:
+        person_id = request.form['id'].strip()
+        display_name = request.form['name'].strip()
+        incl_pmid_string = request.form['inclpmid'].strip()
+        incl_pmid_list = incl_pmid_string.replace(' ', '').split(',')
+        excl_pmid_string = request.form['exclpmid'].strip()
+        excl_pmid_list = excl_pmid_string.replace(' ', '').split(',')
 
-            if pmid_string is '':
-                flash('Please enter a PMID')
-                return redirect(request.url)
+        if person_id == '':
+            flash('Please search and select someone', 'error')
+            return redirect(request.url)
 
-            for pmid in pmid_list:
-                if 'include' in request.form:
-                    cur.execute("INSERT INTO publications (pmid, person_id, include) VALUES (%s, %s, %s) ON CONFLICT (pmid, person_id) DO UPDATE SET include='t'", (pmid, int(person_id), True))
-                elif 'exclude' in request.form:
-                    cur.execute("INSERT INTO publications (pmid, person_id, include) VALUES (%s, %s, %s) ON CONFLICT (pmid, person_id) DO UPDATE SET include='f'", (pmid, int(person_id), False))
+        cur.execute('DELETE FROM publications WHERE person_id = %s',
+                    (int(person_id),))
 
-            conn.commit()
-            flash('PMID(s) ' + pmid_string + ' modified for ' + request.form['name'].strip())
-        except Exception as e:
-            print(e)
-            conn.rollback()
-            flash('Error adding PMID')
-        finally:
-            cur.close()
-        return redirect(request.url)
+        insert = """
+            INSERT INTO publications (pmid, person_id, include)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (pmid, person_id)
+            DO UPDATE SET include=%s
+        """
+        for pmid in incl_pmid_list:
+            cur.execute(insert, (pmid, int(person_id), True, 't'))
+        for pmid in excl_pmid_list:
+            cur.execute(insert, (pmid, int(person_id), False, 'f'))
 
-    return render_template('addpmid.html', dispNameList=display_names)
+        conn.commit()
+        flash(f'PMIDs updated successfully for {display_name}', 'success')
+    except Exception:
+        traceback.print_exc()
+        conn.rollback()
+        flash('Error updating PMIDs', 'error')
+    finally:
+        cur.close()
+    return redirect(f"{request.base_url}?person={person_id}")
 
 
 def main():
     '''Sets up a simple website for admin tasks'''
-    global conn
-    global picture_path
-    global file_storage_alias
-
     if len(sys.argv) < 2:
         print(__doc__)
         sys.exit(2)
@@ -454,7 +473,13 @@ def main():
         print(__doc__)
         sys.exit()
 
-    config_path = sys.argv[1]
+    serve(sys.argv[1])
+
+
+def serve(config_path: str):
+    global conn
+    global picture_path
+    global file_storage_alias
 
     with open(config_path, 'r') as f:
         config_map = safe_load(f)
@@ -474,7 +499,7 @@ def main():
         print('Cannot connect to the database')
         sys.exit(-1)
 
-    server = Flask(__name__)
+    server = Flask(__name__, template_folder=config_map.get('forms'))
     server.register_blueprint(app, url_prefix=os.getenv('APPLICATION_ROOT', ''))
     server.secret_key = secret_key
     server.run()
