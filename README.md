@@ -3,7 +3,7 @@ M3C Tools
 
 ## Installation
 
-    $ pip install git+https://github.com/ctsit/metab_import.git
+    $ pip install git+https://github.com/ctsit/m3c-tools.git
 
 ## PubMed API Token
 
@@ -70,8 +70,8 @@ They should be accessible at: http://localhost:5000/
 Download the code, setup a virtual environment, and configure it for
 development.
 
-    $ git clone https://github.com/ctsit/metab_import.git
-    $ cd metab_import/
+    $ git clone https://github.com/ctsit/m3c-tools.git
+    $ cd m3c-tools/
     $ python3 -m venv venv
     $ source venv/bin/activate
     $ python setup.py develop
