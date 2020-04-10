@@ -6,7 +6,7 @@
 
 from setuptools import setup, find_packages
 
-VERSION="0.7.1"
+VERSION="0.8.0"
 
 setup(
     name="m3c",
@@ -31,11 +31,11 @@ setup(
     },
 
     install_requires=[
-        "PyYAML==5.1.2",
-        "requests==2.22.0",
-        "psycopg2-binary==2.8.3",
-        "flask==1.1.1",
-        "biopython==1.74",
+        "PyYAML==5.3.1",
+        "requests==2.23.0",
+        "psycopg2-binary==2.8.5",
+        "Flask==1.1.2",
+        "biopython==1.76",
     ],
 
     python_requires=">=3.6.0",
