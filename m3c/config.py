@@ -1,3 +1,4 @@
+import traceback
 import typing
 import yaml
 
@@ -20,10 +21,10 @@ class Config:
         return self._data.get(prop, default)
 
 
-def load(yamlfile: str):
+def load(yamlfile: str) -> Optional[Config]:
     try:
         with open(yamlfile, "r") as fp:
-            data = yaml.load(fp.read(), Loader=yaml.FullLoader)
+            data = yaml.safe_load(fp)
         config = Config(data.get("update_endpoint"),
                         data.get("vivo_email"),
                         data.get("vivo_password"),
@@ -31,5 +32,6 @@ def load(yamlfile: str):
                         data)
         return config
     except Exception:
+        traceback.print_exc()
         print("Error: Check config file")
         raise

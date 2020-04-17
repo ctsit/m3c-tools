@@ -3,11 +3,6 @@ import functools
 import logging
 import sys
 
-from m3c import prefill
-from m3c import pubfetch
-from m3c import server
-from m3c import triples
-
 
 PROGRAM: str = "m3c"
 
@@ -40,12 +35,16 @@ def main():
     logger.debug(f"{PROGRAM} {args.cmd} started")
 
     if args.cmd == "prefill":
+        from m3c import prefill
         prefill.prefill(args.config)
     elif args.cmd == "serve":
+        from m3c import server
         server.serve(args.config)
     elif args.cmd == "generate":
+        from m3c import triples
         triples.generate(args.config, args.diff)
     elif args.cmd == "pubfetch":
+        from m3c import pubfetch
         pubfetch.pubfetch(args.config, args.authorships, args.delay, args.max)
 
     logger.debug(f"{PROGRAM} ended")
