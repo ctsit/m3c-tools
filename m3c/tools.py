@@ -39,6 +39,32 @@ import json
 import requests
 
 
+# Header names from the Google Sheet
+SOFTWARE = "Software"
+DESCRIPTION = "Description"
+FUNCTIONALITY = "Functionality"
+INSTRUMENT_DATA_TYPE = "Instrument Data Type"
+APPROACHES = "Approaches"
+COMPUTER_SKILLS = "Computer Skills"
+SOFTWARE_TYPE = "Software Type"
+INTERFACE = "Interface"
+OPERATING_SYSTEM = "Operating System (OS)"
+LANGUAGE = "Language"
+VERSION = "Version"
+DEPENDENCIES = "Dependencies"
+INPUT_FORMATS_OPEN = "Input Formats - Open"
+INPUT_FORMATS_PROPRIETARY = "Input Formats - Proprietary"
+PUBLISHED = "Published"
+LAST_UPDATED = "Last Updated"
+LICENSE = "License"
+WEBSITE = "Website"
+PAPER = "Paper"
+PMID = "PMID"
+SOFTWARE_LINK = "SoftwareLink"
+WEBSITE_LINK = "WebsiteLink"
+PAPER_LINK = "PaperLink"
+
+
 class MetabolomicsToolsWiki:
     """
     Client for the Metabolomics Tools Wiki website.

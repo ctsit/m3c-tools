@@ -22,9 +22,9 @@ import xml.etree.ElementTree as ET
 
 import psycopg2
 
+from m3c import config
 from m3c import db
 from m3c import mwb
-import m3c.triples as metab_import
 from m3c import tools
 
 
@@ -343,15 +343,18 @@ def parse_author_list(xml: str) -> ET.ElementTree:
 
 
 def prefill(config_path: str):
-    config = metab_import.get_config(config_path)
+    cfg = config.load(config_path)
 
-    mwb_client = mwb.Client(config.get("mwb_host"), config.get("mwb_port"))
+    mwb_client = mwb.Client(cfg.get("mwb_host"), cfg.get("mwb_port"))
     sup_conn: db.Connection = psycopg2.connect(
-        host=config.get("sup_host"), dbname=config.get("sup_database"),
-        user=config.get("sup_username"), password=config.get("sup_password"),
-        port=config.get("sup_port"))
+        host=cfg.get("sup_host"),
+        dbname=cfg.get("sup_database"),
+        user=cfg.get("sup_username"),
+        password=cfg.get("sup_password"),
+        port=cfg.get("sup_port")
+    )
 
-    embargoed_path = config.get("embargoed", "")
+    embargoed_path = cfg.get("embargoed", "")
     embargoed: List[str] = []
     if embargoed_path:
         with open(embargoed_path) as f:

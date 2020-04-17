@@ -40,6 +40,7 @@ import psycopg2
 import psycopg2.extensions
 
 from m3c import catalyst
+from m3c import classes
 from m3c import db
 from m3c import triples as metab_import
 from m3c import tools
@@ -294,13 +295,13 @@ def update_authorships(cursor: psql_cursor, authorships_limit: int = -1):
                 "downloaded recently")
             continue
 
-        person = metab_import.Person(person_id=person_id,
-                                     first_name=info[0],
-                                     last_name=info[1],
-                                     display_name=info[2],
-                                     email=info[3],
-                                     phone=info[4],
-                                     withheld=info[5])
+        person = classes.Person(person_id=person_id,
+                                first_name=info[0],
+                                last_name=info[1],
+                                display_name=info[2],
+                                email=info[3],
+                                phone=info[4],
+                                withheld=info[5])
         if person.withheld:
             log(f"{person_id}: skipping withheld author")
             continue

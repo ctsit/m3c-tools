@@ -24,20 +24,17 @@ Instructions:
 """
 
 from datetime import datetime
-import csv
 import getopt
 import os
 import pathlib
 import re
 import sys
-import time
 import traceback
 import typing
-import yaml
 
 import psycopg2
 
-from m3c.aide import Aide
+from m3c import config
 from m3c import db
 from m3c.classes import Dataset
 from m3c.classes import Organization
@@ -47,20 +44,12 @@ from m3c.classes import Project
 from m3c.classes import Publication
 from m3c.classes import Study
 from m3c.classes import Tool
-from m3c import pubfetch
+from m3c import prefill
+from m3c import tools
 
 Dict = typing.Dict
+Iterable = typing.Iterable
 List = typing.List
-
-
-def get_config(config_path):
-    try:
-        with open(config_path, 'r') as config_file:
-            config = yaml.load(config_file.read(), Loader=yaml.FullLoader)
-    except Exception as e:
-        print("Error: Check config file")
-        sys.exit(e)
-    return config
 
 
 def diff(prev_path: str, path: str) -> \
@@ -637,36 +626,33 @@ def make_datasets(namespace, datasets, studies):
     return dataset_triples, study_triples
 
 
-def get_authors_pmid(pmid: typing.Text) -> typing.List[typing.Dict]:
-    authors = []
-    retries = 3
-    while retries > 0:
-        try:
-            data = pubfetch.pubmed_efetch([pmid])
-            author_list = data.findall('./PubmedArticle[1]/MedlineCitation/'
-                                       'Article/AuthorList/Author')
-            for author in author_list:
-                forename = author.findtext('ForeName', '').strip()
-                surname = author.findtext('LastName', '').strip()
-                auth = {
-                    'name': f'{forename} {surname}'.strip()
-                }
-                authors.append(auth)
-            break
-        except IOError:
-            print(f'Error getting PubMed Data for tool with PMID {pmid}. '
-                  'Trying again in 2 seconds')
-            time.sleep(2)
-        except Exception:
-            traceback.print_exc()
-            print(f'Error parsing PubMed Data for tool with PMID {pmid}')
-        retries -= 1
-    return authors
-
-
-def get_yaml_tools(config):
+def get_authors_pmid(sup_cur: db.Cursor,
+                     pmid: typing.Text
+                     ) -> typing.List[typing.Dict[str, str]]:
     try:
-        tools_path = config.get('tools', 'tools.yaml')
+        authors = []
+        pubs = db.get_pubmed_publications(sup_cur, pmids=[pmid])
+        if pmid not in pubs:
+            print(f'PMID {pmid}: Could not find PubMed data')
+            return []
+        author_list = prefill.parse_author_list(pubs[pmid])
+        for author in author_list:
+            forename = author.findtext('ForeName', '').strip()
+            surname = author.findtext('LastName', '').strip()
+            auth = {
+                'name': f'{forename} {surname}'.strip()
+            }
+            authors.append(auth)
+        return authors
+    except Exception:
+        traceback.print_exc()
+        print(f'Error parsing PubMed Data for tool with PMID {pmid}')
+        return []
+
+
+def get_yaml_tools(cfg: config.Config):
+    try:
+        tools_path = cfg.get('tools', 'tools.yaml')
         with open(tools_path, 'r') as tools_file:
             t = yaml.load(tools_file.read(), Loader=yaml.FullLoader)
             tools = []
@@ -684,39 +670,32 @@ def get_yaml_tools(config):
         return []
 
 
-def strip_http(url: typing.Text) -> typing.Text:
-    return url.replace('http://', '').replace('https://', '')
-
-
-def get_csv_tools(csv_tools_path: str) -> List[Tool]:
-    try:
-        with open(csv_tools_path, 'r') as tools_file:
-            t = csv.reader(tools_file)
-            # Skip the header row
-            next(t)
-
-            tools = []
-            for tool_data in t:
-                pmid = tool_data[19].strip()
-                authors = None
-                if pmid.isnumeric():
-                    authors = get_authors_pmid(pmid)
-                if not tool_data[24].replace('-', '').strip():
-                    continue
-                tool = Tool(strip_http(tool_data[24]), {
-                    'name': tool_data[21],
-                    'description': tool_data[1],
-                    'url': tool_data[24],
-                    'authors': authors,
-                    'pmid': pmid,
-                    'tags': tool_data[6].split(',')  # TODO: +split('\n') strip
-                })
-                tools.append(tool)
-            return tools
-    except Exception:
-        traceback.print_exc()
-        print('Error parsing tools config file: %s' % csv_tools_path)
-        return []
+def fetch_mtw_tools(sup_cur: db.Cursor) -> Iterable[Tool]:
+    headers = tools
+    for tool in tools.MetabolomicsToolsWiki.tools():
+        name = tool[headers.SOFTWARE]
+        pmid = tool[headers.PMID]
+        authors = []
+        if tool[headers.PMID].isnumeric():
+            authors = get_authors_pmid(sup_cur, pmid)
+        else:
+            pmid = ""
+        props = {
+            "name": name,
+            "description": tool[headers.DESCRIPTION],
+            "license": {
+                "kind": tool[headers.LICENSE],
+            },
+            "url": tool[headers.WEBSITE],
+            "authors": authors,
+            "pmid": pmid,
+            "approach": tool[headers.APPROACHES],
+            "functionality": tool[headers.FUNCTIONALITY],
+            "instrumental": tool[headers.INSTRUMENT_DATA_TYPE],
+            "language": tool[headers.LANGUAGE],
+            "type": tool[headers.SOFTWARE_TYPE],
+        }
+        yield Tool(name, props)
 
 
 def make_tools(namespace, tools: List[Tool], people, withheld_people, mwb_cur, sup_cur):
@@ -754,12 +733,12 @@ def print_to_open_file(triples: typing.List[str], file: typing.IO) -> None:
 
 def generate(config_path: str, old_path: str):
     timestamp = datetime.now()
-    path = 'data_out/' + timestamp.strftime("%Y") + '/' + \
-        timestamp.strftime("%m") + '/' + timestamp.strftime("%Y_%m_%d")
-    try:
-        os.makedirs(path)
-    except FileExistsError:
-        pass
+    path = os.path.join("data_out",
+                        timestamp.strftime("%Y"),
+                        timestamp.strftime("%m"),
+                        timestamp.strftime("%Y_%m_%d"))
+    os.makedirs(path, exist_ok=True)
+
     org_file = os.path.join(path, 'orgs.nt')
     people_file = os.path.join(path, 'people.nt')
     project_file = os.path.join(path, 'projects.nt')
@@ -771,34 +750,26 @@ def generate(config_path: str, old_path: str):
     add_file = os.path.join(path, 'add.nt')
     sub_file = os.path.join(path, 'sub.nt')
 
-    config = get_config(config_path)
+    cfg = config.load(config_path)
 
-    pubfetch.pubmed_init(email=config.get('pubmed_email'),
-                         api_key=config.get('pubmed_api_token'))
-
-    aide = Aide(config.get('update_endpoint'),
-                config.get('vivo_email'),
-                config.get('vivo_password'),
-                config.get('namespace'))
-
-    if not aide.namespace.endswith('/'):
-        print(f"WARNING! Namespace doesn't end with '/': {aide.namespace}")
+    if not cfg.namespace.endswith('/'):
+        print(f"WARNING! Namespace doesn't end with '/': {cfg.namespace}")
 
     mwb_conn: psycopg2.extensions.connection = psycopg2.connect(
-        host=config.get('mwb_host'), dbname=config.get('mwb_database'),
-        user=config.get('mwb_username'), password=config.get('mwb_password'),
-        port=config.get('mwb_port'))
+        host=cfg.get('mwb_host'), dbname=cfg.get('mwb_database'),
+        user=cfg.get('mwb_username'), password=cfg.get('mwb_password'),
+        port=cfg.get('mwb_port'))
 
     sup_conn: psycopg2.extensions.connection = psycopg2.connect(
-        host=config.get('sup_host'), dbname=config.get('sup_database'),
-        user=config.get('sup_username'), password=config.get('sup_password'),
-        port=config.get('sup_port'))
+        host=cfg.get('sup_host'), dbname=cfg.get('sup_database'),
+        user=cfg.get('sup_username'), password=cfg.get('sup_password'),
+        port=cfg.get('sup_port'))
 
     with mwb_conn, sup_conn:
         with mwb_conn.cursor() as mwb_cur, sup_conn.cursor() as sup_cur:
             # Organizations
             orgs = get_organizations(sup_cur)
-            org_triples = make_organizations(aide.namespace, orgs)
+            org_triples = make_organizations(cfg.namespace, orgs)
             print_to_file(org_triples, org_file)
 
             # People
@@ -808,31 +779,31 @@ def generate(config_path: str, old_path: str):
             withheld_people = {k: v for k, v in all_people.items() if v.withheld}
 
             # Photos
-            photos = get_photos(config.get("picturepath", "."), people)
-            photos_triples = make_photos(aide.namespace, photos)
+            photos = get_photos(cfg.get("picturepath", "."), people)
+            photos_triples = make_photos(cfg.namespace, photos)
             print_to_file(photos_triples, photos_file)
+
+            # Tools
+            yaml_tools = get_yaml_tools(cfg)
+            csv_tools = list(fetch_mtw_tools(sup_cur))
+            tools_triples = make_tools(cfg.namespace, yaml_tools + csv_tools, people, withheld_people, mwb_cur, sup_cur)
+            print_to_file(tools_triples, tools_file)
 
             # Publications
             pubs = get_publications(sup_cur)
-            pubs_triples = make_publications(aide.namespace, pubs)
+            pubs_triples = make_publications(cfg.namespace, pubs)
             print_to_file(pubs_triples, pubs_file)
-
-            # Tools
-            yaml_tools = get_yaml_tools(config)
-            csv_tools = get_csv_tools(config.get("tools_csv", "tools.csv"))
-            tools_triples = make_tools(aide.namespace, yaml_tools + csv_tools, people, withheld_people, mwb_cur, sup_cur)
-            print_to_file(tools_triples, tools_file)
 
             # Projects
             projects = get_projects(mwb_cur, sup_cur, people, orgs)
-            project_triples, project_summaries = \
-                make_projects(aide.namespace, projects)
+            project_data = make_projects(cfg.namespace, projects)
+            project_triples, project_summaries = project_data
             all_proj_triples = project_triples + project_summaries
             print_to_file(all_proj_triples, project_file)
 
             # Studies
             # Study file printed after datasets
-            embargoed_path = config.get('embargoed', '')
+            embargoed_path = cfg.get('embargoed', '')
             embargoed: typing.List[str] = []
             if embargoed_path:
                 with open(embargoed_path) as f:
@@ -840,12 +811,12 @@ def generate(config_path: str, old_path: str):
 
             studies = get_studies(mwb_cur, sup_cur, people, orgs, embargoed)
             study_triples, study_summaries = \
-                make_studies(aide.namespace, studies, projects)
+                make_studies(cfg.namespace, studies, projects)
 
             # Datasets
             datasets = get_datasets(mwb_cur)
             dataset_triples, study_sup_triples = \
-                make_datasets(aide.namespace, datasets, studies)
+                make_datasets(cfg.namespace, datasets, studies)
             print_to_file(dataset_triples, dataset_file)
 
             all_study_triples = study_triples + study_summaries \
@@ -853,9 +824,9 @@ def generate(config_path: str, old_path: str):
             print_to_file(all_study_triples, study_file)
 
             # Make People Triples
-            people_triples = make_people(aide.namespace, people)
+            people_triples = make_people(cfg.namespace, people)
             people_triples.extend(
-                link_people_to_org(aide.namespace, sup_cur, people, orgs))
+                link_people_to_org(cfg.namespace, sup_cur, people, orgs))
             print_to_file(people_triples, people_file)
 
             if old_path:

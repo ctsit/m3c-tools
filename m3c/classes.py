@@ -358,16 +358,23 @@ class Tool(object):
         self.license: Tool.License = Tool.License(**license)
         self.tags: typing.List[typing.Text] = data.get('tags', [])
         self.pmid: typing.Text = data.get('pmid', None)
+        self.approach = data.get('approach', '')
+        self.functionality = data.get('functionality', '')
+        self.instrumental = data.get('instrumental', '')
+        self.language = data.get('language', '')
+        self.type = data.get('type', '')
 
     def uri(self, namespace: typing.Text) -> typing.Text:
         encoded = self.tool_id
         encoded = encoded.replace('_', '__')
-        encoded = encoded.replace('-', '_d')
-        encoded = encoded.replace('/', '_s')
-        encoded = encoded.replace('?', '_p')
-        encoded = encoded.replace('=', '_e')
-        encoded = encoded.replace('&', '_aa')
+        encoded = encoded.replace('&', '_a')
         encoded = encoded.replace(':', '_c')
+        encoded = encoded.replace('-', '_d')
+        encoded = encoded.replace('=', '_e')
+        encoded = encoded.replace('+', '_p')
+        encoded = encoded.replace('?', '_q')
+        encoded = encoded.replace('/', '_s')
+        encoded = encoded.replace(' ', '_w')
 
         contains_unhandled_char = re.search('[^A-Za-z0-9._/]', encoded)
         if contains_unhandled_char:
@@ -412,6 +419,18 @@ class Tool(object):
             tag = tag.strip().lower()
             rdf.append("<{uri}> <{m3c}tag> {tag}"
                        .format(uri=uri, m3c=m3c, tag=escape(tag)))
+
+        if self.approach:
+            rdf.append(f"<{uri}> <{m3c}approach> <{self.approach}>")
+        if self.functionality:
+            rdf.append(f"<{uri}> <{m3c}functionality> <{self.functionality}>")
+        if self.instrumental:
+            instrumental = self.instrumental
+            rdf.append(f"<{uri}> <{m3c}instrumentalDataType> <{instrumental}>")
+        if self.language:
+            rdf.append(f"<{uri}> <{m3c}programmingLanguage> <{self.language}>")
+        if self.type:
+            rdf.append(f"<{uri}> <{m3c}softwareType> <{self.type}>")
 
         return rdf
 
