@@ -1,8 +1,8 @@
-"""M3C PubMed Fethcher
+"""M3C PubMed Fetcher
 
 Usage:
-    python3 pubfetch.py -h | --help
-    python3 pubfetch.py [--authorships] [--delay=DELAY] [--max=MAX] <config>
+    m3c pubfetch -h | --help
+    m3c pubfetch [--authorships] [--delay=DELAY] [--max=MAX] <config>
 
 Options:
     -h --help    Show this help message and exit.

@@ -1,8 +1,8 @@
-"""Metab Importer
+"""M3C N-Triple Generator
 
 Usage:
-    python3 metab_import.py (-h | --help)
-    python3 metab_import.py [-x <prev> | --diff=<prev>] <path_to_config>
+    m3c generate (-h | --help)
+    m3c generate [-x <prev> | --diff=<prev>] <path_to_config>
 
 Options:
     -h --help      Show this message and exit
@@ -19,8 +19,7 @@ Differential Update:
     The corresponding files are written to add.nt and sub.nt.
 
 Instructions:
-    Run the importer where you have access to the postgres metabolomics
-    database.
+    Run the generator where you have access to the Postgres database.
 """
 
 from datetime import datetime

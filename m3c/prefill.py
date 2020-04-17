@@ -1,8 +1,8 @@
-"""
-Metab Importer
+"""M3C Prefill Program
+
 Usage:
-    python m3c/prefill.py (-h | --help)
-    python m3c/prefill.py <path_to_config>
+    m3c prefill (-h | --help)
+    m3c prefill <path_to_config>
 
 Options:
     -h --help       Show this message and exit
@@ -11,7 +11,7 @@ Instructions:
     See README
 
 Example:
-    $ python m3c/prefill.py config.yaml
+    $ m3c prefill config.yaml
 """
 
 import io

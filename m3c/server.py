@@ -1,8 +1,8 @@
-"""
-Metab Admin
+"""M3C Admin Forms Server
+
 Usage:
-    python metab_admin.py (-h | --help)
-    python metab_admin.py <path_to_config>
+    m3c serve (-h | --help)
+    m3c serve <path_to_config>
 
 Options:
     -h --help   Show this message and exit
@@ -11,7 +11,7 @@ Instructions:
     See README
 
 Example:
-    $ python metab_admin.py config.yaml
+    $ m3c serve config.yaml
 """
 
 import logging
