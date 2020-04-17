@@ -4,11 +4,11 @@
 # Use of this source code is governed by the license found in the LICENSE file.
 ###############################################################################
 
-from setuptools import setup, find_packages
+import setuptools
 
-VERSION="0.8.0"
+VERSION = "0.8.0"
 
-setup(
+setuptools.setup(
     name="m3c",
     version=VERSION,
     author="UF CTS-IT",
@@ -21,8 +21,8 @@ setup(
     keywords=["metabolomics", "tpf", "vivo"],
     download_url="https://github.com/ctsit/m3c/releases/tag/" + VERSION,
 
-    package_dir = {'m3c': 'm3c'},
-    packages = find_packages(),
+    packages={"m3c": "m3c"},
+    include_package_data=True,
 
     entry_points={
         "console_scripts": [
