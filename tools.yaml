@@ -1,3 +1,31 @@
+metabolomics.info:
+  name: Metabolomics Info
+  description: |
+    A service of the Metabolomics Consortium Coordinating Center (M3C) of
+    the NIH Common Fund Metabolomics Program.Website and People Portal.
+  url: https://metabolomics.info
+  authors:
+    - name: Kevin Hanson
+      email: kshanson@ufl.edu
+    - name: Christopher Barnes
+      email: cpb@ufl.edu
+    - name: Michael Conlon
+      email: mconlon@ufl.edu
+    - name: Taeber Rapczak
+      email: taeber@ufl.edu
+    - name: Hunter Jarrell
+      email: hunter.jarrell@ufl.edu
+    - name: Samantha Emerson
+      email: s.emerson@ufl.edu
+    - name: Alyssa Kelly
+      email: alyssakelly@ufl.edu
+    - name: Jenny Martinez
+      email: jmjenny@ufl.edu
+    - name: Naomi Braun
+      email: looseymoose@ufl.edu
+  tags:
+    - service
+
 github.com/MoseleyBioinformaticsLab/mwtab:
   name: mwtab
   description: |
