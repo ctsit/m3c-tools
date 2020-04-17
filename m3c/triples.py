@@ -681,7 +681,7 @@ def fetch_mtw_tools(sup_cur: db.Cursor) -> Iterable[Tool]:
 def make_tools(
     namespace, tools: List[Tool], people, withheld_people, mwb_cur, sup_cur
 ):
-    print("Making Tools")
+    print("Generating triples for tools")
     triples = []
     tool_count = 0
     for tool in tools:
@@ -768,6 +768,7 @@ def generate(config_path: str, old_path: str):
             print_to_file(photos_triples, photos_file)
 
             # Tools
+            print("Gathering Tools")
             yaml_tools = get_yaml_tools(cfg)
             csv_tools = list(fetch_mtw_tools(sup_cur))
             all_tools = yaml_tools + csv_tools
