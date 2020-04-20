@@ -22,8 +22,7 @@ namespace: "https://vivo.domain.info/individual/"
 embargoed: embargoed.txt
 
 # Path to the Tools information
-tools: "tools.yaml"
-csv_tools: "tools.csv"
+tools: /path/to/m3c/tools.yaml
 
 # Admin Page Requirements
 secret: "CHANGE ME! DO NOT leave this as is."
