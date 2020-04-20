@@ -421,16 +421,16 @@ class Tool(object):
                        .format(uri=uri, m3c=m3c, tag=escape(tag)))
 
         if self.approach:
-            rdf.append(f"<{uri}> <{m3c}approach> <{self.approach}>")
+            rdf.append(f'<{uri}> <{m3c}approach> "{self.approach}"')
         if self.functionality:
-            rdf.append(f"<{uri}> <{m3c}functionality> <{self.functionality}>")
+            rdf.append(f'<{uri}> <{m3c}functionality> "{self.functionality}"')
         if self.instrumental:
             instrumental = self.instrumental
-            rdf.append(f"<{uri}> <{m3c}instrumentalDataType> <{instrumental}>")
+            rdf.append(f'<{uri}> <{m3c}instrumentalDataType> "{instrumental}"')
         if self.language:
-            rdf.append(f"<{uri}> <{m3c}programmingLanguage> <{self.language}>")
+            rdf.append(f'<{uri}> <{m3c}programmingLanguage> "{self.language}"')
         if self.type:
-            rdf.append(f"<{uri}> <{m3c}softwareType> <{self.type}>")
+            rdf.append(f'<{uri}> <{m3c}softwareType> "{self.type}"')
 
         return rdf
 
