@@ -1,2 +1,2 @@
 recursive-include m3c/templates *
-include tools.yaml
+include m3c/tools.yaml
