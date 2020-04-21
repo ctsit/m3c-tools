@@ -420,17 +420,21 @@ class Tool(object):
             rdf.append("<{uri}> <{m3c}tag> {tag}"
                        .format(uri=uri, m3c=m3c, tag=escape(tag)))
 
-        if self.approach:
-            rdf.append(f'<{uri}> <{m3c}approach> "{self.approach}"')
-        if self.functionality:
-            rdf.append(f'<{uri}> <{m3c}functionality> "{self.functionality}"')
-        if self.instrumental:
-            instrumental = self.instrumental
-            rdf.append(f'<{uri}> <{m3c}instrumentalDataType> "{instrumental}"')
-        if self.language:
-            rdf.append(f'<{uri}> <{m3c}programmingLanguage> "{self.language}"')
-        if self.type:
-            rdf.append(f'<{uri}> <{m3c}softwareType> "{self.type}"')
+        props: typing.Dict[str, str] = {
+            "approach": self.approach,
+            "functionality": self.functionality,
+            "instrumentaltalDataType": self.instrumental,
+            "programmingLanguage": self.language,
+            "softwareType": self.type,
+        }
+
+        for prop, values in props.items():
+            split = values.replace(',', '\n').replace('/', '\n').split('\n')
+            for value in split:
+                if value in ["", "-", "?"]:
+                    continue
+                value = value.strip()
+                rdf.append(f'<{uri}> <{m3c}{prop}> "{value}"')
 
         return rdf
 
