@@ -423,7 +423,7 @@ class Tool(object):
         props: typing.Dict[str, str] = {
             "approach": self.approach,
             "functionality": self.functionality,
-            "instrumentaltalDataType": self.instrumental,
+            "instrumentalDataType": self.instrumental,
             "programmingLanguage": self.language,
             "softwareType": self.type,
         }
