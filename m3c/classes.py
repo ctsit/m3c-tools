@@ -1,14 +1,15 @@
+from typing import Dict, List, Optional, Set, Text
+
 import json
 import io
 import os
 import re
 import textwrap
-import typing
 
 from Bio import Entrez
 
 
-MONTHS = 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split()
+MONTHS: List[str] = 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split()
 
 
 class Citation(object):
@@ -37,14 +38,14 @@ class Project(object):
         self.summary = summary
         self.doi = doi
         self.funding_source = funding_source
-        self.pi = []
-        self.institutes = []
-        self.departments = []
-        self.labs = []
+        self.pi: List[str] = []
+        self.institutes: List[str] = []
+        self.departments: List[str] = []
+        self.labs: List[str] = []
 
     def get_triples(self, namespace: str):
         uri = Project.uri(namespace, self.project_id)
-        rdf = []
+        rdf: List[str] = []
         rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#Project>".format(uri))
         rdf.append("<{}> <http://www.w3.org/2000/01/rdf-schema#label> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.project_title))
         rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#projectId> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.project_id))
@@ -76,7 +77,7 @@ class Project(object):
         if self.summary:
             summary_line = "<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#summary> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.summary)
         else:
-            summary_line = None
+            summary_line = ""
         return rdf, summary_line
 
     @staticmethod
@@ -96,12 +97,12 @@ class Study(object):
         self.submit_date = submit_date
         self.project_id = project_id
 
-        self.runner = []
-        self.institutes = []
-        self.departments = []
-        self.labs = []
+        self.runner: List[str] = []
+        self.institutes: List[str] = []
+        self.departments: List[str] = []
+        self.labs: List[str] = []
 
-        self.subject_species = []
+        self.subject_species: List[str] = []
 
     def get_triples(self, namespace: str):
         uri = Study.uri(namespace, self.study_id)
@@ -141,7 +142,7 @@ class Study(object):
         if self.summary:
             summary_line = "<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#summary> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.summary)
         else:
-            summary_line = None
+            summary_line = ""
         return rdf, summary_line
 
     def get_species_triples(self, namespace: str):
@@ -251,7 +252,7 @@ class Photo(object):
     def filename(self) -> str:
         return f"photo.{self.extension}"
 
-    def get_triples(self, namespace: typing.Text) -> typing.List[typing.Text]:
+    def get_triples(self, namespace: Text) -> List[Text]:
         person_uri = Person.uri(namespace, self.person_id)
         person = f"<{person_uri}>"
         image = f"<{person_uri}photo>"
@@ -285,11 +286,11 @@ class Photo(object):
     def path(self) -> str:
         """Get the directory path for the specified person with `person_id`."""
         # "b~" is shorthand for https://vivo.metabolomics.info/individual/
-        path = f"{self.alias}~{Person.n_number(self.person_id)}pic"
+        fullpath = f"{self.alias}~{Person.n_number(self.person_id)}pic"
         # VIVO expects each directory to be no longer than 3 characters.
         # See: https://wiki.duraspace.org/display/VIVODOC110x/Image+storage
-        path = textwrap.wrap(path, 3)
-        path = os.path.join(self.root, *path)
+        split = textwrap.wrap(fullpath, 3)
+        path = os.path.join(self.root, *split)
         return path
 
 
@@ -333,38 +334,36 @@ class Organization(object):
 
 class Tool(object):
     class License:
-        def __init__(self, kind: typing.Text,
-                     url: typing.Optional[typing.Text] = ''):
+        def __init__(self, kind: str, url: str = ''):
             self.kind = kind.strip()
             self.url = url.strip()
 
     class Author:
-        def __init__(self, name: str, email: typing.Optional[str] = '',
-                     uri: typing.Optional[str] = ''):
+        def __init__(self, name: str, email: str = '', uri: str = ''):
             self.name = name.strip()
             self.email = email.strip()
             self.uri = uri.strip()
 
-    def __init__(self, tool_id: typing.Text, data: dict):
-        self.tool_id: typing.Text = tool_id.strip()
-        self.name: typing.Text = data['name'].replace('\n', ' ').strip()
-        self.description: typing.Text = data['description'].strip()
-        self.url: typing.Text = data['url'].strip()
-        self.authors: typing.List[Tool.Author] = []
+    def __init__(self, tool_id: Text, data: dict):
+        self.tool_id: Text = tool_id.strip()
+        self.name: Text = data['name'].replace('\n', ' ').strip()
+        self.description: Text = data['description'].strip()
+        self.url: Text = data['url'].strip()
+        self.authors: List[Tool.Author] = []
         authors = data.get('authors', None) or []
         for author in authors:
             self.authors.append(Tool.Author(**author))
         license = data.get('license', dict(kind=''))
         self.license: Tool.License = Tool.License(**license)
-        self.tags: typing.List[typing.Text] = data.get('tags', [])
-        self.pmid: typing.Text = data.get('pmid', None)
+        self.tags: List[Text] = data.get('tags', [])
+        self.pmid: Text = data.get('pmid', None)
         self.approach = data.get('approach', '')
         self.functionality = data.get('functionality', '')
         self.instrumental = data.get('instrumental', '')
         self.language = data.get('language', '')
         self.type = data.get('type', '')
 
-    def uri(self, namespace: typing.Text) -> typing.Text:
+    def uri(self, namespace: Text) -> Text:
         encoded = self.tool_id
         encoded = encoded.replace('_', '__')
         encoded = encoded.replace('&', '_a')
@@ -383,7 +382,7 @@ class Tool(object):
 
         return namespace + 't' + encoded
 
-    def get_triples(self, namespace: typing.Text) -> typing.List[typing.Text]:
+    def get_triples(self, namespace: Text) -> List[Text]:
         m3c = 'http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#'
 
         rdf = []
@@ -420,7 +419,7 @@ class Tool(object):
             rdf.append("<{uri}> <{m3c}tag> {tag}"
                        .format(uri=uri, m3c=m3c, tag=escape(tag)))
 
-        props: typing.Dict[str, str] = {
+        props: Dict[str, str] = {
             "approach": self.approach,
             "functionality": self.functionality,
             "instrumentalDataType": self.instrumental,
@@ -438,7 +437,7 @@ class Tool(object):
 
         return rdf
 
-    def match_authors(self, people: typing.Dict[int, Person], namespace: str):
+    def match_authors(self, people: Dict[int, Person], namespace: str):
         non_matched = []
         for author in self.authors:
             for person in people.values():
@@ -464,7 +463,7 @@ class DateTimeValue:
 
     See http://vivoweb.org/ontology/core#DateTimeValue
     '''
-    def __init__(self, year: int, month: int = None, day: int = None):
+    def __init__(self, year: int, month: int = 0, day: int = 0):
         self.precision = 'year'
         self.year = year
         self.month = 1
@@ -478,10 +477,10 @@ class DateTimeValue:
                 self.day = day
                 self.precision = 'yearMonthDay'
 
-    def get_triples(self, datetime_value_uri: str) -> typing.List[str]:
+    def get_triples(self, datetime_value_uri: str) -> List[str]:
         uri = datetime_value_uri
 
-        triples: typing.List[str] = []
+        triples: List[str] = []
         triples.append(f'<{uri}> <http://vivoweb.org/ontology/core#dateTime> "{self.year:04}-{self.month:02}-{self.day:02}T00:00:00"^^<http://www.w3.org/2001/XMLSchema#dateTime>')
         triples.append(f'<{uri}> <http://vivoweb.org/ontology/core#dateTimePrecision> <http://vivoweb.org/ontology/core#{self.precision}Precision>')
         return triples
@@ -489,14 +488,14 @@ class DateTimeValue:
 
 class Publication(object):
     def __init__(self, pmid: str, title: str,
-                 published: typing.Optional[DateTimeValue], doi: str,
-                 citation: str):
+                 published: Optional[DateTimeValue],
+                 doi: str, citation: str):
         self.pmid = pmid
         self.title = title
         self.published = published
         self.doi = doi
         self.citation = citation
-        self.authors = set()
+        self.authors: Set[str] = set()
 
     def get_triples(self, namespace):
         uri = Publication.uri(namespace, self.pmid)
@@ -574,12 +573,12 @@ def make_pub(citation: Citation) -> Publication:
             month_text = pubdate['Month']
             month = MONTHS.index(month_text)+1
         except (KeyError, ValueError):
-            month = None
+            month = 0
 
         try:
             day = int(pubdate['Day'])
         except KeyError:
-            day = None
+            day = 0
 
         published = DateTimeValue(year, month, day)
 
@@ -641,13 +640,13 @@ def make_pub(citation: Citation) -> Publication:
         cite += '. '
     if doi:
         cite += 'doi:' + doi
-    citation = cite
+    citation_string = cite
 
-    return Publication(pmid, title, published, doi, citation)
+    return Publication(pmid, title, published, doi, citation_string)
 
 
-def parse_api(results: dict) -> typing.Dict[str, Publication]:
-    publications: typing.Dict[str, Publication] = {}
+def parse_api(results: dict) -> Dict[str, Publication]:
+    publications: Dict[str, Publication] = {}
 
     for article in results['PubmedArticle']:
         try:

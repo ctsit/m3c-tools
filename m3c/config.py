@@ -1,27 +1,24 @@
-import traceback
-import typing
-import yaml
+from typing import Dict, Optional
 
-Dict = typing.Dict
-Optional = typing.Optional
+import traceback
+import yaml
 
 
 class Config:
     def __init__(self, endpoint: str, email: str, password: str, prefix: str,
-                 data: Optional[Dict[str, str]] = {}):
+                 data: Optional[Dict[str, str]] = None):
         # Endpoint must be the Update API's endpoint, not the Query API's.
         self.endpoint = endpoint
         self.email = email
         self.password = password
         self.namespace = prefix
-        self.used_n_numbers = []
         self._data = data or {}
 
     def get(self, prop, default=None):
         return self._data.get(prop, default)
 
 
-def load(yamlfile: str) -> Optional[Config]:
+def load(yamlfile: str) -> Config:
     try:
         with open(yamlfile, "r") as fp:
             data = yaml.safe_load(fp)

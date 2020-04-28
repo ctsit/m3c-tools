@@ -22,6 +22,8 @@ Instructions:
     Run the generator where you have access to the Postgres database.
 """
 
+from typing import Dict, IO, Iterable, List, Mapping, Tuple
+
 from datetime import datetime
 import getopt
 import os
@@ -29,7 +31,6 @@ import pathlib
 import re
 import sys
 import traceback
-import typing
 import yaml
 
 import psycopg2
@@ -47,13 +48,8 @@ from m3c.classes import Tool
 from m3c import prefill
 from m3c import tools
 
-Dict = typing.Dict
-Iterable = typing.Iterable
-List = typing.List
-Tuple = typing.Tuple
 
-
-def diff(prev_path: str, path: str) -> Tuple[List[str], List[str]]:
+def diff(prev_path: str, path: str) -> Tuple[Iterable[str], Iterable[str]]:
     prev = pathlib.Path(prev_path)
     previous = []
     for file in prev.glob("*.nt"):
@@ -72,11 +68,11 @@ def diff(prev_path: str, path: str) -> Tuple[List[str], List[str]]:
             current += [line for line in list(f) if line]
     current.sort()
 
-    previous = set(previous)
-    current = set(current)
+    previous_set = set(previous)
+    current_set = set(current)
 
-    add = current - previous
-    sub = previous - current
+    add = current_set - previous_set
+    sub = previous_set - current_set
 
     return (add, sub)
 
@@ -104,12 +100,12 @@ def make_organizations(namespace, orgs):
     return triples
 
 
-def get_people(sup_cur: db.Cursor) -> Dict[int, Person]:
+def get_people(sup_cur: db.Cursor) -> Dict[str, Person]:
     print("Gathering People")
-    people: Dict[int, Person] = {}
+    people: Dict[str, Person] = {}
     records = db.get_people(sup_cur)
     for pid, (first, last, display, email, phone, withheld) in records.items():
-        person = Person(person_id=pid,
+        person = Person(person_id=str(pid),
                         first_name=first,
                         last_name=last,
                         display_name=display,
@@ -176,7 +172,7 @@ def get_photos(file_storage_root: str, people):
     return photos
 
 
-def get_publications(sup_cur: db.Cursor) -> typing.Mapping[str, Publication]:
+def get_publications(sup_cur: db.Cursor) -> Mapping[str, Publication]:
     print("Gathering publications")
 
     authorships = db.get_pubmed_authorships(sup_cur)
@@ -200,7 +196,9 @@ def get_publications(sup_cur: db.Cursor) -> typing.Mapping[str, Publication]:
     return publications
 
 
-def make_publications(namespace: str, pubs: List[Publication]) -> List[str]:
+def make_publications(namespace: str,
+                      pubs: Mapping[str, Publication]
+                      ) -> List[str]:
     print("Making Publication triples")
     triples = []
     for pub in pubs.values():
@@ -210,7 +208,9 @@ def make_publications(namespace: str, pubs: List[Publication]) -> List[str]:
 
 
 def get_projects(mwb_cur, sup_cur,
-                 people: List[Person], orgs: List[Organization]):
+                 people: Dict[str, Person],
+                 orgs: List[Organization]
+                 ) -> Mapping[str, Project]:
     print("Gathering Workbench Projects")
     projects = {}
     mwb_cur.execute("""\
@@ -343,7 +343,7 @@ def get_projects(mwb_cur, sup_cur,
             first_name = first_name_list[i]
             ids = list(db.get_person(sup_cur, first_name, last_name))
             try:
-                person_id = ids[0]
+                person_id = str(ids[0])
                 project.pi.append(people[person_id].person_id)
             except (IndexError, KeyError, TypeError):
                 print("Error: Person does not exist.")
@@ -355,7 +355,7 @@ def get_projects(mwb_cur, sup_cur,
     return projects
 
 
-def make_projects(namespace, projects: typing.Mapping[str, Project]):
+def make_projects(namespace, projects: Mapping[str, Project]):
     print("Making Workbench Projects")
     triples = []
     summaries = []
@@ -378,7 +378,7 @@ def is_valid_study(study: Study) -> bool:
     return True
 
 
-def get_studies(mwb_cur, sup_cur, people, orgs, embargoed: typing.List[str]):
+def get_studies(mwb_cur, sup_cur, people, orgs, embargoed: List[str]):
     print("Gathering Workbench Studies")
     studies = {}
     mwb_cur.execute("""\
@@ -540,10 +540,13 @@ def get_studies(mwb_cur, sup_cur, people, orgs, embargoed: typing.List[str]):
     return studies
 
 
-def make_studies(namespace, studies: typing.Dict[str, Study], projects):
+def make_studies(namespace,
+                 studies: Dict[str, Study],
+                 projects: Mapping[str, Project]
+                 ) -> Tuple[List[str], List[str]]:
     print("Making Workbench Studies")
-    triples = []
-    summaries = []
+    triples: List[str] = []
+    summaries: List[str] = []
     study_count = 0
     no_proj_study = 0
     for study in studies.values():
@@ -605,9 +608,7 @@ def make_datasets(namespace, datasets, studies):
     return dataset_triples, study_triples
 
 
-def get_authors_pmid(sup_cur: db.Cursor,
-                     pmid: typing.Text
-                     ) -> typing.List[typing.Dict[str, str]]:
+def get_authors_pmid(sup_cur: db.Cursor, pmid: str) -> List[Dict[str, str]]:
     try:
         authors = []
         pubs = db.get_pubmed_publications(sup_cur, pmids=[pmid])
@@ -615,7 +616,7 @@ def get_authors_pmid(sup_cur: db.Cursor,
             print(f'PMID {pmid}: Could not find PubMed data')
             return []
         author_list = prefill.parse_author_list(pubs[pmid])
-        for author in author_list:
+        for author in author_list:  # type: ignore # ElementTree is iterable
             forename = author.findtext('ForeName', '').strip()
             surname = author.findtext('LastName', '').strip()
             auth = {
@@ -697,12 +698,12 @@ def make_tools(
     return triples
 
 
-def print_to_file(triples: typing.List[str], filename: str) -> None:
+def print_to_file(triples: List[str], filename: str) -> None:
     with open(filename, 'a+') as file:
         print_to_open_file(triples, file)
 
 
-def print_to_open_file(triples: typing.List[str], file: typing.IO) -> None:
+def print_to_open_file(triples: List[str], file: IO) -> None:
     for spo in triples:
         # Replace LFs and CRs with escaped equivalent. Since N-Triples uses
         # " .\n" as a record-separator, these absolutely must be escaped.
@@ -790,7 +791,7 @@ def generate(config_path: str, old_path: str):
             # Studies
             # Study file printed after datasets
             embargoed_path = cfg.get('embargoed', '')
-            embargoed: typing.List[str] = []
+            embargoed: List[str] = []
             if embargoed_path:
                 with open(embargoed_path) as f:
                     embargoed = [line.strip() for line in f if line]
