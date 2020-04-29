@@ -10,28 +10,28 @@
                 <h1 class="mx-auto">M3C Admin Form</h1>
             </div>
             <div class="row my-3">
-                <button class="btn btn-info w-100" onclick="window.location.href = '{{ url_for('metab_admin.upload_image') }}'">Upload Profile Picture</button>
+                <a class="btn btn-info w-100" href="{{ url_for('metab_admin.upload_image') }}">Upload Profile Picture</a>
             </div>
             <div class="row my-3">
-                <button class="btn btn-info w-100" onclick="window.location.href = '{{ url_for('metab_admin.create_person') }}'">Create New Person</button>
+                <a class="btn btn-info w-100" href="{{ url_for('metab_admin.create_person') }}">Create New Person</a>
             </div>
             <div class="row my-3">
-                <button class="btn btn-info w-100" onclick="window.location.href = '{{ url_for('metab_admin.associate_person') }}'">Associate a Person with Inst/Dept/Lab</button>
+                <a class="btn btn-info w-100" href="{{ url_for('metab_admin.associate_person') }}">Associate a Person with Inst/Dept/Lab</a>
             </div>
             <div class="row my-3">
-                <button class="btn btn-info w-100" onclick="window.location.href = '{{ url_for('metab_admin.parent_organization') }}'">Modify an Organization's Parent</button>
+                <a class="btn btn-info w-100" href="{{ url_for('metab_admin.parent_organization') }}">Modify an Organization's Parent</a>
             </div>
             <div class="row my-3">
-                <button class="btn btn-info w-100" onclick="window.location.href = '{{ url_for('metab_admin.withheld_people') }}'">Change a Person's Withholding</button>
+                <a class="btn btn-info w-100" href="{{ url_for('metab_admin.withheld_people') }}">Change a Person's Withholding</a>
             </div>
             <div class="row my-3">
-                <button class="btn btn-info w-100" onclick="window.location.href = '{{ url_for('metab_admin.withheld_organizations') }}'">Change an Organization's Withholding</button>
+                <a class="btn btn-info w-100" href="{{ url_for('metab_admin.withheld_organizations') }}">Change an Organization's Withholding</a>
             </div>
             <div class="row my-3">
-                <button class="btn btn-info w-100" onclick="window.location.href = '{{ url_for('metab_admin.person_alias') }}'">Modify an Person's Aliases</button>
+                <a class="btn btn-info w-100" href="{{ url_for('metab_admin.person_alias') }}">Modify a Person's Aliases</a>
             </div>
             <div class="row my-3">
-                <button class="btn btn-info w-100" onclick="window.location.href = '{{ url_for('metab_admin.add_pmid') }}'">Edit Publications for a Person</button>
+                <a class="btn btn-info w-100" href="{{ url_for('metab_admin.add_pmid') }}">Edit Publications for a Person</a>
             </div>
         </div>
     </body>
