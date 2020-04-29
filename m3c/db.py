@@ -1,14 +1,15 @@
+from typing import Dict, Iterable, List, Mapping, Optional, Type, Tuple
+
 import datetime
 import io
-from typing import Iterable, Mapping, Optional, Tuple
 
 import psycopg2
 import psycopg2.extensions
 
 from m3c import mwb
 
-Cursor = psycopg2.extensions.cursor
-Connection = psycopg2.extensions.connection
+Cursor = Type[psycopg2.extensions.cursor]
+Connection = Type[psycopg2.extensions.connection]
 
 
 def add_organization(cursor: Cursor, type: str, name: str,
@@ -84,16 +85,11 @@ def find_organizations(cursor: Cursor) \
 
     cursor.execute(select_orgs)
 
-    for row in cursor:
-        yield tuple(row)
+    for institute, department, lab, psid in cursor:
+        yield (institute, department, lab, psid)
 
 
-def find_people(cursor: Cursor) \
-        -> Iterable[Tuple[str, str, str, str, str, str, str, str]]:
-    return mwb.find_people(cursor)
-
-
-def get_affiliations(cursor: Cursor) -> Mapping[int, str]:
+def get_affiliations(cursor: Cursor) -> Mapping[int, Iterable[str]]:
     query = """
         SELECT p.id, o.name
           FROM organizations o,
@@ -107,7 +103,7 @@ def get_affiliations(cursor: Cursor) -> Mapping[int, str]:
 
     cursor.execute(query)
 
-    affiliations = {}
+    affiliations: Dict[int, List[str]] = {}
     for row in cursor:
         person_id = int(row[0])
         organization = row[1]
@@ -118,17 +114,16 @@ def get_affiliations(cursor: Cursor) -> Mapping[int, str]:
     return affiliations
 
 
-def get_confirmed_publications(cursor: Cursor) \
-        -> Mapping[int, Tuple[Iterable[str], Iterable[str]]]:
-
-    publications: Mapping[int, Tuple[Iterable[str], Iterable[str]]] = {}
-
+def get_confirmed_publications(
+    cursor: Cursor
+) -> Mapping[int, Tuple[Iterable[str], Iterable[str]]]:
     select = """
         SELECT person_id, pmid, include
         FROM publications
     """
     cursor.execute(select)
 
+    publications: Dict[int, Tuple[List[str], List[str]]] = {}
     for row in cursor:
         person_id = int(row[0])
         pmid = str(row[1])
@@ -153,8 +148,8 @@ def get_contact_details(cursor: Cursor, person_id: int) -> Tuple[str, str]:
     '''
     cursor.execute(query, (person_id,))
     assert cursor.rowcount == 1
-    for row in cursor:
-        return row
+    email, phone = cursor.fetchone()
+    return (email, phone)
 
 
 def get_organization(cursor: Cursor, type: str, name: str,
@@ -228,10 +223,13 @@ def get_people(cursor: Cursor) \
 
     cursor.execute(select_names)
 
-    people: Mapping[int, Tuple[str, str, str, str, str, bool]] = {}
+    people: Dict[int, Tuple[str, str, str, str, str, bool]] = {}
     for row in cursor:
         person_id = int(row[0])
-        people[person_id] = tuple(row[1:7])
+        first_name, last_name, display_name, email, phone, withheld = row[1:7]
+        people[person_id] = (
+            first_name, last_name, display_name, email, phone, withheld
+        )
 
     return people
 
@@ -244,7 +242,7 @@ def get_pubmed_authorships(cursor: Cursor) -> Mapping[str, Iterable[int]]:
 
     cursor.execute(select_pubs)
 
-    authorships = {}
+    authorships: Dict[str, List[int]] = {}
     for row in cursor:
         pmid, person_id = row[0:2]
         if pmid not in authorships:
