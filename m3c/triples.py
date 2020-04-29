@@ -616,7 +616,7 @@ def get_authors_pmid(sup_cur: db.Cursor, pmid: str) -> List[Dict[str, str]]:
             print(f'PMID {pmid}: Could not find PubMed data')
             return []
         author_list = prefill.parse_author_list(pubs[pmid])
-        for author in author_list:  # type: ignore # ElementTree is iterable
+        for author in author_list:
             forename = author.findtext('ForeName', '').strip()
             surname = author.findtext('LastName', '').strip()
             auth = {
