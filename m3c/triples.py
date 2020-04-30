@@ -104,14 +104,15 @@ def get_people(sup_cur: db.Cursor) -> Dict[str, Person]:
     print("Gathering People")
     people: Dict[str, Person] = {}
     records = db.get_people(sup_cur)
-    for pid, (first, last, display, email, phone, withheld) in records.items():
+    for pid, (first, last, display, email, phone, withheld, overview) in records.items():
         person = Person(person_id=str(pid),
                         first_name=first,
                         last_name=last,
                         display_name=display,
                         email=email,
                         phone=phone,
-                        withheld=withheld)
+                        withheld=withheld,
+                        overview=overview)
         people[person.person_id] = person
     print(f"There are {len(people)} people.")
     return people
@@ -756,11 +757,14 @@ def generate(config_path: str, old_path: str):
             print_to_file(org_triples, org_file)
 
             # People
-            # Don't make the triples yet because tools can create new people.
             all_people = get_people(sup_cur)
             people = {k: v for k, v in all_people.items() if not v.withheld}
             withheld_people = {k: v
                                for k, v in all_people.items() if v.withheld}
+            people_triples = make_people(cfg.namespace, people)
+            people_triples.extend(
+                link_people_to_org(cfg.namespace, sup_cur, people, orgs))
+            print_to_file(people_triples, people_file)
 
             # Photos
             photos = get_photos(cfg.get("picturepath", "."), people)
@@ -809,12 +813,6 @@ def generate(config_path: str, old_path: str):
             all_study_triples = study_triples + study_summaries \
                 + study_sup_triples
             print_to_file(all_study_triples, study_file)
-
-            # Make People Triples
-            people_triples = make_people(cfg.namespace, people)
-            people_triples.extend(
-                link_people_to_org(cfg.namespace, sup_cur, people, orgs))
-            print_to_file(people_triples, people_file)
 
             if old_path:
                 add, sub = diff(old_path, path)

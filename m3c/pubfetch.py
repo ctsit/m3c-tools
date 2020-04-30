@@ -45,8 +45,8 @@ from m3c import db
 from m3c import triples as metab_import
 from m3c import tools
 
-psql_connection = psycopg2.extensions.connection
-psql_cursor = psycopg2.extensions.cursor
+psql_connection = typing.Type[psycopg2.extensions.connection]
+psql_cursor = typing.Type[psycopg2.extensions.cursor]
 
 pubmed_delay: int = 0
 
@@ -301,7 +301,8 @@ def update_authorships(cursor: psql_cursor, authorships_limit: int = -1):
                                 display_name=info[2],
                                 email=info[3],
                                 phone=info[4],
-                                withheld=info[5])
+                                withheld=info[5],
+                                overview=info[6])
         if person.withheld:
             log(f"{person_id}: skipping withheld author")
             continue

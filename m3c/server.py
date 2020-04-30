@@ -14,14 +14,18 @@ Example:
     $ m3c serve config.yaml
 """
 
+from typing import Any, Dict, List, Optional, Tuple
+
+from http import HTTPStatus
 import logging
+import operator
 import os
 import sys
-import typing
 import traceback
 
 from flask import (
-    Blueprint, Flask, request, flash, redirect, render_template, send_file
+    Blueprint, Flask, request, flash, redirect, render_template, send_file,
+    jsonify
 )
 import psycopg2
 import psycopg2.errorcodes
@@ -31,9 +35,6 @@ from m3c import classes
 from m3c import config
 from m3c import db
 from m3c import mwb
-
-
-Optional = typing.Optional
 
 # Globals
 app = Blueprint('metab_admin', __name__)
@@ -466,6 +467,80 @@ def add_pmid():
     finally:
         cur.close()
     return redirect(f"{request.base_url}?person={person_id}")
+
+
+@app.route('/personoverview', methods=['GET', 'POST'])
+def person_overview():
+    # POST json => json
+    if request.method == 'POST':
+        formdata: Optional[Dict[str, Any]] = request.json
+        if not formdata:
+            return jsonify(error='no data'), HTTPStatus.BAD_REQUEST
+
+        if 'id' not in formdata or 'overview' not in formdata:
+            return (
+                jsonify(error='id and overview required'),
+                HTTPStatus.BAD_REQUEST
+            )
+
+        try:
+            person_id = int(formdata['id'])
+            assert person_id > 0
+            overview = str(formdata['overview'])
+        except (ValueError, AssertionError):
+            return jsonify(error="bad id"), HTTPStatus.BAD_REQUEST
+
+        try:
+            with conn.cursor() as cur:
+                assert db.update_overview(cur, person_id, overview)
+            conn.commit()
+            return jsonify(msg='Successfully updated overview'), HTTPStatus.OK
+        except Exception:
+            conn.rollback()
+            logging.exception("person_overview")
+            return (
+                jsonify(error='Error updating overview'),
+                HTTPStatus.BAD_GATEWAY
+            )
+
+    try:
+        person_id = int(request.args.get('person_id', '0'))
+    except ValueError:
+        person_id = 0
+
+    # GET ?person_id=DDD => JSON
+    if person_id > 0:
+        try:
+            with conn.cursor() as cur:
+                overview = db.get_overview(cur, person_id)
+            return jsonify(overview=overview)
+        except Exception:
+            logging.exception()
+            return (
+                jsonify(error='Failed to get overview'),
+                HTTPStatus.BAD_GATEWAY
+            )
+
+    # GET => HTML
+    with conn.cursor() as cur:
+        people = db.get_people(cur)
+
+    ppl: List[Tuple[id, str, bool]] = []
+    for person_id, data in people.items():
+        first_name, last_name, display_name, email, phone, withheld, _ = data
+        ppl.append((person_id, f"{first_name} {last_name}".strip(), withheld))
+        ppl.append((person_id, display_name, withheld))
+    ppl = sorted(ppl, key=operator.itemgetter(0, 2, 1))
+
+    names: List[Tuple[id, str]] = []
+    for person_id, name, withheld in ppl:
+        name = f"{name} (#{person_id})"
+        if withheld:
+            name = f"{name} - WITHHELD"
+        if (person_id, name) not in names:
+            names.append((person_id, name))
+
+    return render_template('personoverview.html', names=names)
 
 
 def main():

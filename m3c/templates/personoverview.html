@@ -1,0 +1,210 @@
+<!doctype html>
+<html style="height: 100%">
+    <head>
+        <title>Add or Edit a Person's Overview Text</title>
+        <link rel="stylesheet"
+              href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+              integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"
+              crossorigin="anonymous">
+    </head>
+    <body style="display: flex; flex-direction: column; height: 100%">
+        <div class="container mx-auto" style="width: 75%;">
+            <h1 class="mx-auto">Add or Edit a Person's Overview Text</h1>
+            <a href="{{ url_for('metab_admin.main_menu') }}">Back to Home</a>
+            <div id="messages">
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-warning" role="alert">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            </div>
+
+            <div class="form-group">
+                <label>Search Display Name</label>
+                <input id=searchInput class="form-control" list=displaynames name=displayname>
+                <datalist id=displaynames>
+                    {% for person_id, name in names %}
+                        <option value="{{person_id}}">{{name}}</option>
+                    {% endfor %}
+                </datalist>
+                <a href="#" id=selectedName></a>
+            </div>
+
+            <div class="form-group">
+                <label>Overview</label>
+                <textarea style="height: 15em" class="form-control" id=overview></textarea>
+            </div>
+
+            <div class="form-group">
+                <button id="update" class="btn btn-primary" disabled>
+                    Update
+                </button>
+            </div>
+        </div>
+
+        <iframe style="flex-grow: 1; border: 0; border-top: 1em solid rebeccapurple" src="about:blank" id=profilePage></iframe>
+
+        <script>
+            const messages = document.getElementById("messages");
+            const searchInput = document.getElementById("searchInput");
+            const selectedName = document.getElementById("selectedName");
+            const profilePage = document.getElementById("profilePage")
+            const overview = document.getElementById("overview")
+            const update = document.getElementById("update")
+
+            searchInput.addEventListener("change", handleSelectionChange)
+            searchInput.addEventListener("input", (inputEvent) => {
+                if (inputEvent.inputType === "insertReplacementText") {
+                    handleSelectionChange()
+                }
+            })
+
+            resetForm()
+
+            function handleSelectionChange()
+            {
+                const value = parseInt(searchInput.value)
+                if (!value) {
+                    return resetForm()
+                }
+
+                const options = document.querySelector("#displaynames")
+                const selectedOption = options.querySelector(`option[value='${value}']`)
+                if (!selectedOption)
+                    return resetForm()
+
+                selectedName.innerText = selectedOption.innerText
+                const link = `https://people.metabolomics.info/person.html?iri=https%3A%2F%2Fvivo.metabolomics.info%2Findividual%2Fp${value}`
+                selectedName.href = link
+
+                overview.disabled = true
+                setMessage("Loading overview text...")
+                fetch(`${window.location.href}?person_id=${value}`)
+                    .then(res => res.json())
+                    .then(json => {
+                        overview.value = json.overview
+                        clearMessages()
+                    })
+                    .catch(_ => {
+                        setMessage("Failed to load overview text", "danger")
+                        overview.value = ""
+                    })
+                    .then(() => {
+                        overview.disabled = false
+                        update.disabled = false
+                    })
+
+                profilePage.src = link
+                profilePage.hidden = false
+            }
+
+            update.addEventListener("click", (clickEvent) => {
+                const buttonText = update.innerText
+                update.disabled = true
+                setMessage("Updating...")
+                update.innerText = "Updating..."
+
+                fetch(window.location.href, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        id: parseInt(searchInput.value),
+                        overview: overview.value,
+                    })
+                })
+                .then(res => res.json())
+                .then(res => {
+                    if (res.error) {
+                        setMessage(res.error, "danger")
+                        return
+                    }
+                    setMessage(res.msg)
+                })
+                .catch(() => setMessage("Unknown error", "danger"))
+                .then(() => {
+                    update.innerText = buttonText
+                    update.disabled = false
+                })
+            })
+
+            // const updateAlias = (isNew, personId, firstName, lastName) => {
+            //     fetch(window.location.href, {
+            //         method: isNew ? 'POST' : 'DELETE',
+            //         headers: {
+            //             'Content-Type': 'application/json'
+            //         },
+            //         body: JSON.stringify({
+            //             id: personId,
+            //             first: firstName,
+            //             last: lastName
+            //         })
+            //     }).then(async resp => {
+            //         messages.innerHTML = '';
+            //         if (resp.status === 200) {
+            //             const alertMsg = document.createElement('div');
+            //             alertMsg.textContent = await resp.text();
+            //             alertMsg.className = 'alert alert-success';
+            //             messages.appendChild(alertMsg);
+            //             if (isNew) {
+            //                 aliasData[personId].push({first: firstName, last: lastName});
+            //                 newFirst.value = '';
+            //                 newLast.value = '';
+            //             } else {
+            //                 aliasData[personId].splice(aliasData[personId].findIndex(a => a.first === firstName && a.last === lastName), 1);
+            //             }
+            //             updateTable(aliasData[personId]);
+            //         } else {
+            //             const alertMsg = document.createElement('div');
+            //             alertMsg.textContent = await resp.text();
+            //             alertMsg.className = 'alert alert-danger';
+            //             messages.appendChild(alertMsg);
+            //         }
+            //     })
+            // };
+            // addBtn.addEventListener('click', (e) => {
+            //     if (id.value && newFirst.value && newLast.value) {
+            //         updateAlias(true, id.value, newFirst.value, newLast.value);
+            //     }
+            // });
+
+            function resetForm()
+            {
+                selectedName.innerText = ""
+                selectedName.href = "#"
+                profilePage.src = "about:blank"
+                profilePage.hidden = true
+                overview.value = ""
+                update.disabled = true
+            }
+
+            var setMessageTimeout = 0
+            function setMessage(msg, kind="info")
+            {
+                clearTimeout(setMessageTimeout)
+                setMessageTimeout = setTimeout(() => {
+                    if (!"danger warning info".includes(kind)) {
+                        kind = "info"
+                    }
+                    const messages = document.getElementById("messages")
+                    messages.innerHTML = `
+                    <div class="alert alert-${kind}">
+                        ${msg}
+                    </div>
+                `
+                }, 100)
+            }
+
+            function clearMessages()
+            {
+                clearTimeout(setMessageTimeout)
+                messages.innerHTML = ""
+            }
+        </script>
+    </body>
+</html>
