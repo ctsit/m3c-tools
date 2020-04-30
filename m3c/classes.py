@@ -178,8 +178,8 @@ class Dataset(object):
 
 class Person(object):
     def __init__(self, person_id: str, first_name: str, last_name: str,
-                 display_name: str = "", email: str = "", phone: str = "",
-                 withheld: bool = False):
+                 display_name="", email="", phone="", withheld=False,
+                 overview=""):
         assert person_id and first_name and last_name
 
         self.person_id = person_id
@@ -189,6 +189,7 @@ class Person(object):
         self.phone = phone
         self.display_name = display_name
         self.withheld = withheld
+        self.overview = overview
 
         if not self.display_name:
             self.display_name = f"{self.first_name} {self.last_name}"
@@ -219,6 +220,8 @@ class Person(object):
             rdf.append("<{}> <http://www.w3.org/2006/vcard/ns#hasTelephone>  <{}>".format(vcard_uri, phone_uri))
             rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.w3.org/2006/vcard/ns#Telephone>".format(phone_uri))
             rdf.append("<{}> <http://www.w3.org/2006/vcard/ns#telephone> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(phone_uri, self.phone))
+        if self.overview:
+            rdf.append(f'<{uri}> <http://vivoweb.org/ontology/core#overview> "{self.overview}"^^<http://www.w3.org/2001/XMLSchema#string>')
         return rdf
 
     @staticmethod
@@ -571,7 +574,7 @@ def make_pub(citation: Citation) -> Publication:
 
         try:
             month_text = pubdate['Month']
-            month = MONTHS.index(month_text)+1
+            month = MONTHS.index(month_text) + 1
         except (KeyError, ValueError):
             month = 0
 

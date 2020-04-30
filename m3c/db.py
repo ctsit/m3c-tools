@@ -186,6 +186,13 @@ def get_organizations(cursor: Cursor) \
         yield row
 
 
+def get_overview(cursor: Cursor, person_id: int) -> str:
+    query = "SELECT COALESCE(overview, '') FROM people WHERE id=%s"
+    cursor.execute(query, (person_id,))
+    results = cursor.fetchone()
+    return results[0] if results else ""
+
+
 def get_person(cursor: Cursor,
                first_name: str, last_name: str, exclude_withheld: bool = True
                ) -> Iterable[int]:
@@ -212,23 +219,24 @@ def get_person(cursor: Cursor,
 
 
 def get_people(cursor: Cursor) \
-        -> Mapping[int, Tuple[str, str, str, str, str, bool]]:
+        -> Mapping[int, Tuple[str, str, str, str, str, bool, str]]:
     select_names = """
         SELECT id, first_name, last_name, COALESCE(display_name, ''),
                COALESCE(email, ''), COALESCE(phone, ''),
-               (p.withheld OR n.withheld) as withheld
+               (p.withheld OR n.withheld) as withheld,
+               COALESCE(overview, '')
           FROM people p, names n
          WHERE p.id=n.person_id
     """
 
     cursor.execute(select_names)
 
-    people: Dict[int, Tuple[str, str, str, str, str, bool]] = {}
+    people: Dict[int, Tuple[str, str, str, str, str, bool, str]] = {}
     for row in cursor:
         person_id = int(row[0])
-        first_name, last_name, display_name, email, phone, withheld = row[1:7]
+        first_name, last_name, display_name, email, phone, withheld, overview = row[1:8]
         people[person_id] = (
-            first_name, last_name, display_name, email, phone, withheld
+            first_name, last_name, display_name, email, phone, withheld, overview
         )
 
     return people
@@ -341,6 +349,16 @@ def update_contact_details(cursor: Cursor,
          WHERE id=%s
     '''
     cursor.execute(update, (email, phone, person_id))
+    return cursor.rowcount == 1
+
+
+def update_overview(cursor: Cursor, person_id: int, overview: str) -> bool:
+    update = '''
+        UPDATE people
+            SET overview=%s
+            WHERE id=%s
+    '''
+    cursor.execute(update, (overview, person_id))
     return cursor.rowcount == 1
 
 
