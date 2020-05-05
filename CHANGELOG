@@ -1,6 +1,11 @@
 Changelog
 =========
 
+## [0.9.1] - 2020-05-05
+
+HOTFIX: Fix type mismatch causing triple generation failure.
+
+
 ## [0.9.0] - 2020-05-05
 
  * Rename metab_import m3c-tools (Taeber Rapczak)
