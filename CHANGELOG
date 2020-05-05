@@ -1,6 +1,19 @@
 Changelog
 =========
 
+## [0.9.0] - 2020-05-05
+
+ * Rename metab_import m3c-tools (Taeber Rapczak)
+ * Add Person overview support (Taeber Rapczak)
+ * Address mypy errors (Taeber Rapczak)
+ * Fetch tools from MTWiki and generate triples (Taeber Rapczak)
+ * Fix issues in tool triple generation (Taeber Rapczak)
+ * Correct the primary modules' docstrings (Taeber Rapczak)
+ * Add additional logging (Taeber Rapczak)
+ * Refactor to eliminate flake8 warnings (Taeber Rapczak)
+ * Include flask templates when distributing (Taeber Rapczak)
+
+
 ## [0.8.0] - 2020-04-10
 
 Created a unified `m3c` command which accepts sub-commands that correspond to

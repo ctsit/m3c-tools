@@ -12,7 +12,7 @@ M3C Tools
 ## Configuration
 
 To run the tools, you will need a YAML configuration file containing several
-properties. See `config.yaml.example` for an example.
+properties. See `config-example.yaml` for an example.
 
 ## Database Tunnel
 

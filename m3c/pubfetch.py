@@ -1,8 +1,8 @@
-"""M3C PubMed Fethcher
+"""M3C PubMed Fetcher
 
 Usage:
-    python3 pubfetch.py -h | --help
-    python3 pubfetch.py [--authorships] [--delay=DELAY] [--max=MAX] <config>
+    m3c pubfetch -h | --help
+    m3c pubfetch [--authorships] [--delay=DELAY] [--max=MAX] <config>
 
 Options:
     -h --help    Show this help message and exit.
@@ -40,12 +40,13 @@ import psycopg2
 import psycopg2.extensions
 
 from m3c import catalyst
+from m3c import classes
 from m3c import db
 from m3c import triples as metab_import
 from m3c import tools
 
-psql_connection = psycopg2.extensions.connection
-psql_cursor = psycopg2.extensions.cursor
+psql_connection = typing.Type[psycopg2.extensions.connection]
+psql_cursor = typing.Type[psycopg2.extensions.cursor]
 
 pubmed_delay: int = 0
 
@@ -294,13 +295,14 @@ def update_authorships(cursor: psql_cursor, authorships_limit: int = -1):
                 "downloaded recently")
             continue
 
-        person = metab_import.Person(person_id=person_id,
-                                     first_name=info[0],
-                                     last_name=info[1],
-                                     display_name=info[2],
-                                     email=info[3],
-                                     phone=info[4],
-                                     withheld=info[5])
+        person = classes.Person(person_id=person_id,
+                                first_name=info[0],
+                                last_name=info[1],
+                                display_name=info[2],
+                                email=info[3],
+                                phone=info[4],
+                                withheld=info[5],
+                                overview=info[6])
         if person.withheld:
             log(f"{person_id}: skipping withheld author")
             continue

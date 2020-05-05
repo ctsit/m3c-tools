@@ -1,8 +1,8 @@
-"""Metab Importer
+"""M3C N-Triple Generator
 
 Usage:
-    python3 metab_import.py (-h | --help)
-    python3 metab_import.py [-x <prev> | --diff=<prev>] <path_to_config>
+    m3c generate (-h | --help)
+    m3c generate [-x <prev> | --diff=<prev>] <path_to_config>
 
 Options:
     -h --help      Show this message and exit
@@ -19,25 +19,23 @@ Differential Update:
     The corresponding files are written to add.nt and sub.nt.
 
 Instructions:
-    Run the importer where you have access to the postgres metabolomics
-    database.
+    Run the generator where you have access to the Postgres database.
 """
 
+from typing import Dict, IO, Iterable, List, Mapping, Tuple
+
 from datetime import datetime
-import csv
 import getopt
 import os
 import pathlib
 import re
 import sys
-import time
 import traceback
-import typing
 import yaml
 
 import psycopg2
 
-from m3c.aide import Aide
+from m3c import config
 from m3c import db
 from m3c.classes import Dataset
 from m3c.classes import Organization
@@ -47,24 +45,11 @@ from m3c.classes import Project
 from m3c.classes import Publication
 from m3c.classes import Study
 from m3c.classes import Tool
-from m3c import pubfetch
-
-Dict = typing.Dict
-List = typing.List
+from m3c import prefill
+from m3c import tools
 
 
-def get_config(config_path):
-    try:
-        with open(config_path, 'r') as config_file:
-            config = yaml.load(config_file.read(), Loader=yaml.FullLoader)
-    except Exception as e:
-        print("Error: Check config file")
-        sys.exit(e)
-    return config
-
-
-def diff(prev_path: str, path: str) -> \
-        typing.Tuple[typing.List[str], typing.List[str]]:
+def diff(prev_path: str, path: str) -> Tuple[Iterable[str], Iterable[str]]:
     prev = pathlib.Path(prev_path)
     previous = []
     for file in prev.glob("*.nt"):
@@ -83,11 +68,11 @@ def diff(prev_path: str, path: str) -> \
             current += [line for line in list(f) if line]
     current.sort()
 
-    previous = set(previous)
-    current = set(current)
+    previous_set = set(previous)
+    current_set = set(current)
 
-    add = current - previous
-    sub = previous - current
+    add = current_set - previous_set
+    sub = previous_set - current_set
 
     return (add, sub)
 
@@ -115,35 +100,22 @@ def make_organizations(namespace, orgs):
     return triples
 
 
-def get_people(sup_cur: db.Cursor) -> Dict[int, Person]:
+def get_people(sup_cur: db.Cursor) -> Dict[str, Person]:
     print("Gathering People")
-    people: Dict[int, Person] = {}
+    people: Dict[str, Person] = {}
     records = db.get_people(sup_cur)
-    for pid, (first, last, display, email, phone, withheld) in records.items():
-        person = Person(person_id=pid,
+    for pid, (first, last, display, email, phone, withheld, overview) in records.items():
+        person = Person(person_id=str(pid),
                         first_name=first,
                         last_name=last,
                         display_name=display,
                         email=email,
                         phone=phone,
-                        withheld=withheld)
+                        withheld=withheld,
+                        overview=overview)
         people[person.person_id] = person
     print(f"There are {len(people)} people.")
     return people
-
-
-def get_person(sup_cur, person_id):
-    person = {}
-    sup_cur.execute("""\
-            SELECT id, first_name, last_name, display_name, email, phone
-            FROM people p
-            JOIN names n
-            ON id=person_id
-            WHERE p.withheld = FALSE AND n.withheld = FALSE AND id = %s""", (person_id,))
-    for row in sup_cur:
-        person = Person(person_id=row[0], first_name=row[1], last_name=row[2],
-                        display_name=row[3], email=row[4], phone=row[5])
-    return person
 
 
 def make_people(namespace, people):
@@ -201,7 +173,7 @@ def get_photos(file_storage_root: str, people):
     return photos
 
 
-def get_publications(sup_cur: db.Cursor) -> typing.Mapping[str, Publication]:
+def get_publications(sup_cur: db.Cursor) -> Mapping[str, Publication]:
     print("Gathering publications")
 
     authorships = db.get_pubmed_authorships(sup_cur)
@@ -225,7 +197,9 @@ def get_publications(sup_cur: db.Cursor) -> typing.Mapping[str, Publication]:
     return publications
 
 
-def make_publications(namespace: str, pubs: List[Publication]) -> List[str]:
+def make_publications(namespace: str,
+                      pubs: Mapping[str, Publication]
+                      ) -> List[str]:
     print("Making Publication triples")
     triples = []
     for pub in pubs.values():
@@ -235,7 +209,9 @@ def make_publications(namespace: str, pubs: List[Publication]) -> List[str]:
 
 
 def get_projects(mwb_cur, sup_cur,
-                 people: List[Person], orgs: List[Organization]):
+                 people: Dict[str, Person],
+                 orgs: List[Organization]
+                 ) -> Mapping[str, Project]:
     print("Gathering Workbench Projects")
     projects = {}
     mwb_cur.execute("""\
@@ -278,12 +254,12 @@ def get_projects(mwb_cur, sup_cur,
         for i in range(0, max_range):
             # If there are not enough institutes, default to first
             try:
-                sup_cur.execute("""\
-                        SELECT id, parent_id
-                        FROM organizations
-                        WHERE name=%s AND type='institute'
-                        AND withheld = FALSE""",
-                            (institute_list[i],))
+                sup_cur.execute("""
+                    SELECT id, parent_id
+                    FROM organizations
+                    WHERE name=%s AND type='institute'
+                    AND withheld = FALSE
+                """, (institute_list[i],))
                 try:
                     inst_id = sup_cur.fetchone()[0]
                     project.institutes.append(orgs[inst_id].org_id)
@@ -293,23 +269,23 @@ def get_projects(mwb_cur, sup_cur,
                     print("Organization name: " + institute_list[i])
                     sys.exit()
             except IndexError:
-                sup_cur.execute("""\
-                            SELECT id, parent_id
-                            FROM organizations
-                            WHERE name=%s AND type='institute'
-                            AND withheld = FALSE""",
-                                (institute_list[0],))
+                sup_cur.execute("""
+                    SELECT id, parent_id
+                    FROM organizations
+                    WHERE name=%s AND type='institute'
+                    AND withheld = FALSE
+                """, (institute_list[0],))
                 inst_id = sup_cur.fetchone()[0]
 
             # If there are not enough departments, default to first
             if departments:
                 try:
-                    sup_cur.execute("""\
-                            SELECT id, parent_id
-                            FROM organizations
-                            WHERE name=%s AND type='department'
-                            AND withheld = FALSE""",
-                                (department_list[i],))
+                    sup_cur.execute("""
+                        SELECT id, parent_id
+                        FROM organizations
+                        WHERE name=%s AND type='department'
+                        AND withheld = FALSE
+                    """, (department_list[i],))
                     try:
                         dept_options = {}
                         for row in sup_cur:
@@ -317,19 +293,20 @@ def get_projects(mwb_cur, sup_cur,
                         for dept_id, parent in dept_options.items():
                             if inst_id == parent:
                                 department_id = dept_id
-                                project.departments.append(orgs[dept_id].org_id)
+                                org_id = orgs[dept_id].org_id
+                                project.departments.append(org_id)
                     except TypeError:
                         print("Error: Organization does not exist.")
                         print("Organization for project " + project.project_id)
                         print("Organization name: " + department_list[i])
                         sys.exit()
                 except IndexError:
-                    sup_cur.execute("""\
-                                SELECT id, parent_id
-                                FROM organizations
-                                WHERE name=%s AND type='department'
-                                AND withheld = FALSE""",
-                                    (department_list[0],))
+                    sup_cur.execute("""
+                        SELECT id, parent_id
+                        FROM organizations
+                        WHERE name=%s AND type='department'
+                        AND withheld = FALSE
+                    """, (department_list[0],))
                     dept_options = {}
                     for row in sup_cur:
                         dept_options[row[0]] = row[1]
@@ -338,23 +315,19 @@ def get_projects(mwb_cur, sup_cur,
                             department_id = dept_id
             if labs:
                 try:
-                    sup_cur.execute("""\
-                                SELECT id, parent_id
-                                FROM organizations
-                                WHERE name=%s AND type='laboratory'
-                                AND withheld = FALSE""",
-                                    (lab_list[i],))
+                    sup_cur.execute("""
+                        SELECT id, parent_id
+                        FROM organizations
+                        WHERE name=%s AND type='laboratory'
+                        AND withheld = FALSE
+                    """, (lab_list[i],))
                     try:
                         lab_options = {}
                         for row in sup_cur:
                             lab_options[row[0]] = row[1]
                         for lab_id, parent in lab_options.items():
-                            try:
-                                if department_id == parent:
-                                    project.labs.append(orgs[lab_id].org_id)
-                            except Exception:
-                                import pdb
-                                pdb.set_trace()
+                            if department_id == parent:
+                                project.labs.append(orgs[lab_id].org_id)
                     except TypeError:
                         print("Error: Organization does not exist.")
                         print("Organization for project " + project.project_id)
@@ -371,7 +344,7 @@ def get_projects(mwb_cur, sup_cur,
             first_name = first_name_list[i]
             ids = list(db.get_person(sup_cur, first_name, last_name))
             try:
-                person_id = ids[0]
+                person_id = str(ids[0])
                 project.pi.append(people[person_id].person_id)
             except (IndexError, KeyError, TypeError):
                 print("Error: Person does not exist.")
@@ -383,7 +356,7 @@ def get_projects(mwb_cur, sup_cur,
     return projects
 
 
-def make_projects(namespace, projects: typing.Mapping[str, Project]):
+def make_projects(namespace, projects: Mapping[str, Project]):
     print("Making Workbench Projects")
     triples = []
     summaries = []
@@ -406,7 +379,7 @@ def is_valid_study(study: Study) -> bool:
     return True
 
 
-def get_studies(mwb_cur, sup_cur, people, orgs, embargoed: typing.List[str]):
+def get_studies(mwb_cur, sup_cur, people, orgs, embargoed: List[str]):
     print("Gathering Workbench Studies")
     studies = {}
     mwb_cur.execute("""\
@@ -465,12 +438,12 @@ def get_studies(mwb_cur, sup_cur, people, orgs, embargoed: typing.List[str]):
         for i in range(0, max_range):
             # If there are not enough institutes, default to first
             try:
-                sup_cur.execute("""\
-                        SELECT id, parent_id
-                        FROM organizations
-                        WHERE name=%s AND type='institute'
-                        AND withheld = FALSE""",
-                            (institute_list[i],))
+                sup_cur.execute("""
+                    SELECT id, parent_id
+                    FROM organizations
+                    WHERE name=%s AND type='institute'
+                    AND withheld = FALSE
+                """, (institute_list[i],))
                 try:
                     inst_id = sup_cur.fetchone()[0]
                     study.institutes.append(orgs[inst_id].org_id)
@@ -480,23 +453,23 @@ def get_studies(mwb_cur, sup_cur, people, orgs, embargoed: typing.List[str]):
                     print("Organization name: " + institute_list[i])
                     sys.exit()
             except IndexError:
-                sup_cur.execute("""\
-                            SELECT id, parent_id
-                            FROM organizations
-                            WHERE name=%s AND type='institute'
-                            AND withheld = FALSE""",
-                                (institute_list[0],))
+                sup_cur.execute("""
+                    SELECT id, parent_id
+                    FROM organizations
+                    WHERE name=%s AND type='institute'
+                    AND withheld = FALSE
+                """, (institute_list[0],))
                 inst_id = sup_cur.fetchone()[0]
 
             # If there are not enough departments, default to first
             if departments:
                 try:
-                    sup_cur.execute("""\
-                            SELECT id, parent_id
-                            FROM organizations
-                            WHERE name=%s AND type='department'
-                            AND withheld = FALSE""",
-                                (department_list[i],))
+                    sup_cur.execute("""
+                        SELECT id, parent_id
+                        FROM organizations
+                        WHERE name=%s AND type='department'
+                        AND withheld = FALSE
+                    """, (department_list[i],))
                     try:
                         dept_options = {}
                         for row in sup_cur:
@@ -511,12 +484,12 @@ def get_studies(mwb_cur, sup_cur, people, orgs, embargoed: typing.List[str]):
                         print("Organization name: " + department_list[i])
                         sys.exit()
                 except IndexError:
-                    sup_cur.execute("""\
-                                SELECT id, parent_id
-                                FROM organizations
-                                WHERE name=%s AND type='department'
-                                AND withheld = FALSE""",
-                                    (department_list[0],))
+                    sup_cur.execute("""
+                        SELECT id, parent_id
+                        FROM organizations
+                        WHERE name=%s AND type='department'
+                        AND withheld = FALSE
+                    """, (department_list[0],))
                     dept_options = {}
                     for row in sup_cur:
                         dept_options[row[0]] = row[1]
@@ -525,23 +498,19 @@ def get_studies(mwb_cur, sup_cur, people, orgs, embargoed: typing.List[str]):
                             department_id = dept_id
             if labs:
                 try:
-                    sup_cur.execute("""\
-                                SELECT id, parent_id
-                                FROM organizations
-                                WHERE name=%s AND type='laboratory'
-                                AND withheld = FALSE""",
-                                    (lab_list[i],))
+                    sup_cur.execute("""
+                        SELECT id, parent_id
+                        FROM organizations
+                        WHERE name=%s AND type='laboratory'
+                        AND withheld = FALSE
+                    """, (lab_list[i],))
                     try:
                         lab_options = {}
                         for row in sup_cur:
                             lab_options[row[0]] = row[1]
                         for lab_id, parent in lab_options.items():
-                            try:
-                                if department_id == parent:
-                                    study.labs.append(orgs[lab_id].org_id)
-                            except Exception:
-                                import pdb
-                                pdb.set_trace()
+                            if department_id == parent:
+                                study.labs.append(orgs[lab_id].org_id)
                     except TypeError:
                         print("Error: Organization does not exist.")
                         print("Organization for study " + study.study_id)
@@ -572,10 +541,13 @@ def get_studies(mwb_cur, sup_cur, people, orgs, embargoed: typing.List[str]):
     return studies
 
 
-def make_studies(namespace, studies: typing.Dict[str, Study], projects):
+def make_studies(namespace,
+                 studies: Dict[str, Study],
+                 projects: Mapping[str, Project]
+                 ) -> Tuple[List[str], List[str]]:
     print("Making Workbench Studies")
-    triples = []
-    summaries = []
+    triples: List[str] = []
+    summaries: List[str] = []
     study_count = 0
     no_proj_study = 0
     for study in studies.values():
@@ -637,38 +609,33 @@ def make_datasets(namespace, datasets, studies):
     return dataset_triples, study_triples
 
 
-def get_authors_pmid(pmid: typing.Text) -> typing.List[typing.Dict]:
-    authors = []
-    retries = 3
-    while retries > 0:
-        try:
-            data = pubfetch.pubmed_efetch([pmid])
-            author_list = data.findall('./PubmedArticle[1]/MedlineCitation/'
-                                       'Article/AuthorList/Author')
-            for author in author_list:
-                forename = author.findtext('ForeName', '').strip()
-                surname = author.findtext('LastName', '').strip()
-                auth = {
-                    'name': f'{forename} {surname}'.strip()
-                }
-                authors.append(auth)
-            break
-        except IOError:
-            print(f'Error getting PubMed Data for tool with PMID {pmid}. '
-                  'Trying again in 2 seconds')
-            time.sleep(2)
-        except Exception:
-            traceback.print_exc()
-            print(f'Error parsing PubMed Data for tool with PMID {pmid}')
-        retries -= 1
-    return authors
-
-
-def get_yaml_tools(config):
+def get_authors_pmid(sup_cur: db.Cursor, pmid: str) -> List[Dict[str, str]]:
     try:
-        tools_path = config.get('tools', 'tools.yaml')
+        authors = []
+        pubs = db.get_pubmed_publications(sup_cur, pmids=[pmid])
+        if pmid not in pubs:
+            print(f'PMID {pmid}: Could not find PubMed data')
+            return []
+        author_list = prefill.parse_author_list(pubs[pmid])
+        for author in author_list:
+            forename = author.findtext('ForeName', '').strip()
+            surname = author.findtext('LastName', '').strip()
+            auth = {
+                'name': f'{forename} {surname}'.strip()
+            }
+            authors.append(auth)
+        return authors
+    except Exception:
+        traceback.print_exc()
+        print(f'Error parsing PubMed Data for tool with PMID {pmid}')
+        return []
+
+
+def get_yaml_tools(cfg: config.Config):
+    try:
+        tools_path = cfg.get('tools', 'tools.yaml')
         with open(tools_path, 'r') as tools_file:
-            t = yaml.load(tools_file.read(), Loader=yaml.FullLoader)
+            t = yaml.safe_load(tools_file)
             tools = []
             for tool_id, data in t.items():
                 try:
@@ -684,48 +651,44 @@ def get_yaml_tools(config):
         return []
 
 
-def strip_http(url: typing.Text) -> typing.Text:
-    return url.replace('http://', '').replace('https://', '')
+def fetch_mtw_tools(sup_cur: db.Cursor) -> Iterable[Tool]:
+    headers = tools
+    for tool in tools.MetabolomicsToolsWiki.tools():
+        name = tool[headers.SOFTWARE]
+        pmid = tool[headers.PMID]
+        authors = []
+        if tool[headers.PMID].isnumeric():
+            authors = get_authors_pmid(sup_cur, pmid)
+        else:
+            pmid = ""
+        props = {
+            "name": name,
+            "description": tool[headers.DESCRIPTION],
+            "license": {
+                "kind": tool[headers.LICENSE],
+            },
+            "url": tool[headers.WEBSITE],
+            "authors": authors,
+            "pmid": pmid,
+            "approach": tool[headers.APPROACHES],
+            "functionality": tool[headers.FUNCTIONALITY],
+            "instrumental": tool[headers.INSTRUMENT_DATA_TYPE],
+            "language": tool[headers.LANGUAGE],
+            "type": tool[headers.SOFTWARE_TYPE],
+        }
+        yield Tool(name, props)
 
 
-def get_csv_tools(csv_tools_path: str) -> List[Tool]:
-    try:
-        with open(csv_tools_path, 'r') as tools_file:
-            t = csv.reader(tools_file)
-            # Skip the header row
-            next(t)
-
-            tools = []
-            for tool_data in t:
-                pmid = tool_data[19].strip()
-                authors = None
-                if pmid.isnumeric():
-                    authors = get_authors_pmid(pmid)
-                if not tool_data[24].replace('-', '').strip():
-                    continue
-                tool = Tool(strip_http(tool_data[24]), {
-                    'name': tool_data[21],
-                    'description': tool_data[1],
-                    'url': tool_data[24],
-                    'authors': authors,
-                    'pmid': pmid,
-                    'tags': tool_data[6].split(',')  # TODO: +split('\n') strip
-                })
-                tools.append(tool)
-            return tools
-    except Exception:
-        traceback.print_exc()
-        print('Error parsing tools config file: %s' % csv_tools_path)
-        return []
-
-
-def make_tools(namespace, tools: List[Tool], people, withheld_people, mwb_cur, sup_cur):
-    print("Making Tools")
+def make_tools(
+    namespace, tools: List[Tool], people, withheld_people, mwb_cur, sup_cur
+):
+    print("Generating triples for tools")
     triples = []
     tool_count = 0
     for tool in tools:
         # First, find all the authors' URIs
-        non_matched_authors = tool.match_authors({**people, **withheld_people}, namespace)
+        non_matched_authors = tool.match_authors({**people, **withheld_people},
+                                                 namespace)
         if len(non_matched_authors) != 0:
             print(f"Not all authors matched for Tool: {tool.tool_id}")
             continue
@@ -736,12 +699,12 @@ def make_tools(namespace, tools: List[Tool], people, withheld_people, mwb_cur, s
     return triples
 
 
-def print_to_file(triples: typing.List[str], filename: str) -> None:
+def print_to_file(triples: List[str], filename: str) -> None:
     with open(filename, 'a+') as file:
         print_to_open_file(triples, file)
 
 
-def print_to_open_file(triples: typing.List[str], file: typing.IO) -> None:
+def print_to_open_file(triples: List[str], file: IO) -> None:
     for spo in triples:
         # Replace LFs and CRs with escaped equivalent. Since N-Triples uses
         # " .\n" as a record-separator, these absolutely must be escaped.
@@ -754,12 +717,12 @@ def print_to_open_file(triples: typing.List[str], file: typing.IO) -> None:
 
 def generate(config_path: str, old_path: str):
     timestamp = datetime.now()
-    path = 'data_out/' + timestamp.strftime("%Y") + '/' + \
-        timestamp.strftime("%m") + '/' + timestamp.strftime("%Y_%m_%d")
-    try:
-        os.makedirs(path)
-    except FileExistsError:
-        pass
+    path = os.path.join("data_out",
+                        timestamp.strftime("%Y"),
+                        timestamp.strftime("%m"),
+                        timestamp.strftime("%Y_%m_%d"))
+    os.makedirs(path, exist_ok=True)
+
     org_file = os.path.join(path, 'orgs.nt')
     people_file = os.path.join(path, 'people.nt')
     project_file = os.path.join(path, 'projects.nt')
@@ -771,92 +734,85 @@ def generate(config_path: str, old_path: str):
     add_file = os.path.join(path, 'add.nt')
     sub_file = os.path.join(path, 'sub.nt')
 
-    config = get_config(config_path)
+    cfg = config.load(config_path)
 
-    pubfetch.pubmed_init(email=config.get('pubmed_email'),
-                         api_key=config.get('pubmed_api_token'))
-
-    aide = Aide(config.get('update_endpoint'),
-                config.get('vivo_email'),
-                config.get('vivo_password'),
-                config.get('namespace'))
-
-    if not aide.namespace.endswith('/'):
-        print(f"WARNING! Namespace doesn't end with '/': {aide.namespace}")
+    if not cfg.namespace.endswith('/'):
+        print(f"WARNING! Namespace doesn't end with '/': {cfg.namespace}")
 
     mwb_conn: psycopg2.extensions.connection = psycopg2.connect(
-        host=config.get('mwb_host'), dbname=config.get('mwb_database'),
-        user=config.get('mwb_username'), password=config.get('mwb_password'),
-        port=config.get('mwb_port'))
+        host=cfg.get('mwb_host'), dbname=cfg.get('mwb_database'),
+        user=cfg.get('mwb_username'), password=cfg.get('mwb_password'),
+        port=cfg.get('mwb_port'))
 
     sup_conn: psycopg2.extensions.connection = psycopg2.connect(
-        host=config.get('sup_host'), dbname=config.get('sup_database'),
-        user=config.get('sup_username'), password=config.get('sup_password'),
-        port=config.get('sup_port'))
+        host=cfg.get('sup_host'), dbname=cfg.get('sup_database'),
+        user=cfg.get('sup_username'), password=cfg.get('sup_password'),
+        port=cfg.get('sup_port'))
 
     with mwb_conn, sup_conn:
         with mwb_conn.cursor() as mwb_cur, sup_conn.cursor() as sup_cur:
             # Organizations
             orgs = get_organizations(sup_cur)
-            org_triples = make_organizations(aide.namespace, orgs)
+            org_triples = make_organizations(cfg.namespace, orgs)
             print_to_file(org_triples, org_file)
 
             # People
-            # Don't make the triples yet because tools can create new people.
             all_people = get_people(sup_cur)
             people = {k: v for k, v in all_people.items() if not v.withheld}
-            withheld_people = {k: v for k, v in all_people.items() if v.withheld}
+            withheld_people = {k: v
+                               for k, v in all_people.items() if v.withheld}
+            people_triples = make_people(cfg.namespace, people)
+            people_triples.extend(
+                link_people_to_org(cfg.namespace, sup_cur, people, orgs))
+            print_to_file(people_triples, people_file)
 
             # Photos
-            photos = get_photos(config.get("picturepath", "."), people)
-            photos_triples = make_photos(aide.namespace, photos)
+            photos = get_photos(cfg.get("picturepath", "."), people)
+            photos_triples = make_photos(cfg.namespace, photos)
             print_to_file(photos_triples, photos_file)
+
+            # Tools
+            print("Gathering Tools")
+            yaml_tools = get_yaml_tools(cfg)
+            csv_tools = list(fetch_mtw_tools(sup_cur))
+            all_tools = yaml_tools + csv_tools
+            tools_triples = make_tools(cfg.namespace, all_tools, people,
+                                       withheld_people, mwb_cur, sup_cur)
+            print_to_file(tools_triples, tools_file)
 
             # Publications
             pubs = get_publications(sup_cur)
-            pubs_triples = make_publications(aide.namespace, pubs)
+            pubs_triples = make_publications(cfg.namespace, pubs)
             print_to_file(pubs_triples, pubs_file)
-
-            # Tools
-            yaml_tools = get_yaml_tools(config)
-            csv_tools = get_csv_tools(config.get("tools_csv", "tools.csv"))
-            tools_triples = make_tools(aide.namespace, yaml_tools + csv_tools, people, withheld_people, mwb_cur, sup_cur)
-            print_to_file(tools_triples, tools_file)
 
             # Projects
             projects = get_projects(mwb_cur, sup_cur, people, orgs)
-            project_triples, project_summaries = \
-                make_projects(aide.namespace, projects)
+            project_data = make_projects(cfg.namespace, projects)
+            project_triples, project_summaries = project_data
             all_proj_triples = project_triples + project_summaries
             print_to_file(all_proj_triples, project_file)
 
             # Studies
             # Study file printed after datasets
-            embargoed_path = config.get('embargoed', '')
-            embargoed: typing.List[str] = []
+            embargoed_path = cfg.get('embargoed', '')
+            embargoed: List[str] = []
             if embargoed_path:
                 with open(embargoed_path) as f:
                     embargoed = [line.strip() for line in f if line]
 
             studies = get_studies(mwb_cur, sup_cur, people, orgs, embargoed)
             study_triples, study_summaries = \
-                make_studies(aide.namespace, studies, projects)
+                make_studies(cfg.namespace, studies, projects)
 
             # Datasets
             datasets = get_datasets(mwb_cur)
             dataset_triples, study_sup_triples = \
-                make_datasets(aide.namespace, datasets, studies)
+                make_datasets(cfg.namespace, datasets, studies)
             print_to_file(dataset_triples, dataset_file)
 
             all_study_triples = study_triples + study_summaries \
                 + study_sup_triples
             print_to_file(all_study_triples, study_file)
-
-            # Make People Triples
-            people_triples = make_people(aide.namespace, people)
-            people_triples.extend(
-                link_people_to_org(aide.namespace, sup_cur, people, orgs))
-            print_to_file(people_triples, people_file)
 
             if old_path:
                 add, sub = diff(old_path, path)

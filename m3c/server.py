@@ -1,8 +1,8 @@
-"""
-Metab Admin
+"""M3C Admin Forms Server
+
 Usage:
-    python metab_admin.py (-h | --help)
-    python metab_admin.py <path_to_config>
+    m3c serve (-h | --help)
+    m3c serve <path_to_config>
 
 Options:
     -h --help   Show this message and exit
@@ -11,33 +11,38 @@ Instructions:
     See README
 
 Example:
-    $ python metab_admin.py config.yaml
+    $ m3c serve config.yaml
 """
 
+from typing import Any, Dict, List, Optional, Tuple
+
+from http import HTTPStatus
 import logging
+import operator
 import os
 import sys
 import traceback
-from yaml import safe_load
 
-from flask import Blueprint, Flask, request, flash, redirect, render_template, send_file
-import werkzeug.datastructures
-
+from flask import (
+    Blueprint, Flask, request, flash, redirect, render_template, send_file,
+    jsonify
+)
 import psycopg2
 import psycopg2.errorcodes
+import werkzeug.datastructures
 
-import m3c.classes as metab_classes
+from m3c import classes
+from m3c import config
+from m3c import db
+from m3c import mwb
 
 # Globals
 app = Blueprint('metab_admin', __name__)
 
-conn = None
+conn: Optional[db.Connection] = None
 picture_path = '.'
 file_storage_alias = 'b'
 
-INST_TYPE = 'institute'
-DEPT_TYPE = 'department'
-LAB_TYPE = 'laboratory'
 
 @app.route('/')
 def main_menu():
@@ -51,7 +56,7 @@ def get_photo():
         return 'id required', 400
 
     for type in ('jpg', 'png'):
-        pic = metab_classes.Photo(picture_path, pid, type, file_storage_alias)
+        pic = classes.Photo(picture_path, pid, type, file_storage_alias)
         filename = os.path.join(pic.path(), pic.filename())
         if os.path.isfile(filename):
             return send_file(filename, mimetype=pic.mimetype)
@@ -70,8 +75,8 @@ def upload_image():
 
             person_id = person_id.strip()
 
-            photo = metab_classes.Photo(picture_path, person_id, extension,
-                                        file_storage_alias)
+            photo = classes.Photo(picture_path, person_id, extension,
+                                  file_storage_alias)
             dirname = photo.path()
             os.makedirs(dirname, exist_ok=True)
 
@@ -98,41 +103,42 @@ def upload_image():
 
 def associate_and_insert_orgs(cur, institute, department, lab, person_id):
     '''
-        Takes in a cursor and creates the association between the id and the different organization types. Creates
-        the organization with the right parents if they don't already exist.
+    Takes in a cursor and creates the association between the id and the
+    different organization types. Creates the organization with the right
+    parents if they don't already exist.
     '''
     inst_id = None
-    if institute is not '':
-        cur.execute('SELECT id from organizations WHERE name = %s and type = %s LIMIT 1', (institute, INST_TYPE))
+    if institute:
+        cur.execute('SELECT id from organizations WHERE name = %s and type = %s LIMIT 1', (institute, mwb.INSTITUTE))
         rows = cur.fetchall()
         if len(rows) == 0:
-            cur.execute('INSERT INTO organizations (name, type) VALUES (%s, %s) RETURNING id', (institute, INST_TYPE))
+            cur.execute('INSERT INTO organizations (name, type) VALUES (%s, %s) RETURNING id', (institute, mwb.INSTITUTE))
             inst_id = cur.fetchone()[0]
         else:
             inst_id = rows[0][0]
         cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s) ON CONFLICT DO NOTHING', (inst_id, person_id))
 
-    if department is not '':
+    if department:
         if inst_id is None:
             flash('Please specify an existing or new Institution for this department')
             raise Exception('Department missing Institution')
-        cur.execute('SELECT id FROM organizations WHERE name = %s and type = %s and parent_id = %s LIMIT 1', (department, DEPT_TYPE, inst_id))
+        cur.execute('SELECT id FROM organizations WHERE name = %s and type = %s and parent_id = %s LIMIT 1', (department, mwb.DEPARTMENT, inst_id))
         rows = cur.fetchall()
         if len(rows) == 0:
-            cur.execute('INSERT INTO organizations (name, type, parent_id) VALUES (%s, %s, %s) RETURNING id', (department, DEPT_TYPE, inst_id))
+            cur.execute('INSERT INTO organizations (name, type, parent_id) VALUES (%s, %s, %s) RETURNING id', (department, mwb.DEPARTMENT, inst_id))
             dept_id = cur.fetchone()[0]
         else:
             dept_id = rows[0][0]
         cur.execute('INSERT INTO associations (organization_id, person_id) VALUES (%s, %s) ON CONFLICT DO NOTHING', (dept_id, person_id))
 
-    if lab is not '':
+    if lab:
         if dept_id is None:
             flash('Please specify an existing or new Department for this lab')
             raise Exception('Lab missing Department')
-        cur.execute('SELECT id FROM organizations WHERE name = %s and type = %s and parent_id = %s LIMIT 1', (lab, LAB_TYPE, dept_id))
+        cur.execute('SELECT id FROM organizations WHERE name = %s and type = %s and parent_id = %s LIMIT 1', (lab, mwb.LABORATORY, dept_id))
         rows = cur.fetchall()
         if len(rows) == 0:
-            cur.execute('INSERT INTO organizations (name, type, parent_id) VALUES (%s, %s, %s) RETURNING id', (lab, LAB_TYPE, dept_id))
+            cur.execute('INSERT INTO organizations (name, type, parent_id) VALUES (%s, %s, %s) RETURNING id', (lab, mwb.LABORATORY, dept_id))
             lab_id = cur.fetchone()[0]
         else:
             lab_id = rows[0][0]
@@ -148,11 +154,11 @@ def create_person():
 
     cur.execute('SELECT id, name, type from organizations')
     for row in cur.fetchall():
-        if row[2] == INST_TYPE:
+        if row[2] == mwb.INSTITUTE:
             institutes[row[1]] = row[0]
-        elif row[2] == DEPT_TYPE:
+        elif row[2] == mwb.DEPARTMENT:
             departments[row[1]] = row[0]
-        elif row[2] == LAB_TYPE:
+        elif row[2] == mwb.LABORATORY:
             labs[row[1]] = row[0]
         else:
             pass
@@ -170,7 +176,7 @@ def create_person():
             department = request.form['department'].strip()
             lab = request.form['lab'].strip()
 
-            if first_name is '' or last_name is '':
+            if not first_name or not last_name:
                 flash('First and last name are required')
                 return redirect(request.url)
 
@@ -216,11 +222,11 @@ def associate_person():
 
     cur.execute('SELECT id, name, type from organizations')
     for row in cur.fetchall():
-        if row[2] == INST_TYPE:
+        if row[2] == mwb.INSTITUTE:
             institutes[row[1]] = row[0]
-        elif row[2] == DEPT_TYPE:
+        elif row[2] == mwb.DEPARTMENT:
             departments[row[1]] = row[0]
-        elif row[2] == LAB_TYPE:
+        elif row[2] == mwb.LABORATORY:
             labs[row[1]] = row[0]
         else:
             pass
@@ -235,11 +241,11 @@ def associate_person():
             department = request.form['department'].strip()
             lab = request.form['lab'].strip()
 
-            if person_id is '':
+            if not person_id:
                 flash('Please search and select someone')
                 return redirect(request.url)
 
-            if institute is '' and department is '' and lab is '':
+            if not institute and not department and not lab:
                 flash('Please select or enter at least one institute, department, OR lab.')
                 return redirect(request.url)
 
@@ -274,7 +280,7 @@ def parent_organization():
             org_id = request.form['orgId'].strip()
             parent_id = request.form['parentId'].strip()
 
-            if org_id is '' or parent_id is '':
+            if not org_id or not parent_id:
                 flash('Please select an orgaization')
                 return redirect(request.url)
 
@@ -463,6 +469,80 @@ def add_pmid():
     return redirect(f"{request.base_url}?person={person_id}")
 
 
+@app.route('/personoverview', methods=['GET', 'POST'])
+def person_overview():
+    # POST json => json
+    if request.method == 'POST':
+        formdata: Optional[Dict[str, Any]] = request.json
+        if not formdata:
+            return jsonify(error='no data'), HTTPStatus.BAD_REQUEST
+
+        if 'id' not in formdata or 'overview' not in formdata:
+            return (
+                jsonify(error='id and overview required'),
+                HTTPStatus.BAD_REQUEST
+            )
+
+        try:
+            person_id = int(formdata['id'])
+            assert person_id > 0
+            overview = str(formdata['overview'])
+        except (ValueError, AssertionError):
+            return jsonify(error="bad id"), HTTPStatus.BAD_REQUEST
+
+        try:
+            with conn.cursor() as cur:
+                assert db.update_overview(cur, person_id, overview)
+            conn.commit()
+            return jsonify(msg='Successfully updated overview'), HTTPStatus.OK
+        except Exception:
+            conn.rollback()
+            logging.exception("person_overview")
+            return (
+                jsonify(error='Error updating overview'),
+                HTTPStatus.BAD_GATEWAY
+            )
+
+    try:
+        person_id = int(request.args.get('person_id', '0'))
+    except ValueError:
+        person_id = 0
+
+    # GET ?person_id=DDD => JSON
+    if person_id > 0:
+        try:
+            with conn.cursor() as cur:
+                overview = db.get_overview(cur, person_id)
+            return jsonify(overview=overview)
+        except Exception:
+            logging.exception()
+            return (
+                jsonify(error='Failed to get overview'),
+                HTTPStatus.BAD_GATEWAY
+            )
+
+    # GET => HTML
+    with conn.cursor() as cur:
+        people = db.get_people(cur)
+
+    ppl: List[Tuple[id, str, bool]] = []
+    for person_id, data in people.items():
+        first_name, last_name, display_name, email, phone, withheld, _ = data
+        ppl.append((person_id, f"{first_name} {last_name}".strip(), withheld))
+        ppl.append((person_id, display_name, withheld))
+    ppl = sorted(ppl, key=operator.itemgetter(0, 2, 1))
+
+    names: List[Tuple[id, str]] = []
+    for person_id, name, withheld in ppl:
+        name = f"{name} (#{person_id})"
+        if withheld:
+            name = f"{name} - WITHHELD"
+        if (person_id, name) not in names:
+            names.append((person_id, name))
+
+    return render_template('personoverview.html', names=names)
+
+
 def main():
     '''Sets up a simple website for admin tasks'''
     if len(sys.argv) < 2:
@@ -481,26 +561,35 @@ def serve(config_path: str):
     global picture_path
     global file_storage_alias
 
-    with open(config_path, 'r') as f:
-        config_map = safe_load(f)
-        picture_path = config_map.get('picturepath', picture_path)
-        file_storage_alias = config_map.get('file_storage_alias',
-                                            file_storage_alias)
-        secret_key = config_map['secret']
-        db_host = config_map['sup_host']
-        db_database = config_map['sup_database']
-        db_user = config_map['sup_username']
-        db_password = config_map['sup_password']
-        db_port = config_map['sup_port']
+    cfg = config.load(config_path)
+    if not cfg:
+        print('Error: Check config file')
+        sys.exit(-1)
 
     try:
-        conn = psycopg2.connect(database=db_database, user=db_user, password=db_password, host=db_host, port=db_port)
-    except:
+        conn = psycopg2.connect(
+            host=cfg.get("sup_host"),
+            dbname=cfg.get("sup_database"),
+            user=cfg.get("sup_username"),
+            password=cfg.get("sup_password"),
+            port=cfg.get("sup_port")
+        )
+    except Exception:
         print('Cannot connect to the database')
         sys.exit(-1)
 
-    server = Flask(__name__, template_folder=config_map.get('forms'))
-    server.register_blueprint(app, url_prefix=os.getenv('APPLICATION_ROOT', ''))
+    picture_path = cfg.get('picturepath', picture_path)
+    file_storage_alias = cfg.get('file_storage_alias', file_storage_alias)
+    secret_key = cfg.get('secret', os.getenv('SECRET_KEY', ''))
+    assert secret_key, (
+        "You must set a secret key for sessions in Flask\n"
+        "\thttps://flask.palletsprojects.com/en/1.1.x/quickstart/#sessions"
+    )
+    template_folder = cfg.get('forms', 'templates')
+    url_prefix = os.getenv('APPLICATION_ROOT', '')
+
+    server = Flask(__name__, template_folder=template_folder)
+    server.register_blueprint(app, url_prefix=url_prefix)
     server.secret_key = secret_key
     server.run()
 

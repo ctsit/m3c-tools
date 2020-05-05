@@ -1,8 +1,8 @@
-"""
-Metab Importer
+"""M3C Prefill Program
+
 Usage:
-    python m3c/prefill.py (-h | --help)
-    python m3c/prefill.py <path_to_config>
+    m3c prefill (-h | --help)
+    m3c prefill <path_to_config>
 
 Options:
     -h --help       Show this message and exit
@@ -11,25 +11,22 @@ Instructions:
     See README
 
 Example:
-    $ python m3c/prefill.py config.yaml
+    $ m3c prefill config.yaml
 """
+
+from typing import List, Tuple
 
 import io
 import itertools
 import sys
-import typing
 import xml.etree.ElementTree as ET
 
 import psycopg2
 
+from m3c import config
 from m3c import db
 from m3c import mwb
-import m3c.triples as metab_import
 from m3c import tools
-
-
-List = typing.List
-Tuple = typing.Tuple
 
 
 get_person = db.get_person  # Facilitate testing using monkeypatching.
@@ -101,12 +98,12 @@ def add_developers(sup_cur: db.Cursor) -> None:
                 print(f"PMID {pmid}: added {forename} {lastname}: {pid}")
 
             affiliation_list = author.findall(".//Affiliation")
-            for affiliation in affiliation_list:
-                affiliation = affiliation.text.strip()
-                if not affiliation:
+            for element in affiliation_list:
+                affiliation = element.text
+                if affiliation is None or affiliation.strip() == '':
                     continue
                 print(f"PMID {pmid}: affiliation for {forename} {lastname}"
-                      f": {affiliation}")
+                      f": {affiliation.strip()}")
 
     return
 
@@ -122,7 +119,7 @@ def add_organizations(sup_cur: db.Cursor,
     if not record.institute:
         assert not record.department
         assert not record.laboratory
-        return
+        return []
 
     institutes = [inst.strip() for inst in record.institute.split(';')]
     departments = [dept.strip() for dept in record.department.split(';')]
@@ -335,7 +332,7 @@ def main():
     prefill(sys.argv[1])
 
 
-def parse_author_list(xml: str) -> ET.ElementTree:
+def parse_author_list(xml: str) -> List[ET.Element]:
     file = io.StringIO(xml)
     data = ET.parse(file)
     author_list = data.findall("//Article/AuthorList/Author")
@@ -343,15 +340,18 @@ def parse_author_list(xml: str) -> ET.ElementTree:
 
 
 def prefill(config_path: str):
-    config = metab_import.get_config(config_path)
+    cfg = config.load(config_path)
 
-    mwb_client = mwb.Client(config.get("mwb_host"), config.get("mwb_port"))
+    mwb_client = mwb.Client(cfg.get("mwb_host"), cfg.get("mwb_port"))
     sup_conn: db.Connection = psycopg2.connect(
-        host=config.get("sup_host"), dbname=config.get("sup_database"),
-        user=config.get("sup_username"), password=config.get("sup_password"),
-        port=config.get("sup_port"))
+        host=cfg.get("sup_host"),
+        dbname=cfg.get("sup_database"),
+        user=cfg.get("sup_username"),
+        password=cfg.get("sup_password"),
+        port=cfg.get("sup_port")
+    )
 
-    embargoed_path = config.get("embargoed", "")
+    embargoed_path = cfg.get("embargoed", "")
     embargoed: List[str] = []
     if embargoed_path:
         with open(embargoed_path) as f:

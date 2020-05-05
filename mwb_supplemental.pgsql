@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS public.people
     display_name TEXT,
     email        TEXT,
     phone        TEXT,
+    overview     TEXT,
     withheld     BOOLEAN NOT NULL DEFAULT FALSE
 );
 

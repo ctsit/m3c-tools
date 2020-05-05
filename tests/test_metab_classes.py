@@ -33,7 +33,7 @@ class TestStudy(unittest.TestCase):
             '<http://example.com/i/oOTHER_INSTITUTE_ID> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#directs> <http://example.com/i/STUDY_ID>',
         ]
 
-        self.assertIsNone(actual[1])  # No summary
+        self.assertEquals('', actual[1])  # No summary
         self.assertListEqual(expected, actual[0])
 
 
