@@ -100,9 +100,9 @@ def make_organizations(namespace, orgs):
     return triples
 
 
-def get_people(sup_cur: db.Cursor) -> Dict[str, Person]:
+def get_people(sup_cur: db.Cursor) -> Dict[int, Person]:
     print("Gathering People")
-    people: Dict[str, Person] = {}
+    people: Dict[int, Person] = {}
     records = db.get_people(sup_cur)
     for pid, (first, last, display, email, phone, withheld, overview) in records.items():
         person = Person(person_id=str(pid),
@@ -113,7 +113,7 @@ def get_people(sup_cur: db.Cursor) -> Dict[str, Person]:
                         phone=phone,
                         withheld=withheld,
                         overview=overview)
-        people[person.person_id] = person
+        people[pid] = person
     print(f"There are {len(people)} people.")
     return people
 
@@ -208,8 +208,9 @@ def make_publications(namespace: str,
     return triples
 
 
-def get_projects(mwb_cur, sup_cur,
-                 people: Dict[str, Person],
+def get_projects(mwb_cur: db.Cursor,
+                 sup_cur: db.Cursor,
+                 people: Dict[int, Person],
                  orgs: List[Organization]
                  ) -> Mapping[str, Project]:
     print("Gathering Workbench Projects")
@@ -344,7 +345,7 @@ def get_projects(mwb_cur, sup_cur,
             first_name = first_name_list[i]
             ids = list(db.get_person(sup_cur, first_name, last_name))
             try:
-                person_id = str(ids[0])
+                person_id = ids[0]
                 project.pi.append(people[person_id].person_id)
             except (IndexError, KeyError, TypeError):
                 print("Error: Person does not exist.")
@@ -379,9 +380,14 @@ def is_valid_study(study: Study) -> bool:
     return True
 
 
-def get_studies(mwb_cur, sup_cur, people, orgs, embargoed: List[str]):
+def get_studies(mwb_cur: db.Cursor,
+                sup_cur: db.Cursor,
+                people: Dict[int, Person],
+                orgs: Dict[int, Organization],
+                embargoed: List[str]
+                ) -> Dict[str, Study]:
     print("Gathering Workbench Studies")
-    studies = {}
+    studies: Dict[str, Study] = {}
     mwb_cur.execute("""\
         SELECT study.study_id, study.study_title,
                COALESCE(study.study_type, ''),
