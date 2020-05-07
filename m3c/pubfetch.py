@@ -40,9 +40,9 @@ import psycopg2
 import psycopg2.extensions
 
 from m3c import catalyst
+from m3c import config
 from m3c import classes
 from m3c import db
-from m3c import triples as metab_import
 from m3c import tools
 
 psql_connection = typing.Type[psycopg2.extensions.connection]
@@ -70,16 +70,17 @@ def fetch_publications(cursor: psql_cursor):
     BATCH_SIZE = 5000
     for i in range(0, len(pmids), BATCH_SIZE):
         try:
-            batch = pmids[i:i+BATCH_SIZE]
+            batch = pmids[i:(i + BATCH_SIZE)]
             log(f"Downloading {i} through "
                 f"{min(len(pmids), i+BATCH_SIZE)-1}")
             articles = pubmed_efetch(batch)
             for article in articles.getroot():
                 try:
                     if article.tag == "PubmedBookArticle":
-                        pmid = article.find("./BookDocument/PMID").text
+                        pmid = article.findtext("./BookDocument/PMID")
                     else:
-                        pmid = article.find("./MedlineCitation/PMID").text
+                        pmid = article.findtext("./MedlineCitation/PMID")
+                    assert pmid
                     xml = ET.tostring(article).decode("utf-8")
                     db.upsert_publication(cursor, pmid, xml)
                 except Exception:
@@ -153,7 +154,7 @@ def main():
     pubfetch(config_path, only_update_authorships, delay, max_authorships)
 
 
-def parse_args(argv) -> typing.Tuple[bool, str, bool, int]:
+def parse_args(argv) -> typing.Tuple[bool, str, bool, int, int]:
     try:
         opts, args = getopt.getopt(argv[1:],
                                    "h",
@@ -205,17 +206,17 @@ def pubfetch(
     global pubmed_delay
     pubmed_delay = delay
 
-    config = metab_import.get_config(config_path)
+    cfg = config.load(config_path)
 
-    pubmed_init(email=config.get("pubmed_email"),
-                api_key=config.get("pubmed_api_token"))
+    pubmed_init(email=cfg.get("pubmed_email"),
+                api_key=cfg.get("pubmed_api_token"))
 
-    sup_conn: psql_connection = psycopg2.connect(
-        host=config.get("sup_host"),
-        dbname=config.get("sup_database"),
-        user=config.get("sup_username"),
-        password=config.get("sup_password"),
-        port=config.get("sup_port"))
+    sup_conn: psql_connection
+    sup_conn = psycopg2.connect(host=cfg.get("sup_host"),
+                                dbname=cfg.get("sup_database"),
+                                user=cfg.get("sup_username"),
+                                password=cfg.get("sup_password"),
+                                port=cfg.get("sup_port"))
 
     with sup_conn:
         with sup_conn.cursor() as cursor:
@@ -295,7 +296,7 @@ def update_authorships(cursor: psql_cursor, authorships_limit: int = -1):
                 "downloaded recently")
             continue
 
-        person = classes.Person(person_id=person_id,
+        person = classes.Person(person_id=str(person_id),
                                 first_name=info[0],
                                 last_name=info[1],
                                 display_name=info[2],
@@ -316,12 +317,12 @@ def update_authorships(cursor: psql_cursor, authorships_limit: int = -1):
 
         if person_id in known:
             pmids = catalyst.fetch_ids(person,
-                                       affiliations[person_id],
-                                       include_pmids=known[person_id][0],
-                                       exclude_pmids=known[person_id][1])
+                                       list(affiliations[person_id]),
+                                       include_pmids=list(known[person_id][0]),
+                                       exclude_pmids=list(known[person_id][1]))
         else:
             pmids = get_pubmed_ids(person.first_name, person.last_name,
-                                   affiliations[person_id])
+                                   list(affiliations[person_id]))
 
         authorships[person_id] = pmids
 
