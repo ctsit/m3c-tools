@@ -260,8 +260,8 @@ def get_pubmed_authorships(cursor: Cursor) -> Mapping[str, Iterable[int]]:
     return authorships
 
 
-def get_pubmed_authorships_updates(cursor: Cursor) \
-        -> Mapping[str, datetime.datetime]:
+def get_pubmed_authorships_updates(cursor: Cursor
+                                   ) -> Mapping[int, datetime.datetime]:
     select_pubs = """
         SELECT person_id, updated
           FROM pubmed_authorships_updates
