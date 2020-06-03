@@ -75,7 +75,8 @@ class Project(object):
                 rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#hasPI> <{}>".format(uri, pi_uri))
                 rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#isPIFor> <{}>".format(pi_uri, uri))
         if self.summary:
-            summary_line = "<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#summary> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.summary)
+            safe_summary = escape_slash(self.summary)
+            summary_line = "<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#summary> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, safe_summary)
         else:
             summary_line = ""
         return rdf, summary_line
@@ -140,7 +141,8 @@ class Study(object):
                 rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#runBy> <{}>".format(uri, runner_uri))
                 rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#runnerOf> <{}>".format(runner_uri, uri))
         if self.summary:
-            summary_line = "<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#summary> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.summary)
+            safe_summary = escape_slash(self.summary)
+            summary_line = "<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#summary> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, safe_summary)
         else:
             summary_line = ""
         return rdf, summary_line
@@ -549,6 +551,10 @@ class Publication(object):
 
 def escape(text):
     return json.dumps(text)
+
+
+def escape_slash(text: str):
+    return text.replace("\\", "\\\\")
 
 
 def make_pub(citation: Citation) -> Publication:
