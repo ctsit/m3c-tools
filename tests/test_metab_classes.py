@@ -38,10 +38,37 @@ class TestStudy(unittest.TestCase):
 
 
 class TestProject(unittest.TestCase):
+    def test_escapes_doublequote(self):
+        summary_with_doublequotes = r'"Evaluating lipid mediator"'
+        expected = r' "\"Evaluating lipid mediator\""^^'
+        project = metab_classes.Project(
+            project_id="PROJECT_ID",
+            project_type="",
+            project_title="",
+            summary=summary_with_doublequotes,
+            doi="",
+            funding_source="",
+        )
+        _, actual = project.get_triples("x://test/")
+        self.assertIn(expected, actual)
+
+    def test_escapes_newline(self):
+        summary_with_newline = "datatrack 1810\nPS project 1"
+        expected = ' "datatrack 1810\\nPS project 1"^^'
+        project = metab_classes.Project(
+            project_id="PROJECT_ID",
+            project_type="",
+            project_title="",
+            summary=summary_with_newline,
+            doi="",
+            funding_source="",
+        )
+        _, actual = project.get_triples("x://test/")
+        self.assertIn(expected, actual)
+
     def test_escapes_backslash(self):
         summary_with_backslash = r"In a world where 4\% percent of..."
         expected = r"In a world where 4\\% percent of..."
-
         project = metab_classes.Project(
             project_id="PROJECT_ID",
             project_type="",
@@ -50,9 +77,7 @@ class TestProject(unittest.TestCase):
             doi="",
             funding_source="",
         )
-
         _, actual = project.get_triples("x://test/")
-
         self.assertIn(expected, actual)
 
 
