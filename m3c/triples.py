@@ -224,13 +224,13 @@ def get_projects(mwb_cur: db.Cursor,
     """)
     for row in mwb_cur:
         project = Project(
-            project_id=row[0].replace('\n', ''),
-            project_title=row[1].replace('\n', '').replace('"', '\\"'),
-            project_type=row[2].replace('\n', ''),
-            summary=row[3].replace('\n', '').replace('"', '\\"'),
-            doi=row[4].replace('\n', ''),
-            funding_source=row[5].replace('\n', ''))
-
+            project_id=row[0],
+            project_title=row[1],
+            project_type=row[2],
+            summary=row[3],
+            doi=row[4],
+            funding_source=row[5],
+        )
         last_names: str = row[6]
         first_names: str = row[7]
         institutes = row[8]

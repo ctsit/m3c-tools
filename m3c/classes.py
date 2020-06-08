@@ -1,6 +1,5 @@
 from typing import Dict, List, Optional, Set, Text
 
-import json
 import io
 import os
 import re
@@ -32,7 +31,7 @@ class Project(object):
     def __init__(self, project_id: str, project_type: str, project_title: str,
                  summary: str, doi: str, funding_source: str):
         assert project_id
-        self.project_id = project_id
+        self.project_id = project_id.strip()
         self.project_type = project_type
         self.project_title = project_title
         self.summary = summary
@@ -47,13 +46,13 @@ class Project(object):
         uri = Project.uri(namespace, self.project_id)
         rdf: List[str] = []
         rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#Project>".format(uri))
-        rdf.append("<{}> <http://www.w3.org/2000/01/rdf-schema#label> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.project_title))
+        rdf.append("<{}> <http://www.w3.org/2000/01/rdf-schema#label> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, escape(self.project_title)))
         rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#projectId> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.project_id))
         rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#workbenchLink> \"https://www.metabolomicsworkbench.org/data/DRCCMetadata.php?Mode=Project&ProjectID={}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.project_id))
         if self.project_type:
-            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#projectType> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.project_type))
+            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#projectType> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, escape(self.project_type)))
         if self.doi:
-            rdf.append("<{}> <http://purl.org/ontology/bibo/doi> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.doi))
+            rdf.append("<{}> <http://purl.org/ontology/bibo/doi> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, escape(self.doi)))
         if self.institutes:
             for institute in self.institutes:
                 institute_uri = Organization.uri(namespace, institute)
@@ -75,7 +74,7 @@ class Project(object):
                 rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#hasPI> <{}>".format(uri, pi_uri))
                 rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#isPIFor> <{}>".format(pi_uri, uri))
         if self.summary:
-            summary_line = "<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#summary> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.summary)
+            summary_line = "<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#summary> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, escape(self.summary))
         else:
             summary_line = ""
         return rdf, summary_line
@@ -90,7 +89,7 @@ class Study(object):
                  summary: str, submit_date: str, project_id: str):
         assert study_id
 
-        self.study_id = study_id
+        self.study_id = study_id.strip()
         self.study_title = study_title
         self.study_type = study_type
         self.summary = summary
@@ -108,11 +107,11 @@ class Study(object):
         uri = Study.uri(namespace, self.study_id)
         rdf = []
         rdf.append("<{}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#Study>".format(uri))
-        rdf.append("<{}> <http://www.w3.org/2000/01/rdf-schema#label> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.study_title))
+        rdf.append("<{}> <http://www.w3.org/2000/01/rdf-schema#label> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, escape(self.study_title)))
         rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#studyId> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.study_id))
         rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#workbenchLink> \"https://www.metabolomicsworkbench.org/data/DRCCMetadata.php?Mode=Study&StudyID={}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.study_id))
         if self.study_type:
-            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#studyType> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self. study_type))
+            rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#studyType> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, escape(self.study_type)))
         if self.submit_date:
             rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#submitted> \"{}\"^^<http://www.w3.org/2001/XMLSchema#dateTime>".format(uri, self.submit_date))
         if self.project_id:
@@ -140,7 +139,7 @@ class Study(object):
                 rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#runBy> <{}>".format(uri, runner_uri))
                 rdf.append("<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#runnerOf> <{}>".format(runner_uri, uri))
         if self.summary:
-            summary_line = "<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#summary> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, self.summary)
+            summary_line = "<{}> <http://www.metabolomics.info/ontologies/2019/metabolomics-consortium#summary> \"{}\"^^<http://www.w3.org/2001/XMLSchema#string>".format(uri, escape(self.summary))
         else:
             summary_line = ""
         return rdf, summary_line
@@ -393,19 +392,19 @@ class Tool(object):
 
         rdf.append('<{uri}> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <{m3c}Tool>'
                    .format(uri=uri, m3c=m3c))
-        rdf.append('<{uri}> <http://www.w3.org/2000/01/rdf-schema#label> {name}'
+        rdf.append('<{uri}> <http://www.w3.org/2000/01/rdf-schema#label> \"{name}\"'
                    .format(uri=uri, name=escape(self.name)))
-        rdf.append('<{uri}> <{m3c}summary> {desc}'
+        rdf.append('<{uri}> <{m3c}summary> \"{desc}\"'
                    .format(uri=uri, m3c=m3c, desc=escape(self.description)))
 
-        rdf.append('<{uri}> <{m3c}homepage> {desc}'
+        rdf.append('<{uri}> <{m3c}homepage> \"{desc}\"'
                    .format(uri=uri, m3c=m3c, desc=escape(self.url)))
 
         if self.license and self.license.kind and self.license.url:
             license = self.license
-            rdf.append('<{uri}> <{m3c}licenseType> {kind}'
+            rdf.append('<{uri}> <{m3c}licenseType> \"{kind}\"'
                        .format(uri=uri, m3c=m3c, kind=escape(license.kind)))
-            rdf.append('<{uri}> <{m3c}licenseUrl> {link}'
+            rdf.append('<{uri}> <{m3c}licenseUrl> \"{link}\"'
                        .format(uri=uri, m3c=m3c, link=escape(license.url)))
 
         for author in self.authors:
@@ -419,7 +418,7 @@ class Tool(object):
 
         for tag in self.tags:
             tag = tag.strip().lower()
-            rdf.append("<{uri}> <{m3c}tag> {tag}"
+            rdf.append("<{uri}> <{m3c}tag> \"{tag}\""
                        .format(uri=uri, m3c=m3c, tag=escape(tag)))
 
         props: Dict[str, str] = {
@@ -547,8 +546,12 @@ class Publication(object):
         return f"{namespace}pmid{pmid}"
 
 
-def escape(text):
-    return json.dumps(text)
+def escape(text: str):
+    text = text.strip()
+    text = text.replace('\\', '\\\\')
+    text = text.replace("\n", "\\n")
+    text = text.replace('"', '\\"')
+    return text
 
 
 def make_pub(citation: Citation) -> Publication:
