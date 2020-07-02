@@ -90,11 +90,27 @@ class TestTool(unittest.TestCase):
                               last_name="Doe",
                               display_name="John Doe")
         alias = "John P Doe"
-        # SEP-192: the person has this alias, but it isn't used during lookup.
 
+        aliases = [
+            (pid, alias)
+        ]
         people = {
             pid: igor,
         }
+
+        def find_person(name: str) -> int:
+            # This function (and therefore the enitre test) might seem trivial
+            # but I'm leaving it to document the expected behavior of
+            # find_person and match_authors and prevent a regression.
+            # The expected behavior was NOT the actual behavior before SEP-192
+            # was fixed.
+            for (pid, display_name) in people.items():
+                if display_name == name:
+                    return pid
+            for (pid, alias) in aliases:
+                if alias == name:
+                    return pid
+            return 0
 
         info = {
             "name": "TestTool",
@@ -107,7 +123,7 @@ class TestTool(unittest.TestCase):
 
         tool = classes.Tool(tool_id="TestTool", data=info)
 
-        unmatched = tool.match_authors(people, "x://test/")
+        unmatched = tool.match_authors(find_person, "x://test/")
 
         self.assertEqual(0, len(unmatched))
 

@@ -688,13 +688,22 @@ def fetch_mtw_tools(sup_cur: db.Cursor) -> Iterable[Tool]:
 def make_tools(
     namespace, tools: List[Tool], people, withheld_people, mwb_cur, sup_cur
 ):
+    def find_person(name: str) -> int:
+        try:
+            first_name, last_name = name.split(' ', 1)
+            matches = list(db.get_person(sup_cur, first_name, last_name))
+            if len(matches) == 1:
+                return matches[0]
+        except Exception:
+            pass
+        return 0
+
     print("Generating triples for tools")
     triples = []
     tool_count = 0
     for tool in tools:
         # First, find all the authors' URIs
-        non_matched_authors = tool.match_authors({**people, **withheld_people},
-                                                 namespace)
+        non_matched_authors = tool.match_authors(find_person, namespace)
         if len(non_matched_authors) != 0:
             print(f"Not all authors matched for Tool: {tool.tool_id}")
             continue
