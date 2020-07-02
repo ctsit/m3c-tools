@@ -1,5 +1,6 @@
 import unittest
 
+from m3c import classes
 import m3c.classes as metab_classes
 
 
@@ -79,6 +80,36 @@ class TestProject(unittest.TestCase):
         )
         _, actual = project.get_triples("x://test/")
         self.assertIn(expected, actual)
+
+
+class TestTool(unittest.TestCase):
+    def test_match_authors(self):
+        pid = 780
+        igor = classes.Person(person_id=str(pid),
+                              first_name="John",
+                              last_name="Doe",
+                              display_name="John Doe")
+        alias = "John P Doe"
+        # SEP-192: the person has this alias, but it isn't used during lookup.
+
+        people = {
+            pid: igor,
+        }
+
+        info = {
+            "name": "TestTool",
+            "description": "Fake tool for unit-testing",
+            "url": "",
+            "authors": [{
+                "name": alias,
+            }],
+        }
+
+        tool = classes.Tool(tool_id="TestTool", data=info)
+
+        unmatched = tool.match_authors(people, "x://test/")
+
+        self.assertEqual(0, len(unmatched))
 
 
 if __name__ == "__main__":
