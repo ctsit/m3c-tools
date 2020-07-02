@@ -1,5 +1,6 @@
 import unittest
 
+from m3c import classes
 import m3c.classes as metab_classes
 
 
@@ -79,6 +80,52 @@ class TestProject(unittest.TestCase):
         )
         _, actual = project.get_triples("x://test/")
         self.assertIn(expected, actual)
+
+
+class TestTool(unittest.TestCase):
+    def test_match_authors(self):
+        pid = 780
+        igor = classes.Person(person_id=str(pid),
+                              first_name="John",
+                              last_name="Doe",
+                              display_name="John Doe")
+        alias = "John P Doe"
+
+        aliases = [
+            (pid, alias)
+        ]
+        people = {
+            pid: igor,
+        }
+
+        def find_person(name: str) -> int:
+            # This function (and therefore the enitre test) might seem trivial
+            # but I'm leaving it to document the expected behavior of
+            # find_person and match_authors and prevent a regression.
+            # The expected behavior was NOT the actual behavior before SEP-192
+            # was fixed.
+            for (pid, display_name) in people.items():
+                if display_name == name:
+                    return pid
+            for (pid, alias) in aliases:
+                if alias == name:
+                    return pid
+            return 0
+
+        info = {
+            "name": "TestTool",
+            "description": "Fake tool for unit-testing",
+            "url": "",
+            "authors": [{
+                "name": alias,
+            }],
+        }
+
+        tool = classes.Tool(tool_id="TestTool", data=info)
+
+        unmatched = tool.match_authors(find_person, "x://test/")
+
+        self.assertEqual(0, len(unmatched))
 
 
 if __name__ == "__main__":

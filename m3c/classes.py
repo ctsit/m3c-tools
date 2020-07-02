@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Set, Text
+from typing import Callable, Dict, List, Optional, Set, Text
 
 import io
 import os
@@ -439,19 +439,16 @@ class Tool(object):
 
         return rdf
 
-    def match_authors(self, people: Dict[int, Person], namespace: str):
-        non_matched = []
+    def match_authors(self, find_person: Callable[[str], int], namespace: str
+                      ) -> List["Tool.Author"]:
+        non_matched: List["Tool.Author"] = []
         for author in self.authors:
-            for person in people.values():
-                if person.display_name == author.name:
-                    author.uri = Person.uri(namespace, person.person_id)
-                    break
-            if author.uri:
-                continue
-
-            non_matched.append(author)
-            print(f'Unknown author "{author.name}" for tool: {self.tool_id}')
-
+            person_id = find_person(author.name)
+            if not person_id:
+                non_matched.append(author)
+                print(f'Unknown author "{author.name}" for tool: {self.tool_id}')
+            else:
+                author.uri = Person.uri(namespace, str(person_id))
         return non_matched
 
 
