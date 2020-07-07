@@ -173,7 +173,10 @@ def get_photos(file_storage_root: str, people):
     return photos
 
 
-def get_publications(sup_cur: db.Cursor) -> Mapping[str, Publication]:
+def get_publications(
+    sup_cur: db.Cursor,
+    permitted_people: Dict[int, Person]
+) -> Mapping[str, Publication]:
     print("Gathering publications")
 
     authorships = db.get_pubmed_authorships(sup_cur)
@@ -188,7 +191,8 @@ def get_publications(sup_cur: db.Cursor) -> Mapping[str, Publication]:
             pub = Publication.from_pubmed(xml)
             assert pub and pub.pmid == pmid
             for author in authorships[pmid]:
-                pub.add_author(author)
+                if author in permitted_people:
+                    pub.add_author(author)
             publications[pmid] = pub
         except Exception:
             traceback.print_exc()
@@ -796,7 +800,7 @@ def generate(config_path: str, old_path: str):
             print_to_file(tools_triples, tools_file)
 
             # Publications
-            pubs = get_publications(sup_cur)
+            pubs = get_publications(sup_cur, people)
             pubs_triples = make_publications(cfg.namespace, pubs)
             print_to_file(pubs_triples, pubs_file)
 
