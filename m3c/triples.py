@@ -127,7 +127,12 @@ def make_people(namespace, people):
     return triples
 
 
-def link_people_to_org(namespace: str, sup_cur, people, orgs):
+def make_associations(
+    namespace: str,
+    sup_cur: db.Cursor,
+    people: Dict[int, Person],
+    orgs: Dict[int, Organization]
+) -> List[str]:
     triples = []
     sup_cur.execute("""\
         SELECT person_id, organization_id
@@ -137,8 +142,10 @@ def link_people_to_org(namespace: str, sup_cur, people, orgs):
          WHERE a.person_id = p.id AND a.organization_id = o.id
            AND p.withheld IS NOT TRUE AND o.withheld IS NOT TRUE
     """)
-    for row in sup_cur:
-        triples.extend(orgs[row[1]].add_person(namespace, row[0]))
+    for (person_id, organization_id) in sup_cur:
+        if person_id in people:
+            org = orgs[organization_id]
+            triples.extend(org.add_person(namespace, person_id))
     return triples
 
 
@@ -778,12 +785,12 @@ def generate(config_path: str, old_path: str):
             # People
             all_people = get_people(sup_cur)
             people = {k: v for k, v in all_people.items() if not v.withheld}
-            withheld_people = {k: v
-                               for k, v in all_people.items() if v.withheld}
             people_triples = make_people(cfg.namespace, people)
-            people_triples.extend(
-                link_people_to_org(cfg.namespace, sup_cur, people, orgs))
             print_to_file(people_triples, people_file)
+
+            # Associations (People <=> Organizations)
+            assocs = make_associations(cfg.namespace, sup_cur, people, orgs)
+            print_to_file(assocs, people_file)
 
             # Photos
             photos = get_photos(cfg.get("picturepath", "."), people)
