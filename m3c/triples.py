@@ -696,14 +696,12 @@ def fetch_mtw_tools(sup_cur: db.Cursor) -> Iterable[Tool]:
         yield Tool(name, props)
 
 
-def make_tools(
-    namespace, tools: List[Tool], people, withheld_people, mwb_cur, sup_cur
-):
+def make_tools(namespace, tools: List[Tool], mwb_cur, sup_cur) -> List[str]:
     def find_person(name: str) -> int:
         try:
             first_name, last_name = name.split(' ', 1)
             matches = list(db.get_person(sup_cur, first_name, last_name))
-            if len(matches) == 1:
+            if len(set(matches)) == 1:
                 return matches[0]
         except Exception:
             pass
@@ -802,8 +800,8 @@ def generate(config_path: str, old_path: str):
             yaml_tools = get_yaml_tools(cfg)
             csv_tools = list(fetch_mtw_tools(sup_cur))
             all_tools = yaml_tools + csv_tools
-            tools_triples = make_tools(cfg.namespace, all_tools, people,
-                                       withheld_people, mwb_cur, sup_cur)
+            tools_triples = make_tools(cfg.namespace, all_tools, mwb_cur,
+                                       sup_cur)
             print_to_file(tools_triples, tools_file)
 
             # Publications
