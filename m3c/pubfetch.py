@@ -45,8 +45,8 @@ from m3c import classes
 from m3c import db
 from m3c import tools
 
-psql_connection = typing.Type[psycopg2.extensions.connection]
-psql_cursor = typing.Type[psycopg2.extensions.cursor]
+psql_connection = psycopg2.Connection
+psql_cursor = psycopg2.Cursor
 
 pubmed_delay: int = 0
 

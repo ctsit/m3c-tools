@@ -50,6 +50,13 @@ def main():
     logger.debug(f"{PROGRAM} ended")
 
 
+def natural(parser: argparse.ArgumentParser, value) -> int:
+    i = int(value)
+    if i < 0:
+        parser.exit(2, f"value must be non-negative: got {value}\n")
+    return i
+
+
 def parse_args(args):
     parser = argparse.ArgumentParser(prog=PROGRAM)
     nat = functools.partial(natural, parser)
@@ -91,13 +98,6 @@ def parse_args(args):
     parser.add_argument("config", help="path to the YAML configuration file")
     parsed = parser.parse_args(args)
     return parsed
-
-
-def natural(parser: argparse.ArgumentParser, value) -> int:
-    i = int(value)
-    if i < 0:
-        parser.exit(2, f"value must be non-negative: got {value}\n")
-    return i
 
 
 if __name__ == "__main__":

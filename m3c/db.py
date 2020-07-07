@@ -1,4 +1,4 @@
-from typing import Dict, Iterable, List, Mapping, Optional, Type, Tuple
+from typing import Dict, Iterable, List, Mapping, Optional, Tuple
 
 import datetime
 import io
@@ -8,8 +8,8 @@ import psycopg2.extensions
 
 from m3c import mwb
 
-Cursor = Type[psycopg2.extensions.cursor]
-Connection = Type[psycopg2.extensions.connection]
+Connection = psycopg2.Connection
+Cursor = psycopg2.Cursor
 
 
 def add_organization(cursor: Cursor, type: str, name: str,
