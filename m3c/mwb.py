@@ -2,14 +2,14 @@
 Metabolomics Workbench library
 """
 
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Type
 
 import psycopg2
 import psycopg2.extensions
 
 
-Connection = psycopg2.Connection
-Cursor = psycopg2.Cursor
+Connection = Type[psycopg2.extensions.connection]
+Cursor = Type[psycopg2.extensions.cursor]
 
 
 DEPARTMENT = "department"

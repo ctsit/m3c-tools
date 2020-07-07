@@ -1,4 +1,4 @@
-from typing import Dict, Iterable, List, Mapping, Optional, Tuple
+from typing import Dict, Iterable, List, Mapping, Optional, Type, Tuple
 
 import datetime
 import io
@@ -8,8 +8,8 @@ import psycopg2.extensions
 
 from m3c import mwb
 
-Connection = psycopg2.Connection
-Cursor = psycopg2.Cursor
+Connection = Type[psycopg2.extensions.connection]
+Cursor = Type[psycopg2.extensions.cursor]
 
 
 def add_organization(cursor: Cursor, type: str, name: str,
@@ -68,8 +68,9 @@ def associate(cursor: Cursor, person_id: int, organization_id: int) -> bool:
     return cursor.rowcount == 1
 
 
-def find_organizations(cursor: Cursor) \
-        -> Iterable[Tuple[str, str, str, str]]:
+def find_organizations(
+    cursor: mwb.Cursor
+) -> Iterable[Tuple[str, str, str, str]]:
 
     select_orgs = '''
         SELECT COALESCE(institute, ''), COALESCE(department, ''),

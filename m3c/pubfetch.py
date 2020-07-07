@@ -45,13 +45,11 @@ from m3c import classes
 from m3c import db
 from m3c import tools
 
-psql_connection = psycopg2.Connection
-psql_cursor = psycopg2.Cursor
 
 pubmed_delay: int = 0
 
 
-def fetch_publications(cursor: psql_cursor):
+def fetch_publications(cursor: db.Cursor):
     authorships = db.get_pubmed_authorships(cursor)
     tools_pmids = tools.MetabolomicsToolsWiki.pmids()
     pmids_to_download = set(tools_pmids).union(authorships.keys())
@@ -211,7 +209,7 @@ def pubfetch(
     pubmed_init(email=cfg.get("pubmed_email"),
                 api_key=cfg.get("pubmed_api_token"))
 
-    sup_conn: psql_connection
+    sup_conn: db.Connection
     sup_conn = psycopg2.connect(host=cfg.get("sup_host"),
                                 dbname=cfg.get("sup_database"),
                                 user=cfg.get("sup_username"),
@@ -277,7 +275,7 @@ def too_recent(event: datetime.datetime,
     return now - cutoff < event
 
 
-def update_authorships(cursor: psql_cursor, authorships_limit: int = -1):
+def update_authorships(cursor: db.Cursor, authorships_limit: int = -1):
     people = db.get_people(cursor)
     affiliations = db.get_affiliations(cursor)
     known = db.get_confirmed_publications(cursor)
