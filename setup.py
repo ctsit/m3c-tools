@@ -6,7 +6,7 @@
 
 import setuptools
 
-VERSION = "0.10.0"
+VERSION = "0.11.0"
 
 setuptools.setup(
     name="m3c",

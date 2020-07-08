@@ -2,18 +2,15 @@
 Metabolomics Workbench library
 """
 
-import typing
+from typing import Iterable, Optional, Type
 
 import psycopg2
 import psycopg2.extensions
 
 
-Iterable = typing.Iterable
-Optional = typing.Optional
-Tuple = typing.Tuple
+Connection = Type[psycopg2.extensions.connection]
+Cursor = Type[psycopg2.extensions.cursor]
 
-Connection = psycopg2.extensions.connection
-Cursor = psycopg2.extensions.cursor
 
 DEPARTMENT = "department"
 INSTITUTE = "institute"
@@ -41,11 +38,11 @@ class NameRecord:
 
 class Client:
     def __init__(self,
-                 host: Optional[str] = "localhost",
-                 port: Optional[str] = "5432"):
+                 host: str = "localhost",
+                 port: str = "5432"):
         self.host = host
         self.port = int(port)
-        self.conn: Connection = None
+        self.conn: Optional[Connection] = None
 
     def __del__(self):
         self.disconnect()

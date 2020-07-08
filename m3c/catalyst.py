@@ -4,9 +4,10 @@ Interface to the Harvard PubMed Disambiguation Tool's Profiles Catalyst service
 See http://profiles.catalyst.harvard.edu/docs/ProfilesRNS_DisambiguationEngine.pdf
 """
 
+from typing import List
+
 import sys
 import traceback
-from typing import List
 import xml.etree.ElementTree as ET
 
 import requests
@@ -66,7 +67,8 @@ def build_catalyst_xml(person: Person, affiliations: List[str],
             pmid_elm = ET.SubElement(rem_list, "PMID")
             pmid_elm.text = pmid
 
-    return ET.tostring(root)
+    xml: str = ET.tostring(root, encoding="unicode", method="utf-8")
+    return xml
 
 
 def parse_catalyst_pmids(catalyst_xml: str) -> List[str]:
@@ -95,7 +97,7 @@ def parse_catalyst_pmids(catalyst_xml: str) -> List[str]:
         return []
     try:
         root = ET.fromstring(catalyst_xml)
-        return [pmid.text for pmid in root]
+        return [pmid.text if pmid.text else "" for pmid in root]
     except Exception:
         traceback.print_exc()
         return []

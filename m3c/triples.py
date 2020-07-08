@@ -127,7 +127,12 @@ def make_people(namespace, people):
     return triples
 
 
-def link_people_to_org(namespace: str, sup_cur, people, orgs):
+def make_associations(
+    namespace: str,
+    sup_cur: db.Cursor,
+    people: Dict[int, Person],
+    orgs: Dict[int, Organization]
+) -> List[str]:
     triples = []
     sup_cur.execute("""\
         SELECT person_id, organization_id
@@ -137,8 +142,10 @@ def link_people_to_org(namespace: str, sup_cur, people, orgs):
          WHERE a.person_id = p.id AND a.organization_id = o.id
            AND p.withheld IS NOT TRUE AND o.withheld IS NOT TRUE
     """)
-    for row in sup_cur:
-        triples.extend(orgs[row[1]].add_person(namespace, row[0]))
+    for (person_id, organization_id) in sup_cur:
+        if person_id in people:
+            org = orgs[organization_id]
+            triples.extend(org.add_person(namespace, person_id))
     return triples
 
 
@@ -173,7 +180,10 @@ def get_photos(file_storage_root: str, people):
     return photos
 
 
-def get_publications(sup_cur: db.Cursor) -> Mapping[str, Publication]:
+def get_publications(
+    sup_cur: db.Cursor,
+    permitted_people: Dict[int, Person]
+) -> Mapping[str, Publication]:
     print("Gathering publications")
 
     authorships = db.get_pubmed_authorships(sup_cur)
@@ -188,7 +198,8 @@ def get_publications(sup_cur: db.Cursor) -> Mapping[str, Publication]:
             pub = Publication.from_pubmed(xml)
             assert pub and pub.pmid == pmid
             for author in authorships[pmid]:
-                pub.add_author(author)
+                if author in permitted_people:
+                    pub.add_author(author)
             publications[pmid] = pub
         except Exception:
             traceback.print_exc()
@@ -685,16 +696,23 @@ def fetch_mtw_tools(sup_cur: db.Cursor) -> Iterable[Tool]:
         yield Tool(name, props)
 
 
-def make_tools(
-    namespace, tools: List[Tool], people, withheld_people, mwb_cur, sup_cur
-):
+def make_tools(namespace, tools: List[Tool], mwb_cur, sup_cur) -> List[str]:
+    def find_person(name: str) -> int:
+        try:
+            first_name, last_name = name.split(' ', 1)
+            matches = list(db.get_person(sup_cur, first_name, last_name))
+            if len(set(matches)) == 1:
+                return matches[0]
+        except Exception:
+            pass
+        return 0
+
     print("Generating triples for tools")
     triples = []
     tool_count = 0
     for tool in tools:
         # First, find all the authors' URIs
-        non_matched_authors = tool.match_authors({**people, **withheld_people},
-                                                 namespace)
+        non_matched_authors = tool.match_authors(find_person, namespace)
         if len(non_matched_authors) != 0:
             print(f"Not all authors matched for Tool: {tool.tool_id}")
             continue
@@ -765,12 +783,12 @@ def generate(config_path: str, old_path: str):
             # People
             all_people = get_people(sup_cur)
             people = {k: v for k, v in all_people.items() if not v.withheld}
-            withheld_people = {k: v
-                               for k, v in all_people.items() if v.withheld}
             people_triples = make_people(cfg.namespace, people)
-            people_triples.extend(
-                link_people_to_org(cfg.namespace, sup_cur, people, orgs))
             print_to_file(people_triples, people_file)
+
+            # Associations (People <=> Organizations)
+            assocs = make_associations(cfg.namespace, sup_cur, people, orgs)
+            print_to_file(assocs, people_file)
 
             # Photos
             photos = get_photos(cfg.get("picturepath", "."), people)
@@ -782,12 +800,12 @@ def generate(config_path: str, old_path: str):
             yaml_tools = get_yaml_tools(cfg)
             csv_tools = list(fetch_mtw_tools(sup_cur))
             all_tools = yaml_tools + csv_tools
-            tools_triples = make_tools(cfg.namespace, all_tools, people,
-                                       withheld_people, mwb_cur, sup_cur)
+            tools_triples = make_tools(cfg.namespace, all_tools, mwb_cur,
+                                       sup_cur)
             print_to_file(tools_triples, tools_file)
 
             # Publications
-            pubs = get_publications(sup_cur)
+            pubs = get_publications(sup_cur, people)
             pubs_triples = make_publications(cfg.namespace, pubs)
             print_to_file(pubs_triples, pubs_file)
 
