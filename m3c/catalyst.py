@@ -18,9 +18,12 @@ from m3c.classes import Person
 ENDPOINT = "http://profiles.catalyst.harvard.edu/services/GetPMIDs/default.asp"
 
 
-def build_catalyst_xml(person: Person, affiliations: List[str],
-                       include_pmids: List[str], exclude_pmids: List[str]) \
-        -> str:
+def build_catalyst_xml(
+    person: Person,
+    affiliations: List[str],
+    include_pmids: List[str],
+    exclude_pmids: List[str]
+) -> bytes:
     """
     Build the XML request payload.
 
@@ -67,7 +70,7 @@ def build_catalyst_xml(person: Person, affiliations: List[str],
             pmid_elm = ET.SubElement(rem_list, "PMID")
             pmid_elm.text = pmid
 
-    xml: str = ET.tostring(root, encoding="unicode", method="utf-8")
+    xml: bytes = ET.tostring(root)
     return xml
 
 
