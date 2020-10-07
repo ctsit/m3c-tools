@@ -1,6 +1,10 @@
 Changelog
 =========
 
+## [0.12.0] - 2020-10-07
+
+ * add logic to prefill.py to handle skipping missing first name and last name on projects.
+
 ## [0.11.1] - 2020-07-27
 
  * catalyst: Fix return type of ET.tostring (Taeber Rapczak)
@@ -143,4 +147,3 @@ the old stand-alone scripts. Specifically:
 ### Added
 * Added metab_prefill script, which goes through databases and adds new people and organizations to supplemental database
 * Added metab_import script, which creates profiles for first class objects in metabolomics base and supplemental databases
-
