@@ -247,6 +247,9 @@ def add_people(sup_cur: db.Cursor, record: mwb.NameRecord) -> List[int]:
                                      fillvalue="")
 
     for last_name, first_name, email, phone in combined:
+        if not last_name or not first_name:
+            error(psid, "missing first name or last name")
+            continue
         person_ids = list(get_person(sup_cur, first_name, last_name,
                                      exclude_withheld=False))
         if bad_email(email):
