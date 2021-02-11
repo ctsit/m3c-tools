@@ -17,7 +17,7 @@
                     {% endfor %}
                 {% endif %}
             {% endwith %}
-                        </div>
+            </div>
 
             <div class="form-group">
                 <label>Search Display Name</label>
@@ -120,7 +120,9 @@
                             newFirst.value = '';
                             newLast.value = '';
                         } else {
-                            aliasData[personId].splice(aliasData[personId].findIndex(a => a.first === firstName && a.last === lastName), 1);
+                            aliasData[personId]
+                                .splice(aliasData[personId]
+                                .findIndex(a => a.first === firstName && a.last === lastName), 1);
                         }
                         updateTable(aliasData[personId]);
                     } else {

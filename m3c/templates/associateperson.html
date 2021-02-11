@@ -1,12 +1,15 @@
 <!doctype html>
-    <head>
-        <title>Create a new Person</title>
-        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
-    </head>
-    <body>
-        <div class="container mx-auto" style="width: 50%;">
-            <h1 class="mx-auto">Associate a Person with a Inst/Dept/Lab</h1>
-            <a href="{{ url_for('metab_admin.main_menu') }}">Back to Home</a>
+<head>
+    <title>Modify a Person's Associations</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-giJF6kkoqNQ00vy+HMDP7azOuL0xtbfIcaT9wjKHr8RbDVddVHyTfAAsrekwKmP1" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/js/bootstrap.bundle.min.js" integrity="sha384-ygbV9kiqUc6oa4msXn9868pTtWMgiQaeYH7/t7LECLbyPA2x65Kgf80OJFdroafW" crossorigin="anonymous"></script>
+</head>
+<body>
+    <div class="container mx-auto" style="width: 50%;">
+        <h1 class="mx-auto">Associate a Person with a Inst/Dept/Lab</h1>
+        <a href="{{ url_for('metab_admin.main_menu') }}">Back to Home</a>
+
+        <div id="messages">
             {% with messages = get_flashed_messages() %}
                 {% if messages %}
                     {% for message in messages %}
@@ -16,6 +19,9 @@
                     {% endfor %}
                 {% endif %}
             {% endwith %}
+        </div>
+
+        <form method="post" enctype="multipart/form-data">
 
             <div class="form-group">
                 <label>Search Display Name</label>
@@ -27,65 +33,58 @@
                 </datalist>
             </div>
 
-            <form method=post enctype=multipart/form-data>
-                <div class="form-group">
-                    <label>Name</label>
-                    <input readonly id=name class="form-control" type=text name=name>
-                </div>
+            <div class="form-group">
+                <label>Name</label>
+                <input readonly id=name class="form-control" type=text name=name>
+            </div>
 
-                <div class="form-group">
-                    <label>Email</label>
-                    <input readonly id=email class="form-control" type=text name=email>
-                </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input readonly id=email class="form-control" type=text name=email>
+            </div>
 
-                <input hidden readonly id=id type=text name=id>
+            <input hidden readonly id=id type=text name=id>
 
-                <div class="form-group">
-                    <label>Institute</label>
-                    <input class="form-control" list=institutes name=institute>
-                    <datalist id=institutes>
-                        {% for inst in instituteList %}
-                            <option value="{{inst}}">
-                        {% endfor %}
-                    </datalist>
-                </div>
+            <a target="_blank" href="{{ url_for('metab_admin.org_tree') }}">View the Organization Tree For IDs</a>
 
-                <div class="form-group">
-                    <label>Department</label>
-                    <input class="form-control" list=departments name=department>
-                    <datalist id=departments>
-                        {% for dept in departmentList %}
-                            <option value="{{dept}}">
-                        {% endfor %}
-                    </datalist>
-                </div>
+            <div class="form-group">
+                <label>Institute</label>
+                <input class="form-control" list="institutes-dl" name="institute" id="institutes">
+                <datalist id="institutes-dl">
+                {% for orgId, org in organizations.items() %}
+                    {% if org['orgType'] == 'institute' %}
+                        <option value="{{org['orgName']}} | {{orgId}}">
+                    {% endif %}
+                {% endfor %}
+                </datalist>
+            </div>
 
-                <div class="form-group">
-                    <label>Labs</label>
-                    <input class="form-control" list=labs name=lab>
-                    <datalist id=labs>
-                        {% for labItem in labList %}
-                            <option value="{{labItem}}">
-                        {% endfor %}
-                    </datalist>
-                </div>
+            <div class="form-group">
+                <label>Department</label>
+                <input class="form-control" list="departments-dl" name=department id="departments">
+                <datalist id="departments-dl">
+                </datalist>
+            </div>
 
-                <button class="btn btn-primary" type="submit">Associate Person</button>
-            </form>
-        </div>
-        <script>
-            const displayNameInput = document.getElementById('searchInput');
-            const displayNames = [...document.getElementById('displaynames').childNodes].filter(name => name.value).map(name => name.value);
-            const name = document.getElementById('name');
-            const email = document.getElementById('email');
-            const id = document.getElementById('id');
-            displayNameInput.addEventListener('change', (e) => {
-                if (displayNames.includes(e.srcElement.value)) {
-                    const splitName = e.srcElement.value.split('|');
-                    name.value = splitName[0];
-                    email.value = splitName[1];
-                    id.value = splitName[2];
-                }
-            });
-        </script>
-    </body>
+            <div class="form-group">
+                <label>Labs</label>
+                <input class="form-control" list="labs-dl" name=lab id="labs">
+                <datalist id="labs-dl">
+                </datalist>
+            </div>
+
+            <button class="btn btn-primary" type="submit" id="add-btn">Add New Association</button>
+
+            <div class="form-group">
+                <label>Current Associations (childen will be removed if parent is removed)</label>
+                <ul class="org-tree" id="org-tree-root">
+                </ul>
+            </div>
+        </form>
+    </div>
+    <script>
+        let associationData = {{ assocMap|tojson|safe }};
+        const allOrganizations = {{ organizations|tojson|safe }};
+    </script>
+    <script src="{{url_for('static', filename='associateperson.js')}}"></script>
+</body>
