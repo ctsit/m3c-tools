@@ -206,7 +206,7 @@ def create_person():
     return render_template('createperson.html', instituteList=institutes.keys(), departmentList=departments.keys(), labList=labs.keys())
 
 
-@app.route('/associateperson', methods=['GET', 'POST'])
+@app.route('/associateperson', methods=['GET', 'POST', 'DELETE'])
 def associate_person():
     display_names = []
     cur = conn.cursor()
@@ -220,17 +220,37 @@ def associate_person():
     departments = {}
     labs = {}
 
-    cur.execute('SELECT id, name, type from organizations')
+    organizations = {}
+
+    cur.execute('SELECT id, name, type, parent_id from organizations')
     for row in cur.fetchall():
+        organizations[row[0]] = {
+            'orgName': row[1],
+            'orgType': row[2],
+            'parentId': row[3]
+        }
         if row[2] == mwb.INSTITUTE:
             institutes[row[1]] = row[0]
         elif row[2] == mwb.DEPARTMENT:
             departments[row[1]] = row[0]
         elif row[2] == mwb.LABORATORY:
             labs[row[1]] = row[0]
-        else:
-            pass
-            # what do we do
+    
+    associations = {}
+    cur.execute('SELECT person_id, organization_id FROM associations')
+    for row in cur.fetchall():
+        orgAssoc = {}
+        orgId = row[1]
+        orgs = associations.get(row[0], [])
+        orgAssoc['orgId'] = orgId
+        if orgId in institutes.keys():
+            orgAssoc['orgType'] = mwb.INSTITUTE
+        if orgId in departments.keys():
+            orgAssoc['orgType'] = mwb.DEPARTMENT
+        if orgId in labs.keys():
+            orgAssoc['orgType'] = mwb.LABORATORY
+        orgs.append(orgAssoc)
+        associations[row[0]] = orgs
 
     cur.close()
     if request.method == 'POST':
@@ -246,7 +266,7 @@ def associate_person():
                 return redirect(request.url)
 
             if not institute and not department and not lab:
-                flash('Please select or enter at least one institute, department, OR lab.')
+                flash('Please select or enter at an institute, department, OR lab.')
                 return redirect(request.url)
 
             associate_and_insert_orgs(cur, institute, department, lab, person_id)
@@ -260,8 +280,102 @@ def associate_person():
         finally:
             cur.close()
         return redirect(request.url)
+    elif request.method == 'DELETE':
+        person_id = request.json['personId']
+        org_id = request.json['orgId']
 
-    return render_template('associateperson.html', dispNameList=display_names, instituteList=institutes.keys(), departmentList=departments.keys(), labList=labs.keys())
+        if not person_id:
+            return jsonify(error='Missing person_id'), HTTPStatus.BAD_REQUEST
+        
+        if not org_id:
+            return jsonify(error='Missing org_id'), HTTPStatus.BAD_REQUEST
+        
+        all_children = []
+        search_ids = [org_id]
+        while True:
+            children = [orgId for orgId,orgInfo in organizations.items() if orgInfo['parentId'] in search_ids]
+            if len(children) == 0:
+                break
+            all_children += children
+            search_ids = children
+
+        with conn.cursor() as curr:
+            curr.execute('DELETE FROM associations WHERE organization_id = %s AND person_id = %s;', (org_id, person_id))
+            if len(all_children) > 0:
+                curr.execute(f'DELETE FROM associations where organization_id in %s AND person_id=%s;', (tuple(all_children), person_id))
+            conn.commit()
+
+        associations = {}
+        with conn.cursor() as cur:
+            cur.execute('SELECT person_id, organization_id FROM associations')
+            for row in cur.fetchall():
+                orgAssoc = {}
+                orgId = row[1]
+                orgs = associations.get(row[0], [])
+                orgAssoc['orgId'] = orgId
+                if orgId in institutes.keys():
+                    orgAssoc['orgType'] = mwb.INSTITUTE
+                if orgId in departments.keys():
+                    orgAssoc['orgType'] = mwb.DEPARTMENT
+                if orgId in labs.keys():
+                    orgAssoc['orgType'] = mwb.LABORATORY
+                orgs.append(orgAssoc)
+                associations[row[0]] = orgs
+
+        return jsonify({
+                'message': 'Successfully created association',
+                'assocMap': associations
+            })
+
+
+    return render_template('associateperson.html',
+                           dispNameList=display_names,
+                           assocMap=associations,
+                           organizations=organizations)
+
+
+@app.route('/orgtree', methods=['GET'])
+def org_tree():
+    display_names = []
+    cur = conn.cursor()
+
+    cur.execute('SELECT display_name, email, id from people;')
+    rows = cur.fetchall()
+    for row in rows:
+        display_names.append(str(row[0]) + ' | ' + str(row[1]) + ' | ' + str(row[2]))
+
+    institutes = {}
+    departments = {}
+    labs = {}
+
+    organizations = {}
+
+    cur.execute('SELECT id, name, type, parent_id from organizations')
+    for row in cur.fetchall():
+        organizations[row[0]] = {
+            'orgName': row[1],
+            'orgType': row[2],
+            'parentId': row[3]
+        }
+        if row[2] == mwb.INSTITUTE:
+            institutes[row[1]] = row[0]
+        elif row[2] == mwb.DEPARTMENT:
+            departments[row[1]] = row[0]
+        elif row[2] == mwb.LABORATORY:
+            labs[row[1]] = row[0]
+    
+    associations = {}
+    cur.execute('SELECT person_id, organization_id FROM associations')
+    for row in cur.fetchall():
+        orgId = row[1]
+        associations[orgId] = associations.get(orgId, 0) + 1
+
+    cur.close()
+
+    return render_template('orgtree.html',
+                           dispNameList=display_names,
+                           assocMap=associations,
+                           organizations=organizations)
 
 
 @app.route('/parentorganization', methods=['GET', 'POST'])
@@ -525,14 +639,14 @@ def person_overview():
     with conn.cursor() as cur:
         people = db.get_people(cur)
 
-    ppl: List[Tuple[id, str, bool]] = []
+    ppl: List[Tuple[int, str, bool]] = []
     for person_id, data in people.items():
         first_name, last_name, display_name, email, phone, withheld, _ = data
         ppl.append((person_id, f"{first_name} {last_name}".strip(), withheld))
         ppl.append((person_id, display_name, withheld))
     ppl = sorted(ppl, key=operator.itemgetter(0, 2, 1))
 
-    names: List[Tuple[id, str]] = []
+    names: List[Tuple[int, str]] = []
     for person_id, name, withheld in ppl:
         name = f"{name} (#{person_id})"
         if withheld:
