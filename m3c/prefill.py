@@ -145,17 +145,17 @@ def add_organizations(sup_cur: db.Cursor,
     dcnt = len(departments)
     lcnt = len(laboratories)
 
-    if dcnt not in [1, lcnt]:
+    if dcnt != icnt and icnt != 1:
         error(record.psid, AmbiguousHierarchyError.__name__, AmbiguousHierarchyError(record))
         error('Continuing with creation of institutes.')
         departments = [""] * len(institutes)
         laboratories = [""] * len(institutes)
         dcnt = len(departments)
         lcnt = len(laboratories)
-    elif icnt not in [1, dcnt]:
+    elif lcnt != dcnt and dcnt != 1:
         error(record.psid, AmbiguousHierarchyError.__name__, AmbiguousHierarchyError(record))
         error('Continuing with creation of institutes and departments.')
-        laboratories = [""] * len(institutes)
+        laboratories = [""] * len(departments)
         lcnt = len(laboratories)
 
     institute_ids = []
