@@ -90,8 +90,9 @@ class TestPrefill(unittest.TestCase):
                           department="Biology",
                           laboratory="Bobby")
         cursor = MockDatabaseConnection().cursor()
-        with self.assertRaises(prefill.AmbiguityError):
-            prefill.add_organizations(cursor, rec)
+        prefill.add_organizations(cursor, rec)
+        expected = ["UF", "FSU"]
+        self.assertListEqual(organizations, expected)
 
     def test_multiname_fewer_labs_than_departments_errors(self):
         # Ambiguity: which department does the lab belong to?
@@ -99,8 +100,9 @@ class TestPrefill(unittest.TestCase):
                           department="Biology;Chem",
                           laboratory="Bobby")
         cursor = MockDatabaseConnection().cursor()
-        with self.assertRaises(prefill.AmbiguityError):
-            prefill.add_organizations(cursor, rec)
+        prefill.add_organizations(cursor, rec)
+        expected = ["UF", "Biology", "Chem"]
+        self.assertListEqual(organizations, expected)
 
     def test_multiname_too_many_labs(self):
         # Ambiguity: which department does the last lab belong to?
@@ -108,8 +110,9 @@ class TestPrefill(unittest.TestCase):
                           department="Biology;Chem",
                           laboratory="Bobby;Jones;Davis")
         cursor = MockDatabaseConnection().cursor()
-        with self.assertRaises(prefill.AmbiguityError):
-            prefill.add_organizations(cursor, rec)
+        prefill.add_organizations(cursor, rec)
+        expected = ["UF", "FSU", "Biology", "Chem"]
+        self.assertListEqual(organizations, expected)
 
     def test_multiname_too_many_departments(self):
         # Ambiguity: which institute does the last department belong to?
@@ -117,8 +120,9 @@ class TestPrefill(unittest.TestCase):
                           department="Biology;Chem;Yo",
                           laboratory="Bobby;Jones;Davis")
         cursor = MockDatabaseConnection().cursor()
-        with self.assertRaises(prefill.AmbiguityError):
-            prefill.add_organizations(cursor, rec)
+        prefill.add_organizations(cursor, rec)
+        expected = ["UF", "FSU"]
+        self.assertListEqual(organizations, expected)
 
     def test_multiname_single_person(self):
         rec = make_record(last_name="Bond", first_name="James")
