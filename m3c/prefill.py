@@ -338,7 +338,7 @@ def main():
 def parse_author_list(xml: str) -> List[ET.Element]:
     file = io.StringIO(xml)
     data = ET.parse(file)
-    author_list = data.findall("//Article/AuthorList/Author")
+    author_list = data.findall(".//Article/AuthorList/Author")
     return author_list
 
 
