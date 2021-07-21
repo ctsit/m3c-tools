@@ -1,0 +1,35 @@
+<!doctype html>
+<head>
+    <title>View Org Tree</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-giJF6kkoqNQ00vy+HMDP7azOuL0xtbfIcaT9wjKHr8RbDVddVHyTfAAsrekwKmP1" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/js/bootstrap.bundle.min.js" integrity="sha384-ygbV9kiqUc6oa4msXn9868pTtWMgiQaeYH7/t7LECLbyPA2x65Kgf80OJFdroafW" crossorigin="anonymous"></script>
+</head>
+<body>
+    <div class="container mx-auto" style="width: 50%;">
+        <h1 class="mx-auto">View the org-tree</h1>
+        <a href="{{ url_for('metab_admin.main_menu') }}">Back to Home</a>
+
+        <div id="messages">
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-warning" role="alert">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+
+        <div class="form-group">
+            <label>All orginzations in the form (OrgName - #OrgId - (#OfPeopleAssociated)</label>
+            <ul class="org-tree" id="org-tree-root">
+            </ul>
+        </div>
+    </div>
+    <script>
+        let associationData = {{ assocMap|tojson|safe }};
+        const allOrganizations = {{ organizations|tojson|safe }};
+    </script>
+    <script src="{{url_for('static', filename='orgtree.js')}}"></script>
+</body>

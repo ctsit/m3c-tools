@@ -248,6 +248,10 @@ def get_projects(mwb_cur: db.Cursor,
         departments = row[9]
         labs = row[10]
 
+        if not last_names or not first_names or not institutes:
+            print("missing required project data " + project.project_id)
+            continue
+
         institute_list = [inst.strip() for inst in institutes.split(';')]
         try:
             department_list = [dept.strip() for dept in departments.split(';')]

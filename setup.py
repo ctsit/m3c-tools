@@ -6,7 +6,7 @@
 
 import setuptools
 
-VERSION = "0.12.0"
+VERSION = "0.13.0"
 
 setuptools.setup(
     name="m3c",
@@ -31,7 +31,7 @@ setuptools.setup(
     },
 
     install_requires=[
-        "PyYAML==5.3.1",
+        "PyYAML>=5.4",
         "requests==2.23.0",
         "psycopg2-binary==2.8.5",
         "Flask==1.1.2",
