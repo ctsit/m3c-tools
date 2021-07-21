@@ -53,6 +53,15 @@ class AmbiguousNamesError(AmbiguityError):
         super().__init__(msg)
 
 
+def error(*values, sep=' ', end='\n', flush=False) -> None:
+    """
+    Prints values to `stderr` instead of `stdout`.
+
+    Equivalent to `print(*values, file=sys.stderr)`.
+    """
+    print(*values, sep=sep, end=end, file=sys.stderr, flush=flush)
+
+
 def add_developers(sup_cur: db.Cursor) -> None:
     pmids = set(tools.MetabolomicsToolsWiki.pmids())
     total = len(pmids)
@@ -136,8 +145,18 @@ def add_organizations(sup_cur: db.Cursor,
     dcnt = len(departments)
     lcnt = len(laboratories)
 
-    if not(dcnt in [1, lcnt] and icnt in [1, dcnt]):
-        raise AmbiguousHierarchyError(record)
+    if dcnt != icnt and icnt != 1:
+        error(record.psid, AmbiguousHierarchyError.__name__, AmbiguousHierarchyError(record))
+        error('Continuing with creation of institutes.')
+        departments = [""] * len(institutes)
+        laboratories = [""] * len(institutes)
+        dcnt = len(departments)
+        lcnt = len(laboratories)
+    elif lcnt != dcnt and dcnt != 1:
+        error(record.psid, AmbiguousHierarchyError.__name__, AmbiguousHierarchyError(record))
+        error('Continuing with creation of institutes and departments.')
+        laboratories = [""] * len(departments)
+        lcnt = len(laboratories)
 
     institute_ids = []
     for i, institute in enumerate(institutes):
@@ -311,15 +330,6 @@ def associate(sup_cur: db.Cursor, psid: str, person_id: int, institute_id: int,
 
 def bad_email(email: str) -> bool:
     return ' ' in email
-
-
-def error(*values, sep=' ', end='\n', flush=False) -> None:
-    """
-    Prints values to `stderr` instead of `stdout`.
-
-    Equivalent to `print(*values, file=sys.stderr)`.
-    """
-    print(*values, sep=sep, end=end, file=sys.stderr, flush=flush)
 
 
 def main():
