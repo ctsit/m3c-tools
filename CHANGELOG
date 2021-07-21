@@ -1,6 +1,14 @@
 Changelog
 =========
 
+## [0.13.0] - 2021-07-21
+
+ * Update PyYAML version requirement (Samantha Emerson)
+ * Use a matrix to test across supported python versions (Hunter Jarrell)
+ * Create github actions workflow for linting and testing (Hunter Jarrell)
+ * Add CRUD to associate person and an org tree (Hunter Jarrell)
+ * add logic to skip when project does not have first name last name or institution (Kevin Hanson)
+
 ## [0.12.0] - 2020-10-07
 
  * add logic to prefill.py to handle skipping missing first name and last name on projects.
