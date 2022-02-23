@@ -9,11 +9,11 @@ from typing import List
 import sys
 import traceback
 import xml.etree.ElementTree as ET
-
+import os.path
 import requests
 
 from m3c.classes import Person
-
+from m3c.logger import Logger
 
 ENDPOINT = "http://profiles.catalyst.harvard.edu/services/GetPMIDs/default.asp"
 
@@ -123,8 +123,14 @@ def fetch_ids(person: Person, affiliations: List[str],
     }
     resp = requests.post(ENDPOINT, data=payload_xml, headers=headers)
     if resp.status_code != 200:
+        log_path = os.path.join('', 'log.txt')
+        log = Logger(log_path)
+
+        log("Unexpected response from Catalyst", resp.status_code,
+              file=sys.stderr)
         print("Unexpected response from Catalyst", resp.status_code,
               file=sys.stderr)
+
         return []
 
     return parse_catalyst_pmids(resp.text)
