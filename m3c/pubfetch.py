@@ -28,6 +28,7 @@ Copyright 2020 University of Florida
 import datetime
 import getopt
 import http
+import os
 import sys
 import time
 import traceback
@@ -44,6 +45,7 @@ from m3c import config
 from m3c import classes
 from m3c import db
 from m3c import tools
+from m3c.logger import Logger
 
 
 pubmed_delay: int = 0
@@ -133,7 +135,10 @@ def get_pubmed_ids(first_name: str, last_name: str,
 
 def log(*values):
     """Prints values to stderr."""
+    log_path = os.path.join('', 'log.txt')
+    log = Logger(log_path)
     print(*values, file=sys.stderr)
+    log(*values, file=sys.stderr)
 
 
 def main():

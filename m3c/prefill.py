@@ -17,6 +17,7 @@ Example:
 from typing import List, Tuple
 
 import io
+import os
 import itertools
 import sys
 import xml.etree.ElementTree as ET
@@ -27,7 +28,7 @@ from m3c import config
 from m3c import db
 from m3c import mwb
 from m3c import tools
-
+from m3c.logger import Logger
 
 get_person = db.get_person  # Facilitate testing using monkeypatching.
 
@@ -58,10 +59,14 @@ def add_developers(sup_cur: db.Cursor) -> None:
     total = len(pmids)
     if total == 0:
         return
+    log_path = os.path.join('', 'log.txt')
+    log = Logger(log_path)
 
     publications = db.get_pubmed_publications(sup_cur, pmids)
     pmids = pmids.intersection(publications.keys())
     print(f"Found {len(pmids)} of {total} tools-related publications in the "
+          "Supplemental database.")
+    log(f"Found {len(pmids)} of {total} tools-related publications in the "
           "Supplemental database.")
     if len(pmids) == 0:
         return
@@ -74,28 +79,36 @@ def add_developers(sup_cur: db.Cursor) -> None:
 
             if not forename:
                 print(f"PMID {pmid}: missing forename of author {lastname}")
+                log(f"PMID {pmid}: missing forename of author {lastname}")
                 continue
 
             if not lastname:
                 print(f"PMID {pmid}: missing surname of author {forename}")
+                log(f"PMID {pmid}: missing surname of author {forename}")
                 continue
 
             matches = list(db.get_person(sup_cur, forename, lastname))
             if len(matches) > 1:
                 print(f"PMID {pmid}: WARNING! Found {len(matches)} people "
                       f" named {forename} {lastname}: {matches}")
+                log(f"PMID {pmid}: WARNING! Found {len(matches)} people "
+                      f" named {forename} {lastname}: {matches}")
                 continue
 
             if matches:
                 pid = matches[0]
                 print(f"PMID {pmid}: found {forename} {lastname}: {pid}")
+                log(f"PMID {pmid}: found {forename} {lastname}: {pid}")
             else:
                 pid = db.add_person(sup_cur, forename, lastname, "", "")
                 if not pid:
                     print(f"PMID {pmid}: WARNING failed to add person: "
                           f"{forename} {lastname}")
+                    log(f"PMID {pmid}: WARNING failed to add person: "
+                          f"{forename} {lastname}")
                     continue
                 print(f"PMID {pmid}: added {forename} {lastname}: {pid}")
+                log(f"PMID {pmid}: added {forename} {lastname}: {pid}")
 
             affiliation_list = author.findall(".//Affiliation")
             for element in affiliation_list:
@@ -103,6 +116,8 @@ def add_developers(sup_cur: db.Cursor) -> None:
                 if affiliation is None or affiliation.strip() == '':
                     continue
                 print(f"PMID {pmid}: affiliation for {forename} {lastname}"
+                      f": {affiliation.strip()}")
+                log(f"PMID {pmid}: affiliation for {forename} {lastname}"
                       f": {affiliation.strip()}")
 
     return
@@ -139,14 +154,19 @@ def add_organizations(sup_cur: db.Cursor,
     if not(dcnt in [1, lcnt] and icnt in [1, dcnt]):
         raise AmbiguousHierarchyError(record)
 
+    log_path = os.path.join('', 'log.txt')
+    log = Logger(log_path)
+
     institute_ids = []
     for i, institute in enumerate(institutes):
         oid = db.get_organization(sup_cur, mwb.INSTITUTE, institute)
         if not oid:
             oid = db.add_organization(sup_cur, mwb.INSTITUTE, institute)
             print(record.psid, f"added institute #{oid}: {institute}.")
+            log(record.psid, f"added institute #{oid}: {institute}.")
         else:
             print(record.psid, f"found institute #{oid}: {institute}.")
+            log(record.psid, f"found institute #{oid}: {institute}.")
         assert oid
         institute_ids.append(oid)
 
@@ -169,8 +189,11 @@ def add_organizations(sup_cur: db.Cursor,
                                       parent)
             print(record.psid,
                   f"added department #{oid}: {department} (parent #{parent}).")
+            log(record.psid,
+                  f"added department #{oid}: {department} (parent #{parent}).")
         else:
             print(record.psid, f"found department #{oid}: {department}.")
+            log(record.psid, f"found department #{oid}: {department}.")
 
         assert oid
         department_ids.append(oid)
@@ -200,8 +223,11 @@ def add_organizations(sup_cur: db.Cursor,
                                       parent)
             print(record.psid,
                   f"added laboratory #{oid}: {laboratory} (parent #{parent}).")
+            log(record.psid,
+                  f"added laboratory #{oid}: {laboratory} (parent #{parent}).")
         else:
             print(record.psid, f"found laboratory #{oid}: {laboratory}.")
+            log(record.psid, f"found laboratory #{oid}: {laboratory}.")
 
         assert oid
         laboratory_ids.append(oid)
@@ -225,6 +251,8 @@ def add_organizations(sup_cur: db.Cursor,
 def add_people(sup_cur: db.Cursor, record: mwb.NameRecord) -> List[int]:
     """ Adds people to the Supplemental database, returning their IDs. """
     ids: List[int] = []
+    log_path = os.path.join('', 'log.txt')
+    log = Logger(log_path)
 
     psid = record.psid
     last_names = [ln.strip() for ln in record.last_name.split(';')]
@@ -267,18 +295,22 @@ def add_people(sup_cur: db.Cursor, record: mwb.NameRecord) -> List[int]:
             details = db.get_contact_details(sup_cur, pid)
             curr_email, curr_phone = details
             print(psid, f"found person #{pid}: {first_name} {last_name}.")
+            log(psid, f"found person #{pid}: {first_name} {last_name}.")
             if email != curr_email or phone != curr_phone:
                 updated = db.update_contact_details(sup_cur, pid, email, phone)
                 if updated:
                     print(psid, "updated contact details for person",
+                          f"#{pid}: {first_name} {last_name}.")
+                    log(psid, "updated contact details for person",
                           f"#{pid}: {first_name} {last_name}.")
                 else:
                     error(psid, "failed to update contact details for person",
                           f"#{pid}: {first_name} {last_name}.")
         else:
             pid = db.add_person(sup_cur, first_name, last_name, email, phone)
-            print(psid, f"Added person #{pid}: {first_name} {last_name}",
-                  f"(email={email}; phone={phone}).")
+            message = '{}, Added person #{}: {} {}, email={}; phone={}'.format(psid, pid, first_name, last_name, email, phone)
+            print(message)
+            log(message)
 
         ids.append(pid)
 
@@ -289,6 +321,9 @@ def associate(sup_cur: db.Cursor, psid: str, person_id: int, institute_id: int,
               department_id: int, laboratory_id: int):
     if person_id == 0:
         return
+    
+    log_path = os.path.join('', 'log.txt')
+    log = Logger(log_path)
 
     templates = ["person #{} already associated with {} #{}.",
                  "associated person #{} with {} #{}."]
@@ -296,17 +331,22 @@ def associate(sup_cur: db.Cursor, psid: str, person_id: int, institute_id: int,
     if institute_id > 0:
         t = db.associate(sup_cur, person_id, institute_id)
         tmpl = templates[int(t)]
-        print(psid, tmpl.format(person_id, "institute", institute_id))
+        message = psid + "" + tmpl.format(person_id, "institute", institute_id)
+        print(message)
+        log(message)
 
     if department_id > 0:
         t = db.associate(sup_cur, person_id, department_id)
         tmpl = templates[int(t)]
-        print(psid, tmpl.format(person_id, "department", department_id))
+        message = psid + "" + tmpl.format(person_id, "department", department_id)
+        print(message)
+        log(message)
 
     if laboratory_id > 0:
         t = db.associate(sup_cur, person_id, laboratory_id)
         tmpl = templates[int(t)]
-        print(psid, tmpl.format(person_id, "laboratory", laboratory_id))
+        message = psid + "" + tmpl.format(person_id, "laboratory", laboratory_id)
+        print(message)
 
 
 def bad_email(email: str) -> bool:
@@ -319,7 +359,11 @@ def error(*values, sep=' ', end='\n', flush=False) -> None:
 
     Equivalent to `print(*values, file=sys.stderr)`.
     """
+    log_path = os.path.join('', 'log.txt')
+    log = Logger(log_path)
     print(*values, sep=sep, end=end, file=sys.stderr, flush=flush)
+    # correct this
+    log(*values, sep=sep, end=end, file=sys.stderr, flush=flush)
 
 
 def main():

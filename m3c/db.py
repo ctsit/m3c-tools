@@ -2,11 +2,13 @@ from typing import Dict, Iterable, List, Mapping, Optional, Type, Tuple
 
 import datetime
 import io
+import os
 
 import psycopg2
 import psycopg2.extensions
 
 from m3c import mwb
+from m3c.logger import Logger
 
 Connection = Type[psycopg2.extensions.connection]
 Cursor = Type[psycopg2.extensions.cursor]
@@ -326,7 +328,10 @@ def update_authorships(cursor: Cursor,
 
     # Update timestamps for those authors who have been updated.
     ids = io.StringIO()
+    log_path = os.path.join('', 'log.txt')
+    log = Logger(log_path)
     for person_id in authorships.keys():
+        log('{} {}'.format(person_id, file=ids))
         print(person_id, file=ids)
     ids.seek(0)
     cursor.copy_from(ids, "pubmed_authorships_updates", columns=("person_id",))
@@ -335,6 +340,7 @@ def update_authorships(cursor: Cursor,
     tsv = io.StringIO()
     for person_id, pmids in authorships.items():
         for pmid in pmids:
+            log(person_id, pmid, sep="\t", end="\n", file=tsv)
             print(person_id, pmid, sep="\t", end="\n", file=tsv)
     tsv.seek(0)
     cursor.copy_from(tsv, "pubmed_authorships", columns=("person_id", "pmid"))
