@@ -456,7 +456,10 @@ def get_studies(mwb_cur: db.Cursor,
                 orgs: Dict[int, Organization],
                 embargoed: List[str]
                 ) -> Dict[str, Study]:
+    log_path = os.path.join('', 'log.txt')
+    log = Logger(log_path)
     print("Gathering Workbench Studies")
+    log("Gathering Workbench Studies")
     studies: Dict[str, Study] = {}
     mwb_cur.execute("""\
         SELECT study.study_id, study.study_title,
@@ -484,6 +487,7 @@ def get_studies(mwb_cur: db.Cursor,
         # Exclude embargoed studies.
         if study.study_id in embargoed:
             print(f"Skipping embargoed study: {study.study_id}")
+            log(f"Skipping embargoed study: {study.study_id}")
             continue
 
         # Skip invalid studies
@@ -527,6 +531,9 @@ def get_studies(mwb_cur: db.Cursor,
                     print("Error: Organization does not exist.")
                     print("Organization for study " + study.study_id)
                     print("Organization name: " + institute_list[i])
+                    log("Error: Organization does not exist.")
+                    log("Organization for study " + study.study_id)
+                    log("Organization name: " + institute_list[i])
                     sys.exit()
             except IndexError:
                 sup_cur.execute("""
@@ -558,6 +565,9 @@ def get_studies(mwb_cur: db.Cursor,
                         print("Error: Organization does not exist.")
                         print("Organization for study " + study.study_id)
                         print("Organization name: " + department_list[i])
+                        log("Error: Organization does not exist.")
+                        log("Organization for study " + study.study_id)
+                        log("Organization name: " + department_list[i])
                         sys.exit()
                 except IndexError:
                     sup_cur.execute("""
@@ -591,6 +601,9 @@ def get_studies(mwb_cur: db.Cursor,
                         print("Error: Organization does not exist.")
                         print("Organization for study " + study.study_id)
                         print("Organization name: " + lab_list[i])
+                        log("Error: Organization does not exist.")
+                        log("Organization for study " + study.study_id)
+                        log("Organization name: " + lab_list[i])
                         sys.exit()
                 except IndexError:
                     pass
@@ -611,6 +624,10 @@ def get_studies(mwb_cur: db.Cursor,
                 print("Runner for study " + study.study_id)
                 print("Last name: " + last_name + '.')
                 print("First name: " + first_name + '.')
+                log("Error: Person does not exist.")
+                log("Runner for study " + study.study_id)
+                log("Last name: " + last_name + '.')
+                log("First name: " + first_name + '.')
                 sys.exit()
 
         studies[study.study_id] = study
@@ -621,7 +638,10 @@ def make_studies(namespace,
                  studies: Dict[str, Study],
                  projects: Mapping[str, Project]
                  ) -> Tuple[List[str], List[str]]:
+    log_path = os.path.join('', 'log.txt')
+    log = Logger(log_path)
     print("Making Workbench Studies")
+    log("Making Workbench Studies")
     triples: List[str] = []
     summaries: List[str] = []
     study_count = 0
@@ -635,13 +655,18 @@ def make_studies(namespace,
             summaries.append(summary_line)
         study_count += 1
     print("There are " + str(study_count) + " studies.")
+    log("There are " + str(study_count) + " studies.")
     if no_proj_study > 0:
         print(f"WARNING! There are {no_proj_study} studies without projects")
+        log(f"WARNING! There are {no_proj_study} studies without projects")
     return triples, summaries
 
 
 def get_datasets(mwb_cur):
+    log_path = os.path.join('', 'log.txt')
+    log = Logger(log_path)
     print("Gathering Workbench Datasets")
+    log("Gathering Workbench Datasets")
     datasets = {}
     mwb_cur.execute("""\
         SELECT mb_sample_id, study_id, subject_species
@@ -659,7 +684,10 @@ def get_datasets(mwb_cur):
 
 
 def make_datasets(namespace, datasets, studies):
+    log_path = os.path.join('', 'log.txt')
+    log = Logger(log_path)
     print("Making Workbench Datasets")
+    log("Making Workbench Datasets")
     dataset_triples = []
     study_triples = []
     dataset_count = 0
@@ -677,8 +705,11 @@ def make_datasets(namespace, datasets, studies):
         dataset_triples.extend(dataset.get_triples(study_uri))
         dataset_count += 1
     print("There will be " + str(dataset_count) + " new datasets.")
+    log("There will be " + str(dataset_count) + " new datasets.")
     if no_study_datasets > 0:
         print("There are {} datasets without studies"
+              .format(no_study_datasets))
+        log("There are {} datasets without studies"
               .format(no_study_datasets))
     for study in studies.values():
         study_triples.extend(study.get_species_triples(namespace))
@@ -686,11 +717,14 @@ def make_datasets(namespace, datasets, studies):
 
 
 def get_authors_pmid(sup_cur: db.Cursor, pmid: str) -> List[Dict[str, str]]:
+    log_path = os.path.join('', 'log.txt')
+    log = Logger(log_path)
     try:
         authors = []
         pubs = db.get_pubmed_publications(sup_cur, pmids=[pmid])
         if pmid not in pubs:
             print(f'PMID {pmid}: Could not find PubMed data')
+            log(f'PMID {pmid}: Could not find PubMed data')
             return []
         author_list = prefill.parse_author_list(pubs[pmid])
         for author in author_list:
@@ -704,10 +738,13 @@ def get_authors_pmid(sup_cur: db.Cursor, pmid: str) -> List[Dict[str, str]]:
     except Exception:
         traceback.print_exc()
         print(f'Error parsing PubMed Data for tool with PMID {pmid}')
+        log(f'Error parsing PubMed Data for tool with PMID {pmid}')
         return []
 
 
 def get_yaml_tools(cfg: config.Config):
+    log_path = os.path.join('', 'log.txt')
+    log = Logger(log_path)
     try:
         tools_path = cfg.get('tools', 'tools.yaml')
         with open(tools_path, 'r') as tools_file:
@@ -720,10 +757,13 @@ def get_yaml_tools(cfg: config.Config):
                 except Exception as e:
                     print(f'{e!r}')
                     print('Error: check configuration for tool "%s"' % tool_id)
+                    log(f'{e!r}')
+                    log('Error: check configuration for tool "%s"' % tool_id)
                     continue
             return tools
     except Exception:
         print('Error parsing tools config file: %s' % tools_path)
+        log('Error parsing tools config file: %s' % tools_path)
         return []
 
 
@@ -756,6 +796,8 @@ def fetch_mtw_tools(sup_cur: db.Cursor) -> Iterable[Tool]:
 
 
 def make_tools(namespace, tools: List[Tool], mwb_cur, sup_cur) -> List[str]:
+    log_path = os.path.join('', 'log.txt')
+    log = Logger(log_path)
     def find_person(name: str) -> int:
         try:
             first_name, last_name = name.split(' ', 1)
@@ -767,6 +809,7 @@ def make_tools(namespace, tools: List[Tool], mwb_cur, sup_cur) -> List[str]:
         return 0
 
     print("Generating triples for tools")
+    log("Generating triples for tools")
     triples = []
     tool_count = 0
     for tool in tools:
@@ -774,11 +817,13 @@ def make_tools(namespace, tools: List[Tool], mwb_cur, sup_cur) -> List[str]:
         non_matched_authors = tool.match_authors(find_person, namespace)
         if len(non_matched_authors) != 0:
             print(f"Not all authors matched for Tool: {tool.tool_id}")
+            log(f"Not all authors matched for Tool: {tool.tool_id}")
             continue
         # Now, generate the triples.
         triples.extend(tool.get_triples(namespace))
         tool_count += 1
     print("There are " + str(tool_count) + " tools.")
+    log("There are " + str(tool_count) + " tools.")
     return triples
 
 
@@ -799,6 +844,8 @@ def print_to_open_file(triples: List[str], file: IO) -> None:
 
 
 def generate(config_path: str, old_path: str):
+    log_path = os.path.join('', 'log.txt')
+    log = Logger(log_path)
     timestamp = datetime.now()
     path = os.path.join("data_out",
                         timestamp.strftime("%Y"),
@@ -821,6 +868,7 @@ def generate(config_path: str, old_path: str):
 
     if not cfg.namespace.endswith('/'):
         print(f"WARNING! Namespace doesn't end with '/': {cfg.namespace}")
+        log(f"WARNING! Namespace doesn't end with '/': {cfg.namespace}")
 
     mwb_conn: psycopg2.extensions.connection = psycopg2.connect(
         host=cfg.get('mwb_host'), dbname=cfg.get('mwb_database'),
