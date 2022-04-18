@@ -163,10 +163,10 @@ def add_organizations(sup_cur: db.Cursor,
         if not oid:
             oid = db.add_organization(sup_cur, mwb.INSTITUTE, institute)
             print(record.psid, f"added institute #{oid}: {institute}.")
-            log(record.psid, f"added institute #{oid}: {institute}.")
+            log(f"{record.psid} found institute #{oid}: {institute}.")
         else:
             print(record.psid, f"found institute #{oid}: {institute}.")
-            log(record.psid, f"found institute #{oid}: {institute}.")
+            log(f"{record.psid} found institute #{oid}: {institute}.")
         assert oid
         institute_ids.append(oid)
 
@@ -189,11 +189,10 @@ def add_organizations(sup_cur: db.Cursor,
                                       parent)
             print(record.psid,
                   f"added department #{oid}: {department} (parent #{parent}).")
-            log(record.psid,
-                  f"added department #{oid}: {department} (parent #{parent}).")
+            log(f"{record.psid} added department #{oid}: {department} (parent #{parent}).")
         else:
             print(record.psid, f"found department #{oid}: {department}.")
-            log(record.psid, f"found department #{oid}: {department}.")
+            log(f"{record.psid} found department #{oid}: {department}.")
 
         assert oid
         department_ids.append(oid)
@@ -223,11 +222,10 @@ def add_organizations(sup_cur: db.Cursor,
                                       parent)
             print(record.psid,
                   f"added laboratory #{oid}: {laboratory} (parent #{parent}).")
-            log(record.psid,
-                  f"added laboratory #{oid}: {laboratory} (parent #{parent}).")
+            log(f"{record.psid} added laboratory #{oid}: {laboratory} (parent #{parent}).")
         else:
             print(record.psid, f"found laboratory #{oid}: {laboratory}.")
-            log(record.psid, f"found laboratory #{oid}: {laboratory}.")
+            log(f"{record.psid} found laboratory #{oid}: {laboratory}.")
 
         assert oid
         laboratory_ids.append(oid)
@@ -363,7 +361,7 @@ def error(*values, sep=' ', end='\n', flush=False) -> None:
     log = Logger(log_path)
     print(*values, sep=sep, end=end, file=sys.stderr, flush=flush)
     # correct this
-    log(*values, sep=sep, end=end, file=sys.stderr, flush=flush)
+    # log('error - {} '.format(", ".join(*values)))
 
 
 def main():
