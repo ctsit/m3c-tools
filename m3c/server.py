@@ -35,6 +35,7 @@ from m3c import classes
 from m3c import config
 from m3c import db
 from m3c import mwb
+from m3c.logger import Logger
 
 # Globals
 app = Blueprint('metab_admin', __name__)
@@ -152,6 +153,9 @@ def create_person():
     departments = {}
     labs = {}
 
+    log_path = os.path.join('', 'log.txt')
+    log = Logger(log_path)
+
     cur.execute('SELECT id, name, type from organizations')
     for row in cur.fetchall():
         if row[2] == mwb.INSTITUTE:
@@ -194,9 +198,11 @@ def create_person():
                 flash('First and Last name pair must be unique')
             else:
                 print(e)
+                log(e)
                 flash('Other integrity error')
         except Exception as e:
             print(e)
+            log(e)
             conn.rollback()
             flash('Error creating a new person')
         finally:
@@ -210,6 +216,9 @@ def create_person():
 def associate_person():
     display_names = []
     cur = conn.cursor()
+
+    log_path = os.path.join('', 'log.txt')
+    log = Logger(log_path)
 
     cur.execute('SELECT display_name, email, id from people;')
     rows = cur.fetchall()
@@ -275,6 +284,7 @@ def associate_person():
             flash('Association created successfully')
         except Exception as e:
             print(e)
+            log(e)
             conn.rollback()
             flash('Error creating association')
         finally:
@@ -383,6 +393,8 @@ def parent_organization():
     cur = conn.cursor()
 
     organizations = []
+    log_path = os.path.join('', 'log.txt')
+    log = Logger(log_path)
 
     cur.execute('SELECT id, name, type, parent_id from organizations')
     for row in cur.fetchall():
@@ -409,6 +421,7 @@ def parent_organization():
             return redirect(request.url)
         except Exception as e:
             print(e)
+            log(e)
             conn.rollback()
             cur.close()
             flash('Error setting parent')
@@ -420,6 +433,8 @@ def parent_organization():
 @app.route('/withheldpeople', methods=['GET', 'POST'])
 def withheld_people():
     people = []
+    log_path = os.path.join('', 'log.txt')
+    log = Logger(log_path)
 
     with conn.cursor() as cur:
         cur.execute('SELECT id, display_name, email, withheld from people ORDER BY id;')
@@ -441,6 +456,7 @@ def withheld_people():
             return 'OK'
         except Exception as e:
             print(e)
+            log(e)
             return 'ERROR', 500
 
     return render_template('withheldpeople.html', people=people)
@@ -449,6 +465,8 @@ def withheld_people():
 @app.route('/withheldorgs', methods=['GET', 'POST'])
 def withheld_organizations():
     orgs = []
+    log_path = os.path.join('', 'log.txt')
+    log = Logger(log_path)
 
     with conn.cursor() as cur:
         cur.execute('SELECT id, name, type, withheld, parent_id from organizations ORDER BY id;')
@@ -465,6 +483,7 @@ def withheld_organizations():
             return 'OK'
         except Exception as e:
             print(e)
+            log(e)
             return 'ERROR', 500
 
     return render_template('withheldorgs.html', orgs=orgs)
@@ -675,9 +694,13 @@ def serve(config_path: str):
     global picture_path
     global file_storage_alias
 
+    log_path = os.path.join('', 'log.txt')
+    log = Logger(log_path)
+
     cfg = config.load(config_path)
     if not cfg:
         print('Error: Check config file')
+        log('Error: Check config file')
         sys.exit(-1)
 
     try:
@@ -690,6 +713,7 @@ def serve(config_path: str):
         )
     except Exception:
         print('Cannot connect to the database')
+        log('Cannot connect to the database')
         sys.exit(-1)
 
     picture_path = cfg.get('picturepath', picture_path)

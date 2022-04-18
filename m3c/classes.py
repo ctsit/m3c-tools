@@ -6,6 +6,7 @@ import re
 import textwrap
 
 from Bio import Entrez
+from m3c.logger import Logger
 
 
 MONTHS: List[str] = 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split()
@@ -442,11 +443,14 @@ class Tool(object):
     def match_authors(self, find_person: Callable[[str], int], namespace: str
                       ) -> List["Tool.Author"]:
         non_matched: List["Tool.Author"] = []
+        log_path = os.path.join('', 'log.txt')
+        log = Logger(log_path)
         for author in self.authors:
             person_id = find_person(author.name)
             if not person_id:
                 non_matched.append(author)
                 print(f'Unknown author "{author.name}" for tool: {self.tool_id}')
+                log(f'Unknown author "{author.name}" for tool: {self.tool_id}')
             else:
                 author.uri = Person.uri(namespace, str(person_id))
         return non_matched
@@ -650,6 +654,8 @@ def make_pub(citation: Citation) -> Publication:
 
 def parse_api(results: dict) -> Dict[str, Publication]:
     publications: Dict[str, Publication] = {}
+    log_path = os.path.join('', 'log.txt')
+    log = Logger(log_path)
 
     for article in results['PubmedArticle']:
         try:
@@ -662,6 +668,7 @@ def parse_api(results: dict) -> Dict[str, Publication]:
             citation = Citation(article)
             pmid = str(citation.check_key(['MedlineCitation', 'PMID']))
             print(f'Skipping publication {pmid}')
+            log(f'Skipping publication {pmid}')
             continue
 
     return publications
