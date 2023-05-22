@@ -32,7 +32,7 @@ setuptools.setup(
 
     install_requires=[
         "PyYAML>=5.4",
-        "requests==2.23.0",
+        "requests==2.31.0",
         "psycopg2-binary==2.8.5",
         "Flask==1.1.2",
         "biopython==1.76",
